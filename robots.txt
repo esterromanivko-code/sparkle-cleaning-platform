@@ -1,0 +1,17 @@
+# Sparkle — Cleaning Marketplace
+# https://sparkle.app
+
+User-agent: *
+Allow: /
+Allow: /app
+Allow: /blog
+
+# Keep API endpoints, admin, and auth pages out of search results
+Disallow: /api/
+Disallow: /admin/
+Disallow: /sparkle_full.html
+Disallow: /sparkle_landing.html
+Disallow: /sparkle_blog.html
+
+# Sitemap location
+Sitemap: https://sparkle.app/sitemap.xml

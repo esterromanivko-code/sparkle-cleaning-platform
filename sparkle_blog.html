@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="page-title">Sparkle Journal — Seattle's Cleaning Marketplace</title>
+<meta name="description" id="page-desc" content="Tips, guides and insights for home cleaning in Seattle.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✦</text></svg>">
+
+<!-- Non-blocking Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"></noscript>
+
+<style>
+/* ══ Design System ══ */
+:root {
+  --navy:    #0F172A;
+  --navy-lg: #1E293B;
+  --cream:   #F8F6F2;
+  --cream-d: #EDE9E0;
+  --sand:    #D6C7AE;
+  --gold:    #C9A227;
+  --gold-d:  #A07C1A;
+  --slate:   #475569;
+  --slate-l: #64748B;
+  --white:   #FFFFFF;
+
+  --r-sm:  10px;
+  --r-md:  16px;
+  --r-lg:  20px;
+  --r-xl:  28px;
+
+  --sh-sm: 0 2px 8px rgba(15,23,42,.07);
+  --sh-md: 0 6px 20px rgba(15,23,42,.09), 0 2px 8px rgba(15,23,42,.05);
+  --sh-lg: 0 16px 48px rgba(15,23,42,.13), 0 4px 16px rgba(15,23,42,.06);
+
+  --font-serif: 'Playfair Display', Georgia, serif;
+  --font-sans:  'Inter', system-ui, sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-sans);
+  background: var(--cream);
+  color: var(--navy);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; text-decoration: none; }
+img { display: block; max-width: 100%; }
+
+/* ══ Nav ══ */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(248,246,242,.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(214,199,174,.35);
+}
+.nav__inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.nav__logo {
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--navy);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.nav__logo-star { color: var(--gold); font-size: 1rem; }
+.nav__links {
+  display: flex;
+  list-style: none;
+  gap: 28px;
+}
+.nav__links a {
+  font-size: .875rem;
+  font-weight: 500;
+  color: var(--slate);
+  transition: color .2s;
+}
+.nav__links a:hover { color: var(--navy); }
+.nav__ctas { display: flex; align-items: center; gap: 12px; }
+.nav-login {
+  font-size: .875rem;
+  font-weight: 500;
+  color: var(--slate);
+  padding: 8px 16px;
+  border-radius: var(--r-sm);
+  transition: all .2s;
+}
+.nav-login:hover { background: rgba(71,85,105,.07); color: var(--navy); }
+.nav-book {
+  font-size: .875rem;
+  font-weight: 600;
+  background: var(--navy);
+  color: var(--cream) !important;
+  padding: 9px 20px;
+  border-radius: var(--r-sm);
+  transition: background .2s, transform .15s;
+}
+.nav-book:hover { background: var(--navy-lg); transform: translateY(-1px); }
+@media (max-width: 768px) {
+  .nav__links { display: none; }
+  .nav-login { display: none; }
+}
+
+/* ══ Container ══ */
+.container {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+.container--narrow {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ══ Blog index ══ */
+.blog-index { padding: 72px 0 96px; }
+.blog-index-header {
+  text-align: center;
+  margin-bottom: 56px;
+}
+.sec-label {
+  display: inline-block;
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 12px;
+}
+.h1 {
+  font-family: var(--font-serif);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--navy);
+}
+.h1 em { font-style: italic; color: var(--gold); }
+.index-sub {
+  font-size: 1.05rem;
+  color: var(--slate);
+  margin-top: 14px;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.blog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 28px;
+}
+.blog-card {
+  background: var(--white);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow: var(--sh-sm);
+  border: 1px solid rgba(214,199,174,.3);
+  transition: transform .25s, box-shadow .25s;
+  cursor: pointer;
+}
+.blog-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--sh-md);
+}
+.blog-thumb {
+  height: 180px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.blog-thumb-emoji { font-size: 3rem; }
+.blog-thumb-overlay {
+  position: absolute;
+  bottom: 12px;
+  left: 14px;
+}
+.blog-cat {
+  font-size: .7rem;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  background: rgba(255,255,255,.15);
+  backdrop-filter: blur(8px);
+  color: rgba(255,255,255,.9);
+  border: 1px solid rgba(255,255,255,.2);
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+.blog-body { padding: 22px 22px 26px; }
+.blog-title {
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--navy);
+  line-height: 1.35;
+  margin-bottom: 10px;
+}
+.blog-excerpt {
+  font-size: .875rem;
+  color: var(--slate);
+  line-height: 1.65;
+  margin-bottom: 18px;
+}
+.blog-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.blog-meta-ava {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--gold);
+  color: var(--white);
+  font-size: .65rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.blog-meta-author { font-size: .8rem; font-weight: 600; color: var(--navy); }
+.blog-meta-date { font-size: .78rem; color: var(--slate-l); margin-left: auto; }
+.blog-read {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--gold);
+  transition: gap .2s;
+}
+.blog-read:hover { gap: 10px; }
+
+/* ══ Article view ══ */
+.article-hero {
+  padding: 64px 0 0;
+}
+.article-hero-inner {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+.article-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .82rem;
+  font-weight: 500;
+  color: var(--slate);
+  margin-bottom: 32px;
+  transition: color .2s;
+}
+.article-back:hover { color: var(--navy); }
+.article-category {
+  display: inline-block;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--gold);
+  border: 1.5px solid rgba(201,162,39,.3);
+  padding: 4px 12px;
+  border-radius: 20px;
+  margin-bottom: 20px;
+}
+.article-title {
+  font-family: var(--font-serif);
+  font-size: clamp(1.75rem, 4vw, 2.75rem);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--navy);
+  margin-bottom: 18px;
+}
+.article-title em { font-style: italic; color: var(--gold); }
+.article-byline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid rgba(214,199,174,.4);
+  margin-bottom: 40px;
+}
+.article-ava {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold), var(--gold-d));
+  color: var(--white);
+  font-size: .78rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.article-author-name { font-size: .88rem; font-weight: 600; color: var(--navy); }
+.article-author-meta { font-size: .78rem; color: var(--slate-l); }
+
+/* Article banner image placeholder */
+.article-banner {
+  height: 300px;
+  border-radius: var(--r-xl);
+  margin-bottom: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4.5rem;
+}
+
+/* Article body typography */
+.article-body { padding: 0 0 80px; }
+.article-body .container--narrow {}
+.prose { font-size: 1.05rem; color: var(--navy); line-height: 1.85; }
+.prose h2 {
+  font-family: var(--font-serif);
+  font-size: 1.55rem;
+  font-weight: 600;
+  color: var(--navy);
+  margin: 44px 0 14px;
+  line-height: 1.3;
+}
+.prose h3 {
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 32px 0 10px;
+}
+.prose p { margin-bottom: 20px; }
+.prose ul, .prose ol { margin: 0 0 20px 24px; }
+.prose li { margin-bottom: 8px; line-height: 1.7; }
+.prose strong { font-weight: 600; color: var(--navy); }
+.prose em { font-style: italic; }
+.prose blockquote {
+  border-left: 3px solid var(--gold);
+  background: rgba(201,162,39,.06);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  padding: 18px 24px;
+  margin: 28px 0;
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  font-style: italic;
+  color: var(--slate);
+}
+.prose .tip-box {
+  background: var(--navy);
+  color: var(--cream);
+  border-radius: var(--r-md);
+  padding: 20px 24px;
+  margin: 28px 0;
+}
+.prose .tip-box strong { color: var(--gold); }
+.prose .tip-label {
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 8px;
+}
+.prose a { color: var(--gold); border-bottom: 1px solid rgba(201,162,39,.3); transition: border-color .2s; }
+.prose a:hover { border-color: var(--gold); }
+
+/* Article CTA */
+.article-cta {
+  background: var(--navy);
+  border-radius: var(--r-xl);
+  padding: 48px 40px;
+  text-align: center;
+  margin: 0 0 80px;
+}
+.article-cta-eyebrow {
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 14px;
+}
+.article-cta h3 {
+  font-family: var(--font-serif);
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: var(--cream);
+  margin-bottom: 12px;
+  line-height: 1.25;
+}
+.article-cta p {
+  font-size: .95rem;
+  color: rgba(248,246,242,.6);
+  margin-bottom: 28px;
+}
+.cta-btns {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-sans);
+  font-size: .875rem;
+  font-weight: 600;
+  padding: 12px 26px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: all .2s;
+  border: none;
+}
+.btn-primary {
+  background: var(--gold);
+  color: var(--navy);
+}
+.btn-primary:hover { background: #d4a82a; transform: translateY(-1px); }
+.btn-outline-light {
+  background: transparent;
+  color: var(--cream);
+  border: 1.5px solid rgba(248,246,242,.25);
+}
+.btn-outline-light:hover { background: rgba(248,246,242,.07); }
+
+/* More articles */
+.more-articles { padding: 0 0 80px; }
+.more-articles h3 {
+  font-family: var(--font-serif);
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--navy);
+  margin-bottom: 28px;
+}
+
+/* Footer */
+.footer {
+  background: var(--navy);
+  color: rgba(248,246,242,.55);
+  padding: 48px 0 32px;
+}
+.footer-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  border-top: 1px solid rgba(255,255,255,.07);
+  padding-top: 32px;
+}
+.footer-logo {
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--cream);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.footer-copy { font-size: .78rem; }
+.footer-links { display: flex; gap: 20px; }
+.footer-links a { font-size: .78rem; transition: color .2s; }
+.footer-links a:hover { color: var(--cream); }
+
+/* Hidden sections */
+.view { display: none; }
+.view.active { display: block; }
+</style>
+</head>
+<body>
+
+<!-- ══ Nav ══ -->
+<nav class="nav">
+  <div class="nav__inner">
+    <a href="sparkle_landing.html" class="nav__logo">
+      <span class="nav__logo-star">✦</span>Sparkle
+    </a>
+    <ul class="nav__links">
+      <li><a href="sparkle_landing.html#how-it-works">How It Works</a></li>
+      <li><a href="sparkle_landing.html#services">Services</a></li>
+      <li><a href="sparkle_landing.html#why-sparkle">Why Sparkle</a></li>
+      <li><a href="sparkle_blog.html">Journal</a></li>
+      <li><a href="sparkle_landing.html#contact">Contact</a></li>
+    </ul>
+    <div class="nav__ctas">
+      <a href="sparkle_full.html" class="nav-login">Log In</a>
+      <a href="sparkle_full.html?role=client" class="nav-book">Book a Cleaning</a>
+    </div>
+  </div>
+</nav>
+
+
+<!-- ══════════════════════════════════
+     BLOG INDEX (shown when no ?id=)
+══════════════════════════════════ -->
+<div id="view-index" class="view active">
+  <section class="blog-index">
+    <div class="container">
+      <div class="blog-index-header">
+        <span class="sec-label">Sparkle Journal</span>
+        <h1 class="h1">Tips, Guides &amp; <em>Insights</em></h1>
+        <p class="index-sub">Practical advice on home cleaning, how to get the most out of your cleaner, and what it takes to build a great reputation on Sparkle.</p>
+      </div>
+      <div class="blog-grid">
+
+        <a href="sparkle_blog.html?id=1" class="blog-card" style="text-decoration:none">
+          <div class="blog-thumb" style="background:linear-gradient(145deg,#0F172A,#1a3660)">
+            <span class="blog-thumb-emoji">🧹</span>
+            <div class="blog-thumb-overlay">
+              <span class="blog-cat">Cleaning Tips</span>
+            </div>
+          </div>
+          <div class="blog-body">
+            <div class="blog-title">5 Signs Your Home Is Overdue for a Deep Clean</div>
+            <p class="blog-excerpt">The "it smells fine" logic isn't always reliable. Here's how to tell when surface cleaning isn't actually cutting it anymore.</p>
+            <div class="blog-meta">
+              <div class="blog-meta-ava">SK</div>
+              <div class="blog-meta-author">Sparkle Team</div>
+              <div class="blog-meta-date">May 14, 2026</div>
+            </div>
+            <span class="blog-read">Read Article →</span>
+          </div>
+        </a>
+
+        <a href="sparkle_blog.html?id=2" class="blog-card" style="text-decoration:none">
+          <div class="blog-thumb" style="background:linear-gradient(145deg,#1c2a0f,#2d4a1a)">
+            <span class="blog-thumb-emoji">🏡</span>
+            <div class="blog-thumb-overlay">
+              <span class="blog-cat">Client Guide</span>
+            </div>
+          </div>
+          <div class="blog-body">
+            <div class="blog-title">How to Prepare for Your First Professional Cleaning</div>
+            <p class="blog-excerpt">Getting the most out of your cleaner starts before they arrive. A little prep goes a long way toward an exceptional result.</p>
+            <div class="blog-meta">
+              <div class="blog-meta-ava">SK</div>
+              <div class="blog-meta-author">Sparkle Team</div>
+              <div class="blog-meta-date">May 7, 2026</div>
+            </div>
+            <span class="blog-read">Read Article →</span>
+          </div>
+        </a>
+
+        <a href="sparkle_blog.html?id=3" class="blog-card" style="text-decoration:none">
+          <div class="blog-thumb" style="background:linear-gradient(145deg,#1a1200,#3a2900)">
+            <span class="blog-thumb-emoji">✦</span>
+            <div class="blog-thumb-overlay">
+              <span class="blog-cat">Behind the Platform</span>
+            </div>
+          </div>
+          <div class="blog-body">
+            <div class="blog-title">The Sparkle Standard: What Sets Our Cleaners Apart</div>
+            <p class="blog-excerpt">Every cleaner went through background checks, ID verification, and a skills screening. Here's exactly what that process looks like.</p>
+            <div class="blog-meta">
+              <div class="blog-meta-ava">SK</div>
+              <div class="blog-meta-author">Sparkle Team</div>
+              <div class="blog-meta-date">Apr 28, 2026</div>
+            </div>
+            <span class="blog-read">Read Article →</span>
+          </div>
+        </a>
+
+      </div>
+    </div>
+  </section>
+</div>
+
+
+<!-- ══════════════════════════════════
+     ARTICLE VIEW (shown when ?id= is set)
+══════════════════════════════════ -->
+<div id="view-article" class="view">
+
+  <!-- Article header -->
+  <section class="article-hero">
+    <div class="article-hero-inner">
+      <a href="sparkle_blog.html" class="article-back">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Back to Journal
+      </a>
+      <div id="article-category" class="article-category">Cleaning Tips</div>
+      <h1 class="article-title" id="article-title">Article Title</h1>
+      <div class="article-byline">
+        <div class="article-ava">SK</div>
+        <div>
+          <div class="article-author-name">Sparkle Team</div>
+          <div class="article-author-meta" id="article-date">May 14, 2026 · 5 min read</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Article body -->
+  <div class="article-body">
+    <div class="container--narrow">
+      <div class="article-banner" id="article-banner" style="background:linear-gradient(145deg,#0F172A,#1a3660)">🧹</div>
+      <div class="prose" id="article-prose">
+        <!-- Content injected by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="container--narrow">
+    <div class="article-cta">
+      <div class="article-cta-eyebrow">Ready to Experience It?</div>
+      <h3>Book a Cleaning in Minutes</h3>
+      <p>Post your job for free and receive competitive bids from verified Seattle cleaners — no calls, no guesswork.</p>
+      <div class="cta-btns">
+        <a href="sparkle_full.html?role=client" class="btn btn-primary">
+          Book a Cleaning
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+        <a href="sparkle_full.html?role=cleaner" class="btn btn-outline-light">Join as a Cleaner</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- More articles -->
+  <div class="container--narrow more-articles">
+    <h3>More from the Journal</h3>
+    <div class="blog-grid" id="more-articles-grid">
+      <!-- Injected by JS -->
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ══ Footer ══ -->
+<footer class="footer">
+  <div class="footer-inner">
+    <a href="sparkle_landing.html" class="footer-logo">
+      <span style="color:var(--gold)">✦</span> Sparkle
+    </a>
+    <div class="footer-copy">© 2026 Sparkle Cleaning Marketplace · Seattle, WA</div>
+    <div class="footer-links">
+      <a href="sparkle_landing.html#contact">Contact</a>
+      <a href="#">Privacy</a>
+      <a href="#">Terms</a>
+    </div>
+  </div>
+</footer>
+
+
+<script>
+// ══════════════════════════
+// ARTICLE DATA
+// ══════════════════════════
+const ARTICLES = {
+  1: {
+    id: 1,
+    title: '5 Signs Your Home Is Overdue for a Deep Clean',
+    category: 'Cleaning Tips',
+    date: 'May 14, 2026',
+    readTime: '6 min read',
+    banner: { bg: 'linear-gradient(145deg,#0F172A,#1a3660)', emoji: '🧹' },
+    prose: `
+      <p>We've all done it — a quick wipe of the counter, a run of the vacuum, and told ourselves the house is clean. And most of the time, that's perfectly fine. Maintenance cleaning keeps the everyday mess under control.</p>
+      <p>But there's a different kind of clean. A <strong>deep clean</strong> — the kind that goes behind the fridge, inside the oven, along the baseboards, inside the shower grout. And most homes need it far more often than they get it.</p>
+      <p>Here are five honest signs that your home has been going too long without one.</p>
+
+      <h2>1. The Smell Is "Off" — But You Can't Find the Source</h2>
+      <p>If guests sometimes comment that your home has an unusual smell, or you notice it yourself right after coming back from a trip, that's a telling sign. Odors build up in places you're not cleaning regularly: drains, garbage disposals, under appliances, inside upholstery, and even inside washing machines.</p>
+      <blockquote>"Your nose adapts to your home's smell within about 20 minutes of being inside. The best way to assess it honestly is to step out for an hour, then come back in cold."</blockquote>
+      <p>A deep clean targets all of these hidden odor sources in one session.</p>
+
+      <h2>2. You Don't Remember the Last Time You Cleaned Behind the Fridge</h2>
+      <p>If the answer is "I've never moved the fridge," that's a flag. Dust accumulation on the refrigerator coils can actually reduce the appliance's efficiency by up to 25%, and the floor underneath often develops grease residue, mold, and debris that no amount of standard mopping will reach.</p>
+      <div class="tip-box">
+        <div class="tip-label">Sparkle Pro Tip</div>
+        Behind appliances, inside the oven, and under the kitchen sink are the top three areas Sparkle cleaners report being most neglected during self-cleaning. They're also the areas that make the biggest difference when done.
+      </div>
+
+      <h2>3. Your Grout Has Changed Color</h2>
+      <p>Grout starts out light-colored. If the grout in your shower, kitchen backsplash, or bathroom floor has gone grey, brown, or black, that's a combination of mildew, mineral deposits, and built-up soap scum. Regular mopping doesn't fix this — it needs a proper scrub with a grout brush and the right cleaner.</p>
+      <p>Left too long, darkened grout becomes a permanent discoloration. Professional cleaners catch it while it can still be reversed.</p>
+
+      <h2>4. Cleaning Takes Longer Than It Should</h2>
+      <p>If your weekly clean is consistently taking longer than 90 minutes for an average-sized home, it's usually because there's a backlog of buildup that's compounding. Each week, the "base layer" of grime is slightly thicker, making everything harder to remove.</p>
+      <p>A single deep clean resets that baseline. Weekly maintenance after that becomes much faster and easier — often half the time.</p>
+
+      <h2>5. You're Having Guests Over and You're Anxious About It</h2>
+      <p>This one's the most honest signal. If you find yourself pre-apologizing for your home, or if you close certain doors when guests come by, that instinct is telling you something. Your home doesn't have to be spotless — but it should feel like yours to be proud of.</p>
+      <p>One deep clean before guests arrive can change how you feel about your space for months afterward.</p>
+
+      <h2>So How Often Should You Deep Clean?</h2>
+      <p>Most cleaning professionals recommend a full deep clean <strong>2–4 times per year</strong>, with standard maintenance cleaning in between. If you have pets, allergies, or kids, lean toward the more frequent end.</p>
+      <p>On Sparkle, you can post a job in under two minutes, receive competitive bids from background-checked cleaners, and have it done this week — without a single phone call. <a href="sparkle_full.html?role=client">Post your first job here →</a></p>
+    `
+  },
+
+  2: {
+    id: 2,
+    title: 'How to Prepare for Your First Professional Cleaning',
+    category: 'Client Guide',
+    date: 'May 7, 2026',
+    readTime: '5 min read',
+    banner: { bg: 'linear-gradient(145deg,#1c2a0f,#2d4a1a)', emoji: '🏡' },
+    prose: `
+      <p>You've booked your first professional cleaning. It's the right call — there's a meaningful difference between how a professional cleans and how most of us clean ourselves, even when we're being thorough.</p>
+      <p>But like most services, you get the best results when both sides prepare well. Here's exactly what to do before your cleaner arrives — and a few things not to do.</p>
+
+      <h2>Before Your Cleaner Arrives</h2>
+
+      <h3>Declutter surfaces — but don't clean them</h3>
+      <p>Your cleaner's job is to clean, not to organize. If countertops and tables are covered in mail, dishes, kids' toys, or random items, they'll spend time moving those instead of actually cleaning. <strong>Clear the surfaces you want cleaned</strong> — put items away, stack dishes in the sink, and make the actual surfaces accessible.</p>
+      <p>Do <em>not</em>, however, pre-clean those surfaces. Let the cleaner tackle the actual grime — that's what they're trained for and what you're paying them to do.</p>
+
+      <h3>Secure pets</h3>
+      <p>Even friendly dogs and cats can slow down a cleaning significantly. Some cleaners are comfortable with pets; others aren't. More practically, a dog that wants to follow someone room to room, or a cat that bolts outside when a door opens, creates real delays.</p>
+      <p>The safest approach: put pets in a room that isn't being cleaned, or ask a family member to take them out for the duration of the visit.</p>
+
+      <div class="tip-box">
+        <div class="tip-label">Communication tip</div>
+        Leave a note or message your cleaner through the Sparkle platform if there are specific areas you want prioritized, or anything they should know before arriving (parking situation, building entry codes, rooms to skip). The more specific you are, the better the result.
+      </div>
+
+      <h3>Be specific about what you want</h3>
+      <p>A standard clean includes most surfaces, floors, bathrooms, and kitchen. A deep clean goes further — inside the oven, behind appliances, inside the refrigerator, windows. When posting your job on Sparkle, describe what you actually want. Cleaners bid based on that description, so accuracy gets you accurate pricing.</p>
+
+      <h3>Make sure there's access to cleaning supplies — or specify they'll bring their own</h3>
+      <p>Many Sparkle cleaners bring their own professional-grade supplies. If you have preferred products (especially important for allergies, sensitivities, or delicate surfaces), mention this in your job description or message your cleaner directly. Don't assume either way — just confirm beforehand.</p>
+
+      <h2>During the Clean</h2>
+      <p>You don't need to be home while your cleaner works — many clients aren't. If you are home, the best thing you can do is simply stay out of the rooms being cleaned and let them do their job efficiently.</p>
+      <p>If you notice something being missed, it's perfectly fine to politely mention it. Good cleaners appreciate feedback in the moment, not in a negative review afterward.</p>
+
+      <h2>After</h2>
+      <p>Walk through and check the work before your cleaner leaves if possible. This is the right time to flag anything that needs touching up — not hours later. Sparkle cleaners want you to be happy, and a quick walk-through takes less than five minutes.</p>
+      <p>Leave an honest review. Star ratings and written feedback are how cleaners build their reputation on the platform, and how other clients make informed choices. Your feedback matters.</p>
+
+      <h2>Ready to Book?</h2>
+      <p>Post a job on Sparkle in under two minutes. It's free to post — you only pay when you choose a cleaner. <a href="sparkle_full.html?role=client">Book your first cleaning →</a></p>
+    `
+  },
+
+  3: {
+    id: 3,
+    title: 'The Sparkle Standard: What Sets Our Cleaners Apart',
+    category: 'Behind the Platform',
+    date: 'Apr 28, 2026',
+    readTime: '7 min read',
+    banner: { bg: 'linear-gradient(145deg,#1a1200,#3a2900)', emoji: '✦' },
+    prose: `
+      <p>When we built Sparkle, we made a clear decision: we wouldn't be the platform that lets anyone sign up and start taking jobs. We'd be the platform where clients could trust the person they were letting into their home.</p>
+      <p>That commitment shows up in what we call the <strong>Sparkle Standard</strong> — a set of requirements every cleaner goes through before they can accept their first booking. Here's exactly what that process looks like.</p>
+
+      <h2>Step 1: Identity Verification</h2>
+      <p>Every cleaner on Sparkle goes through Stripe Identity verification — the same identity infrastructure used by financial institutions and major platforms. This involves submitting a government-issued ID (driver's license, passport, or ID card) and a live selfie that's checked against the document using biometric matching.</p>
+      <p>This means the person you booked is the person who shows up. Not a borrowed identity, not a stock profile photo.</p>
+
+      <h2>Step 2: Criminal Background Check</h2>
+      <p>After identity is confirmed, each cleaner goes through a full background check powered by Checkr, one of the most trusted background check providers in the gig economy. This covers:</p>
+      <ul>
+        <li>National criminal database search</li>
+        <li>County courthouse records (current and past counties of residence)</li>
+        <li>Sex offender registry search</li>
+        <li>Terrorist watchlist check</li>
+      </ul>
+      <p>The background check is conducted at the cleaner's own expense — a $30 fee they pay during onboarding. This is intentional. It signals seriousness and commitment before they've taken a single job.</p>
+
+      <div class="tip-box">
+        <div class="tip-label">Why the cleaner pays for it</div>
+        Some platforms absorb the background check cost as a signup incentive. We chose not to, for a specific reason: the cleaners who are willing to pay a $30 fee upfront are the ones who are serious about building a real business. It self-selects for the right people.
+      </div>
+
+      <h2>Step 3: The Verified Badge</h2>
+      <p>Once both identity verification and the criminal background check return clear results, the cleaner receives a <strong>Sparkle Verified</strong> badge on their profile. This badge is visible to every client during the bidding process.</p>
+      <p>Badges don't expire automatically, but Sparkle reviews them annually and can revoke them if a cleaner's status changes. Cleaners whose checks expire are required to re-verify before continuing to accept bookings.</p>
+
+      <blockquote>"Every person you let into your home through Sparkle went through the same vetting process. That's not a checkbox — it's the baseline."</blockquote>
+
+      <h2>Step 4: Reputation Over Time</h2>
+      <p>Verification covers the baseline. But the cleaner's ongoing rating tells you even more. Every Sparkle job ends with a rating from the client — and those ratings are aggregated publicly on the cleaner's profile. You can see:</p>
+      <ul>
+        <li>Their overall star rating (out of 5)</li>
+        <li>Total number of jobs completed</li>
+        <li>Review text from previous clients</li>
+        <li>Response rate and average response time</li>
+      </ul>
+      <p>A cleaner with a 4.9 rating over 80+ jobs has built that reputation job by job. No platform can fake that track record.</p>
+
+      <h2>What Happens If a Problem Occurs?</h2>
+      <p>Despite our vetting process, things occasionally go wrong — a missed area, a broken item, a miscommunication. Sparkle's payment structure is designed to protect you when that happens.</p>
+      <p><strong>Payment is held in escrow</strong> until the job is complete and you're satisfied. If there's a dispute, you can flag it before funds are released, and our support team reviews it. No other cleaning platform in Seattle does this.</p>
+
+      <h2>A Note on Cleaners Who Don't Have the Badge</h2>
+      <p>You may occasionally see cleaner profiles without the Verified badge — these are cleaners who have recently joined and are in the process of completing their background check. You're free to hire them, but we recommend waiting for the badge if trust is your top priority.</p>
+      <p>We're transparent about this distinction rather than hiding it, because we think you deserve to make an informed choice.</p>
+
+      <h2>Ready to Book a Verified Cleaner?</h2>
+      <p>Post your job on Sparkle — it's free and takes under two minutes. You'll receive bids from verified professionals, and you choose who you hire. <a href="sparkle_full.html?role=client">Post a cleaning job →</a></p>
+    `
+  }
+};
+
+// ══════════════════════════
+// ROUTING LOGIC
+// ══════════════════════════
+function init() {
+  const params = new URLSearchParams(window.location.search);
+  const id = parseInt(params.get('id'), 10);
+
+  if (id && ARTICLES[id]) {
+    showArticle(id);
+  } else {
+    showIndex();
+  }
+}
+
+function showIndex() {
+  document.getElementById('view-index').classList.add('active');
+  document.getElementById('view-article').classList.remove('active');
+  document.title = 'Sparkle Journal — Tips, Guides & Insights';
+}
+
+function showArticle(id) {
+  const article = ARTICLES[id];
+  if (!article) { showIndex(); return; }
+
+  document.getElementById('view-index').classList.remove('active');
+  document.getElementById('view-article').classList.add('active');
+
+  // Update meta
+  document.title = article.title + ' — Sparkle Journal';
+  const metaDesc = document.getElementById('page-desc');
+  if (metaDesc) metaDesc.setAttribute('content', article.title);
+
+  // Populate header
+  document.getElementById('article-category').textContent = article.category;
+  document.getElementById('article-title').textContent = article.title;
+  document.getElementById('article-date').textContent = article.date + ' · ' + article.readTime;
+
+  // Banner
+  const banner = document.getElementById('article-banner');
+  banner.style.background = article.banner.bg;
+  banner.textContent = article.banner.emoji;
+
+  // Prose
+  document.getElementById('article-prose').innerHTML = article.prose;
+
+  // More articles
+  const grid = document.getElementById('more-articles-grid');
+  grid.innerHTML = Object.values(ARTICLES)
+    .filter(a => a.id !== id)
+    .map(a => `
+      <a href="sparkle_blog.html?id=${a.id}" class="blog-card" style="text-decoration:none">
+        <div class="blog-thumb" style="background:${a.banner.bg}">
+          <span class="blog-thumb-emoji">${a.banner.emoji}</span>
+          <div class="blog-thumb-overlay">
+            <span class="blog-cat">${a.category}</span>
+          </div>
+        </div>
+        <div class="blog-body">
+          <div class="blog-title">${a.title}</div>
+          <p class="blog-excerpt">${Object.values(a.prose.match(/^<p>(.*?)<\/p>/m) || ['',''])[1] || ''}</p>
+          <div class="blog-meta">
+            <div class="blog-meta-ava">SK</div>
+            <div class="blog-meta-author">Sparkle Team</div>
+            <div class="blog-meta-date">${a.date}</div>
+          </div>
+          <span class="blog-read">Read Article →</span>
+        </div>
+      </a>
+    `).join('');
+
+  // Scroll to top
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Run on load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+</script>
+</body>
+</html>
