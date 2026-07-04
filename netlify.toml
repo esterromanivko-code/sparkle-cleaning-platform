@@ -1,0 +1,47 @@
+[build]
+  publish = "."
+
+# ── Force HTTPS ───────────────────────────────────────────────────────────────
+[[redirects]]
+  from  = "http://sparkle.app/*"
+  to    = "https://sparkle.app/:splat"
+  status = 301
+  force  = true
+
+# ── Security headers on every response ───────────────────────────────────────
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+    Permissions-Policy = "geolocation=(self), camera=(), microphone=()"
+    X-XSS-Protection = "1; mode=block"
+
+# Serve sparkle_full.html at /app for a cleaner URL
+[[redirects]]
+  from = "/app"
+  to = "/sparkle_full.html"
+  status = 200
+
+[[redirects]]
+  from = "/blog"
+  to = "/sparkle_blog.html"
+  status = 200
+
+[[redirects]]
+  from = "/"
+  to = "/sparkle_landing.html"
+  status = 200
+
+# ── Block internal docs/archives from being served publicly ──────────────────
+[[redirects]]
+  from = "/*.md"
+  to = "/sparkle_landing.html"
+  status = 404
+
+[[redirects]]
+  from = "/*.zip"
+  to = "/sparkle_landing.html"
+  status = 404

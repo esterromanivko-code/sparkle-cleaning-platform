@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Sparkle — Seattle's Cleaning Marketplace</title>
+<meta name="description" content="Seattle's most trusted cleaning marketplace. Post a job, receive bids from background-checked professionals, and book in minutes. Satisfaction guaranteed.">
+<meta name="keywords" content="cleaning service Seattle, house cleaning, maid service, deep clean, recurring cleaning, background checked cleaners">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#1D9E75">
+
+<!-- Open Graph (Facebook, LinkedIn, iMessage previews) -->
+<meta property="og:title" content="Sparkle — Seattle's Cleaning Marketplace">
+<meta property="og:description" content="Book Seattle's top cleaning professionals. Background-checked, insured, and satisfaction guaranteed.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sparkle.app/">
+<meta property="og:image" content="https://sparkle.app/og-image.png">
+<meta property="og:locale" content="en_US">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Sparkle — Seattle's Cleaning Marketplace">
+<meta name="twitter:description" content="Book Seattle's top cleaning professionals. Background-checked, insured, and satisfaction guaranteed.">
+<meta name="twitter:image" content="https://sparkle.app/og-image.png">
+
+<!-- Canonical URL -->
+<link rel="canonical" href="https://sparkle.app/">
+
+<!-- Favicon -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✦</text></svg>">
+
+<!-- JSON-LD Schema Markup — helps Google understand your business -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "LocalBusiness",
+  "name": "Sparkle Cleaning Marketplace",
+  "description": "Seattle's trusted cleaning marketplace. Post a job, receive bids from background-checked professionals, and book in minutes.",
+  "url": "https://sparkle.app",
+  "logo": "https://sparkle.app/og-image.png",
+  "foundingDate": "2026",
+  "areaServed": {
+    "@type": "City",
+    "name": "Seattle"
+  },
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Seattle",
+    "addressRegion": "WA",
+    "addressCountry": "US"
+  },
+  "contactPoint": {
+    "@type": "ContactPoint",
+    "contactType": "customer service",
+    "email": "support@sparkle.app"
+  },
+  "sameAs": [],
+  "offers": {
+    "@type": "AggregateOffer",
+    "name": "Professional Cleaning Services",
+    "description": "Standard cleans, deep cleans, move-in/out, recurring plans"
+  }
+}
+</script>
+
+<!-- Non-blocking Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"></noscript>
+
+<style>
+/* ═══════════════════════════════════════
+   DESIGN SYSTEM
+═══════════════════════════════════════ */
+:root {
+  --navy:     #0F172A;
+  --navy-lg:  #1E293B;
+  --navy-md:  #243044;
+  --cream:    #F8F6F2;
+  --cream-d:  #EDE9E0;
+  --sand:     #D6C7AE;
+  --sand-d:   #C4AF95;
+  --gold:     #C9A227;
+  --gold-d:   #A07C1A;
+  --gold-l:   #DEB84A;
+  --slate:    #475569;
+  --slate-l:  #64748B;
+  --white:    #FFFFFF;
+  --green:    #4ADE80;
+
+  --r-xs:  6px;
+  --r-sm:  10px;
+  --r-md:  16px;
+  --r-lg:  20px;
+  --r-xl:  28px;
+  --r-2xl: 36px;
+
+  --sh-xs: 0 1px 2px rgba(15,23,42,.05);
+  --sh-sm: 0 2px 8px rgba(15,23,42,.07), 0 1px 3px rgba(15,23,42,.04);
+  --sh-md: 0 6px 20px rgba(15,23,42,.09), 0 2px 8px rgba(15,23,42,.05);
+  --sh-lg: 0 16px 48px rgba(15,23,42,.13), 0 4px 16px rgba(15,23,42,.06);
+  --sh-xl: 0 28px 72px rgba(15,23,42,.18), 0 8px 24px rgba(15,23,42,.08);
+
+  --gold-glow: 0 4px 20px rgba(201,162,39,.3);
+  --serif: 'Playfair Display', Georgia, serif;
+  --sans:  'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* ── Reset ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;font-size:16px}
+body{font-family:var(--sans);color:var(--navy);background:var(--cream);line-height:1.6;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+img{max-width:100%;display:block}
+a{text-decoration:none;color:inherit}
+button{cursor:pointer;border:none;background:none;font-family:inherit}
+ul{list-style:none}
+
+/* ── Typography ── */
+.display{font-family:var(--serif);font-size:clamp(2.6rem,5.5vw,4.75rem);line-height:1.08;font-weight:700;letter-spacing:-.025em}
+.h1{font-family:var(--serif);font-size:clamp(2rem,4vw,3.5rem);line-height:1.12;font-weight:600;letter-spacing:-.02em}
+.h2{font-family:var(--serif);font-size:clamp(1.75rem,3vw,2.75rem);line-height:1.2;font-weight:600;letter-spacing:-.015em}
+.h3{font-family:var(--serif);font-size:clamp(1.25rem,2vw,1.625rem);line-height:1.3;font-weight:500}
+.lead{font-size:clamp(1rem,1.5vw,1.125rem);line-height:1.75;color:var(--slate);font-weight:400}
+
+/* ── Layout ── */
+.container{max-width:1180px;margin:0 auto;padding:0 28px}
+.section{padding:104px 0}
+.section--sm{padding:68px 0}
+.sec-label{display:inline-block;color:var(--gold);font-size:.7rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin-bottom:14px}
+.sec-title{margin-bottom:18px}
+.sec-sub{max-width:560px;color:var(--slate);line-height:1.75;margin-bottom:52px}
+.text-center{text-align:center}
+.text-cream{color:var(--cream)}
+.text-gold{color:var(--gold)}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:14px 28px;border-radius:var(--r-md);font-family:var(--sans);font-size:.9375rem;font-weight:600;transition:all .2s ease;white-space:nowrap;cursor:pointer}
+.btn-primary{background:var(--gold);color:var(--navy);box-shadow:var(--gold-glow)}
+.btn-primary:hover{background:var(--gold-l);transform:translateY(-2px);box-shadow:0 8px 28px rgba(201,162,39,.4)}
+.btn-outline-light{background:transparent;color:var(--cream);border:1.5px solid rgba(248,246,242,.28)}
+.btn-outline-light:hover{border-color:rgba(248,246,242,.55);background:rgba(248,246,242,.07);transform:translateY(-1px)}
+.btn-outline-dark{background:transparent;color:var(--navy);border:1.5px solid rgba(15,23,42,.18)}
+.btn-outline-dark:hover{border-color:var(--gold);color:var(--gold-d);transform:translateY(-1px)}
+
+/* ── Scroll Reveal ── */
+.reveal{opacity:0;transform:translateY(22px);transition:opacity .65s ease,transform .65s ease}
+.reveal.visible{opacity:1;transform:none}
+.reveal-left{opacity:0;transform:translateX(-24px);transition:opacity .65s ease,transform .65s ease}
+.reveal-left.visible{opacity:1;transform:none}
+.reveal-right{opacity:0;transform:translateX(24px);transition:opacity .65s ease,transform .65s ease}
+.reveal-right.visible{opacity:1;transform:none}
+
+/* ═══════════════════════════════════════
+   NAVIGATION
+═══════════════════════════════════════ */
+.nav{position:fixed;top:0;left:0;right:0;z-index:200;padding:0 28px;transition:all .3s ease}
+.nav.scrolled{background:rgba(15,23,42,.96);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 1px 0 rgba(255,255,255,.07)}
+.nav__inner{max-width:1180px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:72px}
+.nav__logo{display:flex;align-items:center;gap:9px;font-family:var(--serif);font-size:1.5rem;font-weight:700;color:var(--cream);letter-spacing:-.01em}
+.nav__logo-star{color:var(--gold);font-size:1.1rem;transition:transform .3s}
+.nav__logo:hover .nav__logo-star{transform:rotate(30deg) scale(1.2)}
+.nav__links{display:flex;align-items:center;gap:34px}
+.nav__links a{color:rgba(248,246,242,.7);font-size:.875rem;font-weight:500;transition:color .2s;position:relative}
+.nav__links a::after{content:'';position:absolute;bottom:-3px;left:0;width:0;height:1.5px;background:var(--gold);transition:width .25s ease;border-radius:2px}
+.nav__links a:hover{color:var(--cream)}
+.nav__links a:hover::after{width:100%}
+.nav__ctas{display:flex;align-items:center;gap:10px}
+.nav-login{padding:10px 18px;color:rgba(248,246,242,.75);font-size:.875rem;font-weight:500;border-radius:var(--r-sm);transition:all .2s}
+.nav-login:hover{color:var(--cream);background:rgba(255,255,255,.06)}
+.nav-book{background:var(--gold);color:var(--navy);padding:10px 22px;border-radius:var(--r-sm);font-size:.875rem;font-weight:700;box-shadow:0 2px 10px rgba(201,162,39,.3);transition:all .2s}
+.nav-book:hover{background:var(--gold-l);transform:translateY(-1px);box-shadow:var(--gold-glow)}
+.nav__burger{display:none;color:var(--cream);padding:6px}
+
+/* Mobile drawer */
+.nav__drawer{display:none;position:fixed;inset:0;top:72px;background:var(--navy);z-index:199;padding:28px;flex-direction:column;gap:0;overflow-y:auto}
+.nav__drawer.open{display:flex}
+.nav__drawer a{display:block;padding:16px 0;color:rgba(248,246,242,.8);font-size:1.0625rem;font-weight:500;border-bottom:1px solid rgba(255,255,255,.06);transition:color .2s}
+.nav__drawer a:hover{color:var(--cream)}
+.nav__drawer-ctas{display:flex;flex-direction:column;gap:12px;padding-top:28px}
+
+/* ═══════════════════════════════════════
+   HERO
+═══════════════════════════════════════ */
+.hero{position:relative;overflow:hidden;min-height:100vh;background:var(--navy);display:flex;align-items:center}
+
+/* Layered background — gradient orbs */
+.hero__bg{position:absolute;inset:0;pointer-events:none}
+.hero__bg::before{content:'';position:absolute;top:-10%;right:-5%;width:65%;height:90%;background:radial-gradient(ellipse at center,rgba(201,162,39,.13) 0%,transparent 65%);animation:glow1 14s ease-in-out infinite alternate}
+.hero__bg::after{content:'';position:absolute;bottom:-20%;left:-5%;width:55%;height:80%;background:radial-gradient(ellipse at center,rgba(214,199,174,.07) 0%,transparent 60%);animation:glow2 18s ease-in-out infinite alternate}
+@keyframes glow1{0%{opacity:.6;transform:scale(1)}100%{opacity:1;transform:scale(1.08)}}
+@keyframes glow2{0%{opacity:.4;transform:scale(1)}100%{opacity:.8;transform:scale(1.12)}}
+
+/* Subtle dot grid */
+.hero__dots{position:absolute;inset:0;background-image:radial-gradient(rgba(248,246,242,.055) 1px,transparent 1px);background-size:36px 36px;pointer-events:none}
+
+.hero__wrap{position:relative;z-index:2;max-width:1180px;margin:0 auto;padding:128px 28px 88px;display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:center}
+.hero__eyebrow{display:inline-flex;align-items:center;gap:9px;background:rgba(201,162,39,.1);border:1px solid rgba(201,162,39,.22);color:var(--gold);font-size:.7rem;font-weight:700;letter-spacing:.13em;text-transform:uppercase;padding:6px 14px;border-radius:100px;margin-bottom:24px}
+.hero__dot{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:pulse 2.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(1.4)}}
+.hero__title{color:var(--cream);margin-bottom:22px}
+.hero__title em{font-style:normal;color:var(--gold)}
+.hero__sub{color:rgba(248,246,242,.62);max-width:490px;margin-bottom:40px;font-size:1.0625rem;line-height:1.78}
+.hero__ctas{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:52px}
+.hero__trust{display:flex;flex-wrap:wrap;gap:22px}
+.trust-item{display:flex;align-items:center;gap:7px;color:rgba(248,246,242,.5);font-size:.8125rem;font-weight:500}
+.trust-item svg{color:var(--gold);flex-shrink:0}
+
+/* Hero card — mockup UI */
+.hero__visual{position:relative;display:flex;justify-content:flex-end}
+.hero__card-wrap{position:relative;width:100%;max-width:420px}
+
+.hcard{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-radius:var(--r-xl);padding:26px;box-shadow:var(--sh-lg)}
+.hcard-float{position:absolute;background:rgba(18,30,52,.92);border:1px solid rgba(255,255,255,.1);border-radius:var(--r-lg);padding:14px 18px;box-shadow:var(--sh-xl);z-index:3}
+.hcard-float.t{top:-20px;right:-16px;min-width:178px}
+.hcard-float.b{bottom:-20px;left:-16px;min-width:200px}
+.hf-label{font-size:.65rem;color:rgba(248,246,242,.4);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
+.hf-val{font-size:1.2rem;font-weight:700;color:var(--cream);font-family:var(--serif)}
+.hf-sub{font-size:.7rem;color:rgba(248,246,242,.4);margin-top:2px}
+.hf-green{color:var(--green)}
+
+.hlive{display:inline-flex;align-items:center;gap:6px;background:rgba(201,162,39,.14);color:var(--gold);font-size:.65rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;padding:4px 10px;border-radius:100px;margin-bottom:12px}
+.hjob-title{font-family:var(--serif);font-size:1rem;color:var(--cream);margin-bottom:2px}
+.hjob-sub{font-size:.75rem;color:rgba(248,246,242,.4);margin-bottom:16px}
+
+.hbid{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.07)}
+.hbid:last-of-type{border-bottom:none}
+.hava{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;color:var(--navy);flex-shrink:0}
+.hava-1{background:linear-gradient(135deg,var(--sand),var(--gold))}
+.hava-2{background:linear-gradient(135deg,#64748B,#475569);color:var(--cream)}
+.hbid-info{flex:1}
+.hbid-name{font-size:.8rem;font-weight:600;color:var(--cream)}
+.hbid-stars{font-size:.68rem;color:var(--gold)}
+.hbid-sub{font-size:.68rem;color:rgba(248,246,242,.35)}
+.hbid-price{font-size:.9rem;font-weight:700;color:var(--cream)}
+.hstep{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.hstep:last-child{border-bottom:none}
+.hstep-num{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;flex-shrink:0}
+.hstep-num.done{background:rgba(74,222,128,.15);color:var(--green)}
+.hstep-num.active{background:rgba(201,162,39,.15);color:var(--gold)}
+.hstep-text{font-size:.78rem;color:rgba(248,246,242,.72)}
+.hstep-meta{font-size:.67rem;color:rgba(248,246,242,.35)}
+
+/* ═══════════════════════════════════════
+   STATS BAND
+═══════════════════════════════════════ */
+.stats-band{background:var(--navy-lg);padding:52px 0}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;text-align:center}
+.stat-num{font-family:var(--serif);font-size:clamp(1.9rem,3vw,2.75rem);font-weight:700;color:var(--cream);line-height:1}
+.stat-num span{color:var(--gold)}
+.stat-label{font-size:.8rem;color:rgba(248,246,242,.45);margin-top:6px;letter-spacing:.03em}
+.stats-band .stat-divider{display:none}
+@media(min-width:641px){.stats-band .stat-divider{display:block;width:1px;height:48px;background:rgba(255,255,255,.08);margin:auto}}
+
+/* ═══════════════════════════════════════
+   HOW IT WORKS
+═══════════════════════════════════════ */
+.how{background:var(--cream)}
+.how-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;position:relative}
+/* Dashed connector line between steps */
+.how-grid::before{content:'';position:absolute;top:44px;left:calc(16.67% + 26px);right:calc(16.67% + 26px);height:1px;background:repeating-linear-gradient(90deg,var(--sand) 0,var(--sand) 6px,transparent 6px,transparent 14px);pointer-events:none}
+.how-card{background:var(--white);border-radius:var(--r-xl);padding:38px 32px;box-shadow:var(--sh-sm);position:relative;transition:transform .25s,box-shadow .25s;border:1px solid transparent}
+.how-card:hover{transform:translateY(-5px);box-shadow:var(--sh-md);border-color:rgba(201,162,39,.18)}
+.how-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--r-xl) var(--r-xl) 0 0;background:linear-gradient(90deg,var(--gold),var(--sand))}
+.how-num{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,rgba(201,162,39,.14),rgba(214,199,174,.18));border:1.5px solid rgba(201,162,39,.22);color:var(--gold);font-family:var(--serif);font-size:1.25rem;font-weight:700;display:flex;align-items:center;justify-content:center;margin-bottom:20px}
+.how-title{font-family:var(--serif);font-size:1.2rem;font-weight:600;margin-bottom:10px;color:var(--navy)}
+.how-desc{font-size:.875rem;color:var(--slate);line-height:1.68}
+
+/* ═══════════════════════════════════════
+   SERVICES
+═══════════════════════════════════════ */
+.services{background:var(--cream-d)}
+.services-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+.svc-card{background:var(--white);border-radius:var(--r-lg);padding:30px;border:1px solid transparent;box-shadow:var(--sh-xs);transition:all .25s}
+.svc-card:hover{border-color:rgba(201,162,39,.2);box-shadow:var(--sh-md);transform:translateY(-3px)}
+.svc-icon{width:48px;height:48px;border-radius:var(--r-sm);background:linear-gradient(135deg,rgba(201,162,39,.1),rgba(214,199,174,.14));display:flex;align-items:center;justify-content:center;font-size:1.25rem;margin-bottom:16px}
+.svc-name{font-family:var(--serif);font-size:1.075rem;font-weight:600;margin-bottom:8px;color:var(--navy)}
+.svc-desc{font-size:.845rem;color:var(--slate);line-height:1.65}
+.svc-badge{display:inline-block;margin-top:14px;font-size:.675rem;font-weight:700;color:var(--gold-d);background:rgba(201,162,39,.09);padding:3px 10px;border-radius:100px;letter-spacing:.06em;text-transform:uppercase}
+
+/* ═══════════════════════════════════════
+   WHY SPARKLE
+═══════════════════════════════════════ */
+.why{background:var(--navy)}
+.why .sec-label{color:var(--sand)}
+.why .sec-title{color:var(--cream)}
+.why .sec-sub{color:rgba(248,246,242,.5)}
+.why-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.why-card{background:rgba(248,246,242,.04);border:1px solid rgba(248,246,242,.08);border-radius:var(--r-lg);padding:30px;transition:all .25s}
+.why-card:hover{background:rgba(248,246,242,.07);border-color:rgba(201,162,39,.2)}
+.why-icon{font-size:1.75rem;margin-bottom:14px;display:block}
+.why-title{font-family:var(--serif);font-size:1.075rem;font-weight:600;color:var(--cream);margin-bottom:8px}
+.why-desc{font-size:.855rem;color:rgba(248,246,242,.48);line-height:1.68}
+
+/* ═══════════════════════════════════════
+   TESTIMONIALS
+═══════════════════════════════════════ */
+.testimonials{background:var(--cream)}
+.testi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
+.testi-card{background:var(--white);border-radius:var(--r-xl);padding:34px 30px;box-shadow:var(--sh-md);position:relative;overflow:hidden;transition:transform .25s,box-shadow .25s}
+.testi-card:hover{transform:translateY(-4px);box-shadow:var(--sh-lg)}
+.testi-card::before{content:'\201C';position:absolute;top:-12px;right:20px;font-family:var(--serif);font-size:8rem;color:rgba(201,162,39,.08);line-height:1;font-weight:700;pointer-events:none}
+.testi-stars{color:var(--gold);font-size:.875rem;letter-spacing:2px;margin-bottom:14px}
+.testi-quote{font-size:.9125rem;color:var(--slate);line-height:1.74;margin-bottom:22px;font-style:italic}
+.testi-author{display:flex;align-items:center;gap:12px}
+.testi-ava{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,var(--sand),var(--cream-d));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.8rem;color:var(--slate);flex-shrink:0}
+.testi-name{font-weight:600;font-size:.855rem;color:var(--navy)}
+.testi-role{font-size:.74rem;color:var(--slate-l);margin-top:2px}
+
+/* ═══════════════════════════════════════
+   FOR CLEANERS CTA
+═══════════════════════════════════════ */
+.cleaners{background:var(--navy-lg);position:relative;overflow:hidden}
+.cleaners::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 55% 85% at 85% 50%,rgba(201,162,39,.1) 0%,transparent 60%);pointer-events:none}
+.cleaners-inner{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center}
+.cleaners .sec-label{color:var(--sand)}
+.cleaners .sec-title{color:var(--cream)}
+.cleaners-features{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:28px}
+.cf-item{display:flex;align-items:flex-start;gap:9px}
+.cf-check{width:20px;height:20px;border-radius:50%;background:rgba(201,162,39,.12);border:1px solid rgba(201,162,39,.28);color:var(--gold);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;font-size:.6rem}
+.cf-text{font-size:.855rem;color:rgba(248,246,242,.62);line-height:1.5}
+.cleaners-stats{display:flex;flex-direction:column;gap:20px}
+.cs-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:var(--r-lg);padding:22px 26px}
+.cs-num{font-family:var(--serif);font-size:2.2rem;font-weight:700;color:var(--cream)}
+.cs-num span{color:var(--gold)}
+.cs-label{font-size:.8rem;color:rgba(248,246,242,.42);margin-top:3px}
+
+/* ═══════════════════════════════════════
+   BLOG
+═══════════════════════════════════════ */
+.blog{background:var(--cream-d)}
+.blog-header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:50px;flex-wrap:wrap;gap:16px}
+.blog-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
+.blog-card{background:var(--white);border-radius:var(--r-xl);overflow:hidden;box-shadow:var(--sh-sm);transition:transform .25s,box-shadow .25s}
+.blog-card:hover{transform:translateY(-5px);box-shadow:var(--sh-lg)}
+.blog-thumb{height:196px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.blog-thumb-emoji{font-size:2.75rem;opacity:.25;position:relative;z-index:1}
+.blog-thumb-overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:18px;background:linear-gradient(to top,rgba(15,23,42,.85),rgba(15,23,42,.1))}
+.blog-cat{font-size:.67rem;font-weight:700;color:var(--gold);letter-spacing:.1em;text-transform:uppercase}
+.blog-body{padding:22px 24px}
+.blog-title{font-family:var(--serif);font-size:1.075rem;font-weight:600;color:var(--navy);line-height:1.4;margin-bottom:9px}
+.blog-excerpt{font-size:.83rem;color:var(--slate);line-height:1.66;margin-bottom:16px}
+.blog-meta{display:flex;align-items:center;gap:10px}
+.blog-meta-ava{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--sand),var(--cream-d));display:flex;align-items:center;justify-content:center;font-size:.67rem;font-weight:700;color:var(--slate)}
+.blog-meta-author{font-size:.765rem;color:var(--slate-l)}
+.blog-meta-date{margin-left:auto;font-size:.74rem;color:var(--slate-l)}
+.blog-read{display:inline-flex;align-items:center;gap:5px;font-size:.8rem;font-weight:600;color:var(--gold-d);margin-top:14px;transition:gap .2s}
+.blog-card:hover .blog-read{gap:9px}
+
+/* ═══════════════════════════════════════
+   CONTACT
+═══════════════════════════════════════ */
+.contact{background:var(--cream)}
+.contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:start}
+.contact-detail{display:flex;align-items:flex-start;gap:14px;padding:18px 0;border-bottom:1px solid var(--cream-d)}
+.contact-detail:first-of-type{padding-top:0}
+.contact-detail:last-of-type{border-bottom:none}
+.contact-icon{width:42px;height:42px;border-radius:var(--r-sm);background:rgba(201,162,39,.09);border:1px solid rgba(201,162,39,.14);color:var(--gold);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cd-label{font-size:.7rem;font-weight:700;color:var(--gold-d);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
+.cd-val{font-size:.9375rem;color:var(--navy);font-weight:500}
+.cd-sub{font-size:.8rem;color:var(--slate);margin-top:2px}
+
+/* Form card */
+.form-card{background:var(--white);border-radius:var(--r-2xl);padding:42px;box-shadow:var(--sh-lg)}
+.form-heading{font-family:var(--serif);font-size:1.5rem;font-weight:600;color:var(--navy);margin-bottom:4px}
+.form-sub{font-size:.875rem;color:var(--slate);margin-bottom:28px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fg{margin-bottom:18px}
+.fg label{display:block;font-size:.785rem;font-weight:600;color:var(--navy);margin-bottom:5px;letter-spacing:.02em}
+.fg label span{color:var(--gold)}
+.fi,.fsel,.fta{width:100%;padding:12px 15px;border-radius:var(--r-sm);border:1.5px solid var(--cream-d);background:var(--cream);font-family:var(--sans);font-size:.9375rem;color:var(--navy);transition:border-color .2s,box-shadow .2s;outline:none}
+.fi:focus,.fsel:focus,.fta:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,162,39,.11)}
+.fi.err{border-color:#ef4444}
+.fta{resize:vertical;min-height:118px;line-height:1.6}
+.fsel{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:38px}
+.fsubmit{width:100%;padding:15px;border-radius:var(--r-md);background:var(--gold);color:var(--navy);font-family:var(--sans);font-size:1rem;font-weight:700;box-shadow:var(--gold-glow);transition:all .2s;border:none;cursor:pointer}
+.fsubmit:hover{background:var(--gold-l);transform:translateY(-1px);box-shadow:0 8px 24px rgba(201,162,39,.4)}
+.fsubmit:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.fprivacy{font-size:.74rem;color:var(--slate-l);text-align:center;margin-top:12px}
+.fprivacy a{color:var(--gold-d);text-decoration:underline}
+.form-success{display:none;padding:18px;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);border-radius:var(--r-md);color:#166534;font-size:.9rem;font-weight:500;text-align:center;margin-bottom:20px}
+
+/* ═══════════════════════════════════════
+   FOOTER
+═══════════════════════════════════════ */
+footer{background:var(--navy);padding:72px 0 36px}
+.footer-grid{display:grid;grid-template-columns:2.2fr 1fr 1fr 1fr;gap:48px;margin-bottom:56px}
+.footer-tagline{font-size:.875rem;color:rgba(248,246,242,.42);line-height:1.7;max-width:268px;margin-top:14px}
+.footer-socials{display:flex;gap:10px;margin-top:22px}
+.social-btn{width:36px;height:36px;border-radius:var(--r-xs);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);color:rgba(248,246,242,.42);display:flex;align-items:center;justify-content:center;transition:all .2s}
+.social-btn:hover{background:rgba(201,162,39,.15);border-color:rgba(201,162,39,.28);color:var(--gold)}
+.footer-col-title{font-size:.7rem;font-weight:700;color:rgba(248,246,242,.42);text-transform:uppercase;letter-spacing:.13em;margin-bottom:18px}
+.footer-links{display:flex;flex-direction:column;gap:11px}
+.footer-links a{font-size:.875rem;color:rgba(248,246,242,.42);transition:color .2s}
+.footer-links a:hover{color:var(--cream)}
+.footer-bottom{border-top:1px solid rgba(255,255,255,.07);padding-top:28px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.footer-copy{font-size:.78rem;color:rgba(248,246,242,.28)}
+.footer-legal{display:flex;gap:22px}
+.footer-legal a{font-size:.78rem;color:rgba(248,246,242,.28);transition:color .2s}
+.footer-legal a:hover{color:rgba(248,246,242,.6)}
+
+/* ═══════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════ */
+@media(max-width:1024px){
+  .hero__wrap{grid-template-columns:1fr;gap:52px;padding-top:108px}
+  .hero__visual{justify-content:center}
+  .cleaners-inner{grid-template-columns:1fr;gap:48px}
+  .contact-grid{grid-template-columns:1fr;gap:48px}
+  .footer-grid{grid-template-columns:1fr 1fr;gap:36px}
+}
+@media(max-width:900px){
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .how-grid::before{display:none}
+  .how-grid{grid-template-columns:1fr}
+  .services-grid{grid-template-columns:repeat(2,1fr)}
+  .why-grid{grid-template-columns:repeat(2,1fr)}
+  .testi-grid{grid-template-columns:1fr}
+  .blog-grid{grid-template-columns:1fr}
+  .cleaners-features{grid-template-columns:1fr}
+}
+@media(max-width:640px){
+  .nav__links,.nav__ctas{display:none}
+  .nav__burger{display:block}
+  .section{padding:68px 0}
+  .services-grid{grid-template-columns:1fr}
+  .why-grid{grid-template-columns:1fr}
+  .form-row{grid-template-columns:1fr}
+  .footer-grid{grid-template-columns:1fr}
+  .footer-bottom{flex-direction:column;text-align:center}
+  .hero__ctas{flex-direction:column}
+  .hcard-float{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════
+     NAVIGATION
+════════════════════════ -->
+<nav class="nav" id="main-nav">
+  <div class="nav__inner">
+    <a href="sparkle_landing.html" class="nav__logo">
+      <span class="nav__logo-star">✦</span>Sparkle
+    </a>
+    <ul class="nav__links">
+      <li><a href="#how-it-works">How It Works</a></li>
+      <li><a href="#services">Services</a></li>
+      <li><a href="#why-sparkle">Why Sparkle</a></li>
+      <li><a href="#blog">Journal</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+    <div class="nav__ctas">
+      <a href="sparkle_full.html" class="nav-login">Log In</a>
+      <a href="sparkle_full.html?role=client" class="nav-book">Book a Cleaning</a>
+    </div>
+    <button class="nav__burger" id="nav-burger" aria-label="Open menu" aria-expanded="false" aria-controls="nav-drawer">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+  </div>
+</nav>
+
+<!-- Mobile Drawer -->
+<div class="nav__drawer" id="nav-drawer" role="dialog" aria-modal="true" aria-label="Site navigation">
+  <a href="#how-it-works" onclick="closeDrawer()">How It Works</a>
+  <a href="#services" onclick="closeDrawer()">Services</a>
+  <a href="#why-sparkle" onclick="closeDrawer()">Why Sparkle</a>
+  <a href="#blog" onclick="closeDrawer()">Journal</a>
+  <a href="#contact" onclick="closeDrawer()">Contact</a>
+  <div class="nav__drawer-ctas">
+    <a href="sparkle_full.html" class="btn btn-outline-light" onclick="closeDrawer()">Log In</a>
+    <a href="sparkle_full.html?role=client" class="btn btn-primary" onclick="closeDrawer()">Book a Cleaning</a>
+  </div>
+</div>
+
+
+<!-- ════════════════════════
+     HERO
+════════════════════════ -->
+<section class="hero" id="home">
+  <div class="hero__bg"></div>
+  <div class="hero__dots"></div>
+
+  <div class="hero__wrap">
+    <!-- Left: copy -->
+    <div>
+      <div class="hero__eyebrow">
+        <span class="hero__dot"></span>
+        Seattle's Cleaning Marketplace
+      </div>
+
+      <h1 class="display hero__title">
+        Your Home<br>Deserves to<br><em>Sparkle.</em>
+      </h1>
+
+      <p class="hero__sub">
+        Connect with Seattle's most trusted, background-checked cleaning professionals. Post a job, receive competitive bids, and book in minutes — no calls, no guesswork.
+      </p>
+
+      <div class="hero__ctas">
+        <a href="sparkle_full.html?role=client" class="btn btn-primary">
+          Book a Cleaning
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+        <a href="sparkle_full.html?role=cleaner" class="btn btn-outline-light">Join as a Cleaner</a>
+      </div>
+
+      <div class="hero__trust">
+        <div class="trust-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Background Checked
+        </div>
+        <div class="trust-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>
+          Satisfaction Guaranteed
+        </div>
+        <div class="trust-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          Seattle Local
+        </div>
+        <div class="trust-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          Free to Post a Job
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: UI mockup -->
+    <div class="hero__visual">
+      <div class="hero__card-wrap">
+
+        <!-- Float top: rating -->
+        <div class="hcard-float t">
+          <div class="hf-label">Platform Rating</div>
+          <div class="hf-val">4.9 <span style="color:var(--gold)">★</span></div>
+          <div class="hf-sub"><span class="hf-green">↑ 2,400+</span> bookings completed</div>
+        </div>
+
+        <!-- Main card -->
+        <div class="hcard">
+          <div class="hlive">
+            <svg width="7" height="7" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
+            Live Bids
+          </div>
+          <div class="hjob-title">Deep Clean · 3 BR / 2 BA</div>
+          <div class="hjob-sub">Capitol Hill, Seattle · This Saturday</div>
+
+          <div class="hbid">
+            <div class="hava hava-1">MR</div>
+            <div class="hbid-info">
+              <div class="hbid-name">Maria R. <span style="color:var(--gold);font-size:.68rem">✦ Pro</span></div>
+              <div class="hbid-stars">★★★★★</div>
+              <div class="hbid-sub">4.97 · 89 jobs completed</div>
+            </div>
+            <div class="hbid-price">$148</div>
+          </div>
+
+          <div class="hbid">
+            <div class="hava hava-2">JT</div>
+            <div class="hbid-info">
+              <div class="hbid-name">James T.</div>
+              <div class="hbid-stars">★★★★★</div>
+              <div class="hbid-sub">4.89 · 54 jobs completed</div>
+            </div>
+            <div class="hbid-price">$162</div>
+          </div>
+
+          <div style="margin-top:14px">
+            <div class="hstep">
+              <div class="hstep-num done">✓</div>
+              <div>
+                <div class="hstep-text">Job posted</div>
+                <div class="hstep-meta">2 hours ago · free</div>
+              </div>
+            </div>
+            <div class="hstep">
+              <div class="hstep-num active">2</div>
+              <div>
+                <div class="hstep-text">Choose your cleaner</div>
+                <div class="hstep-meta">3 bids received so far</div>
+              </div>
+            </div>
+            <div class="hstep">
+              <div class="hstep-num" style="background:rgba(255,255,255,.06);color:rgba(248,246,242,.3)">3</div>
+              <div>
+                <div class="hstep-text" style="color:rgba(248,246,242,.35)">Book & relax</div>
+                <div class="hstep-meta">Payment held until complete</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Float bottom: payment protection -->
+        <div class="hcard-float b">
+          <div class="hf-label">Your Payment</div>
+          <div class="hf-val" style="font-size:1rem;display:flex;align-items:center;gap:6px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            Held in Escrow
+          </div>
+          <div class="hf-sub"><span class="hf-green">✓ Released only when you're satisfied</span></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════
+     STATS BAND
+════════════════════════ -->
+<section class="stats-band">
+  <div class="container">
+    <div class="stats-grid">
+      <div class="reveal" style="position:relative">
+        <div class="stat-num">2,400<span>+</span></div>
+        <div class="stat-label">Jobs Completed in Seattle</div>
+      </div>
+      <div class="reveal">
+        <div class="stat-num">4.<span>9</span>★</div>
+        <div class="stat-label">Average Client Rating</div>
+      </div>
+      <div class="reveal">
+        <div class="stat-num">98<span>%</span></div>
+        <div class="stat-label">Satisfaction Rate</div>
+      </div>
+      <div class="reveal">
+        <div class="stat-num"><span>$0</span></div>
+        <div class="stat-label">Platform Fee to Post a Job — Always Free</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════
+     HOW IT WORKS
+════════════════════════ -->
+<section class="how section" id="how-it-works">
+  <div class="container">
+    <div class="text-center" style="margin-bottom:58px">
+      <span class="sec-label">Simple Process</span>
+      <h2 class="h2 sec-title">Booked in Three Steps</h2>
+      <p class="lead" style="max-width:520px;margin:0 auto">No phone calls. No haggling. Post your job, let cleaners compete for your business, and pick the best fit.</p>
+    </div>
+    <div class="how-grid">
+      <div class="how-card reveal">
+        <div class="how-num">1</div>
+        <div class="how-title">Post Your Job</div>
+        <p class="how-desc">Describe your space, cleaning type, and preferred date. Takes two minutes and costs nothing to post. Your job goes live instantly.</p>
+      </div>
+      <div class="how-card reveal" style="transition-delay:.1s">
+        <div class="how-num">2</div>
+        <div class="how-title">Receive Bids</div>
+        <p class="how-desc">Verified cleaners send competitive quotes directly to you. Read real reviews, see ratings, compare prices — then decide on your timeline.</p>
+      </div>
+      <div class="how-card reveal" style="transition-delay:.2s">
+        <div class="how-num">3</div>
+        <div class="how-title">Book &amp; Relax</div>
+        <p class="how-desc">Choose your cleaner, confirm the booking, and step back. Payment is held securely and only released when you're fully satisfied.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════
+     SERVICES
+════════════════════════ -->
+<section class="services section" id="services">
+  <div class="container">
+    <div style="margin-bottom:56px">
+      <span class="sec-label">What We Offer</span>
+      <h2 class="h2 sec-title">Every Type of Clean, Covered.</h2>
+      <p class="lead sec-sub">From weekly upkeep to complete move-out cleans, Sparkle connects you with the right specialist for the job.</p>
+    </div>
+    <div class="services-grid">
+      <div class="svc-card reveal">
+        <div class="svc-icon">🏠</div>
+        <div class="svc-name">Regular Maintenance</div>
+        <p class="svc-desc">Weekly or bi-weekly visits to keep your home consistently fresh. Same cleaner, same schedule — every time.</p>
+        <span class="svc-badge">Most Popular</span>
+      </div>
+      <div class="svc-card reveal" style="transition-delay:.08s">
+        <div class="svc-icon">✨</div>
+        <div class="svc-name">Deep Clean</div>
+        <p class="svc-desc">A top-to-bottom clean covering baseboards, inside appliances, grout lines, and every place that regular cleaning skips.</p>
+        <span class="svc-badge">Best Value</span>
+      </div>
+      <div class="svc-card reveal" style="transition-delay:.16s">
+        <div class="svc-icon">📦</div>
+        <div class="svc-name">Move In / Move Out</div>
+        <p class="svc-desc">Leave your old place spotless or arrive to a fresh start. Our cleaners specialize in handover-ready results that pass walkthroughs.</p>
+      </div>
+      <div class="svc-card reveal" style="transition-delay:.04s">
+        <div class="svc-icon">🛏</div>
+        <div class="svc-name">Short-Term Rental</div>
+        <p class="svc-desc">Fast, reliable Airbnb & VRBO turnovers. We sync to your calendar and work on your guests' schedule — not ours.</p>
+      </div>
+      <div class="svc-card reveal" style="transition-delay:.12s">
+        <div class="svc-icon">🏗</div>
+        <div class="svc-name">Post-Construction</div>
+        <p class="svc-desc">Construction dust, paint overspray, adhesive residue — our post-construction specialists have the equipment and training to handle it all.</p>
+      </div>
+      <div class="svc-card reveal" style="transition-delay:.2s">
+        <div class="svc-icon">🏢</div>
+        <div class="svc-name">Commercial Spaces</div>
+        <p class="svc-desc">Offices, studios, and retail spaces. Professional commercial cleaning with flexible scheduling and recurring service plans.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════
+     WHY SPARKLE
+════════════════════════ -->
+<section class="why section" id="why-sparkle">
+  <div class="container">
+    <div style="margin-bottom:56px">
+      <span class="sec-label">Our Standard</span>
+      <h2 class="h2 sec-title text-cream">Why Seattle Chooses Sparkle</h2>
+      <p class="lead sec-sub">We built Sparkle because average wasn't good enough. Every cleaner, booking, and outcome is held to a higher standard.</p>
+    </div>
+    <div class="why-grid">
+      <div class="why-card reveal">
+        <span class="why-icon">🛡</span>
+        <div class="why-title">Background Checked</div>
+        <p class="why-desc">Every cleaner passes a full criminal background check and government ID verification before their first booking. Renewed annually.</p>
+      </div>
+      <div class="why-card reveal" style="transition-delay:.08s">
+        <span class="why-icon">⭐</span>
+        <div class="why-title">Verified Reviews Only</div>
+        <p class="why-desc">Every rating comes from a real, completed booking. No fake reviews, no star-padding — just honest feedback from real clients.</p>
+      </div>
+      <div class="why-card reveal" style="transition-delay:.16s">
+        <span class="why-icon">💰</span>
+        <div class="why-title">Transparent Pricing</div>
+        <p class="why-desc">You see every bid before you commit. No hidden fees, no surprise invoices. The price you accept is exactly the price you pay.</p>
+      </div>
+      <div class="why-card reveal" style="transition-delay:.04s">
+        <span class="why-icon">🔒</span>
+        <div class="why-title">Insured &amp; Bonded</div>
+        <p class="why-desc">All cleaners carry liability insurance. If something breaks, you're protected — not left fighting it out on your own.</p>
+      </div>
+      <div class="why-card reveal" style="transition-delay:.12s">
+        <span class="why-icon">📍</span>
+        <div class="why-title">Seattle Focused</div>
+        <p class="why-desc">We only serve the greater Seattle area. Local knowledge, local trust, and a team that knows your neighborhood inside and out.</p>
+      </div>
+      <div class="why-card reveal" style="transition-delay:.2s">
+        <span class="why-icon">✦</span>
+        <div class="why-title">Satisfaction Guaranteed</div>
+        <p class="why-desc">Not happy with your clean? We'll send a different cleaner at no extra charge. No questions asked, no awkward conversations.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════
+     TESTIMONIALS
+════════════════════════ -->
+<section class="testimonials section" id="testimonials">
+  <div class="container">
+    <div class="text-center" style="margin-bottom:56px">
+      <span class="sec-label">Real Reviews</span>
+      <h2 class="h2 sec-title">What Seattle Is Saying</h2>
+    </div>
+    <div class="testi-grid">
+      <div class="testi-card reveal">
+        <div class="testi-stars">★★★★★</div>
+        <p class="testi-quote">"I've used every cleaning service in Seattle. Nothing comes close to Sparkle. The bidding process meant I got an incredible cleaner at a fair price — and I actually know who I'm letting into my home."</p>
+        <div class="testi-author">
+          <div class="testi-ava">SR</div>
+          <div>
+            <div class="testi-name">Sarah R.</div>
+            <div class="testi-role">Capitol Hill · Regular Client</div>
+          </div>
+        </div>
+      </div>
+      <div class="testi-card reveal" style="transition-delay:.1s">
+        <div class="testi-stars">★★★★★</div>
+        <p class="testi-quote">"As someone who manages three Airbnb properties, Sparkle has been a game changer. Fast turnovers, consistent quality, and the cleaners actually show up. I recommend it to every host I know."</p>
+        <div class="testi-author">
+          <div class="testi-ava">DK</div>
+          <div>
+            <div class="testi-name">David K.</div>
+            <div class="testi-role">South Lake Union · Airbnb Host</div>
+          </div>
+        </div>
+      </div>
+      <div class="testi-card reveal" style="transition-delay:.2s">
+        <div class="testi-stars">★★★★★</div>
+        <p class="testi-quote">"The background check system gave me real peace of mind. My cleaner Maria has been with me for six months now — it's like having a trusted friend look after my home every two weeks."</p>
+        <div class="testi-author">
+          <div class="testi-ava">LP</div>
+          <div>
+            <div class="testi-name">Lauren P.</div>
+            <div class="testi-role">Queen Anne · Monthly Client</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════
+     FOR CLEANERS
+════════════════════════ -->
+<section class="cleaners section" id="for-cleaners">
+  <div class="container">
+    <div class="cleaners-inner">
+      <div class="reveal-left">
+        <span class="sec-label">For Professionals</span>
+        <h2 class="h2 sec-title text-cream" style="margin-bottom:16px">Are You a Professional Cleaner?</h2>
+        <p class="lead" style="color:rgba(248,246,242,.58);margin-bottom:32px">Join Seattle's fastest-growing cleaning marketplace. Set your own rates, choose your schedule, and build a loyal client base — with zero cold calling and no monthly fees.</p>
+        <div class="cleaners-features">
+          <div class="cf-item"><div class="cf-check">✓</div><div class="cf-text">Set your own rates</div></div>
+          <div class="cf-item"><div class="cf-check">✓</div><div class="cf-text">Work on your schedule</div></div>
+          <div class="cf-item"><div class="cf-check">✓</div><div class="cf-text">Instant or weekly cashout</div></div>
+          <div class="cf-item"><div class="cf-check">✓</div><div class="cf-text">No monthly platform fee</div></div>
+          <div class="cf-item"><div class="cf-check">✓</div><div class="cf-text">Build a verified reputation</div></div>
+          <div class="cf-item"><div class="cf-check">✓</div><div class="cf-text">Pro membership perks</div></div>
+        </div>
+        <div style="margin-top:34px">
+          <a href="sparkle_full.html?role=cleaner" class="btn btn-primary">Apply to Join Sparkle →</a>
+        </div>
+      </div>
+      <div class="cleaners-stats reveal-right">
+        <div class="cs-card">
+          <div class="cs-num">$<span>2,800</span></div>
+          <div class="cs-label">Average monthly earnings for active Sparkle cleaners</div>
+        </div>
+        <div class="cs-card">
+          <div class="cs-num"><span>48</span>hrs</div>
+          <div class="cs-label">Average time from your first bid to your first booking</div>
+        </div>
+        <div class="cs-card">
+          <div class="cs-num"><span>0</span></div>
+          <div class="cs-label">Monthly subscription fee — you only pay a success fee when you win a job</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════
+     BLOG / JOURNAL
+════════════════════════ -->
+<section class="blog section" id="blog">
+  <div class="container">
+    <div class="blog-header">
+      <div>
+        <span class="sec-label">Sparkle Journal</span>
+        <h2 class="h2 sec-title" style="margin-bottom:0">Tips, Guides &amp; Insights</h2>
+      </div>
+      <a href="sparkle_blog.html" class="btn btn-outline-dark" style="font-size:.875rem;padding:10px 22px">View All Posts →</a>
+    </div>
+    <div class="blog-grid">
+      <div class="blog-card reveal">
+        <div class="blog-thumb" style="background:linear-gradient(145deg,#0F172A,#1a3660)">
+          <span class="blog-thumb-emoji">🧹</span>
+          <div class="blog-thumb-overlay">
+            <span class="blog-cat">Cleaning Tips</span>
+          </div>
+        </div>
+        <div class="blog-body">
+          <div class="blog-title">5 Signs Your Home Is Overdue for a Deep Clean</div>
+          <p class="blog-excerpt">The "it smells fine" logic isn't always reliable. Here's how to tell when surface cleaning isn't actually cutting it anymore.</p>
+          <div class="blog-meta">
+            <div class="blog-meta-ava">SK</div>
+            <div class="blog-meta-author">Sparkle Team</div>
+            <div class="blog-meta-date">May 14, 2026</div>
+          </div>
+          <a href="sparkle_blog.html?id=1" class="blog-read">Read Article →</a>
+        </div>
+      </div>
+      <div class="blog-card reveal" style="transition-delay:.1s">
+        <div class="blog-thumb" style="background:linear-gradient(145deg,#1c2a0f,#2d4a1a)">
+          <span class="blog-thumb-emoji">🏡</span>
+          <div class="blog-thumb-overlay">
+            <span class="blog-cat">Client Guide</span>
+          </div>
+        </div>
+        <div class="blog-body">
+          <div class="blog-title">How to Prepare for Your First Professional Cleaning</div>
+          <p class="blog-excerpt">Getting the most out of your cleaner starts before they arrive. A little prep goes a long way toward an exceptional result.</p>
+          <div class="blog-meta">
+            <div class="blog-meta-ava">SK</div>
+            <div class="blog-meta-author">Sparkle Team</div>
+            <div class="blog-meta-date">May 7, 2026</div>
+          </div>
+          <a href="sparkle_blog.html?id=2" class="blog-read">Read Article →</a>
+        </div>
+      </div>
+      <div class="blog-card reveal" style="transition-delay:.2s">
+        <div class="blog-thumb" style="background:linear-gradient(145deg,#1a1200,#3a2900)">
+          <span class="blog-thumb-emoji">✦</span>
+          <div class="blog-thumb-overlay">
+            <span class="blog-cat">Behind the Platform</span>
+          </div>
+        </div>
+        <div class="blog-body">
+          <div class="blog-title">The Sparkle Standard: What Sets Our Cleaners Apart</div>
+          <p class="blog-excerpt">Every cleaner went through background checks, ID verification, and a skills screening. Here's exactly what that process looks like.</p>
+          <div class="blog-meta">
+            <div class="blog-meta-ava">SK</div>
+            <div class="blog-meta-author">Sparkle Team</div>
+            <div class="blog-meta-date">Apr 28, 2026</div>
+          </div>
+          <a href="sparkle_blog.html?id=3" class="blog-read">Read Article →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════
+     CONTACT
+════════════════════════ -->
+<section class="contact section" id="contact">
+  <div class="container">
+    <div class="contact-grid">
+
+      <!-- Left: info -->
+      <div class="reveal-left">
+        <span class="sec-label">Support &amp; Questions</span>
+        <h2 class="h2 sec-title">We're Here to Help</h2>
+        <p class="lead" style="margin-bottom:36px">Have a question about the platform, need help with an existing booking, or just want to say hello? Send us a message — we respond to every inquiry within one business day.</p>
+        <p style="font-size:.875rem;color:var(--slate-l);margin-bottom:28px;display:flex;align-items:center;gap:8px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          Ready to book? <a href="sparkle_full.html?role=client" style="color:var(--gold);font-weight:600;text-decoration:none">Create your account →</a>
+        </p>
+
+        <div class="contact-detail">
+          <div class="contact-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          </div>
+          <div>
+            <div class="cd-label">Our Location</div>
+            <div class="cd-val">Seattle, Washington</div>
+            <div class="cd-sub">Serving Greater Seattle &amp; surrounding areas</div>
+          </div>
+        </div>
+
+        <div class="contact-detail">
+          <div class="contact-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.72 1.18 2 2 0 012.7 1h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 8.66a16 16 0 006.43 6.43l1.02-1.04a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+          </div>
+          <div>
+            <div class="cd-label">Phone</div>
+            <div class="cd-val">(206) 555-0190</div>
+            <div class="cd-sub">Mon–Fri, 8am–6pm PT · Sat 9am–4pm</div>
+          </div>
+        </div>
+
+        <div class="contact-detail">
+          <div class="contact-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          </div>
+          <div>
+            <div class="cd-label">Email</div>
+            <div class="cd-val">hello@sparkle.com</div>
+            <div class="cd-sub">We respond within 2 business hours</div>
+          </div>
+        </div>
+
+        <div class="contact-detail">
+          <div class="contact-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div>
+            <div class="cd-label">Business Hours</div>
+            <div class="cd-val">Mon–Fri: 8am – 6pm PT</div>
+            <div class="cd-sub">Saturday: 9am – 4pm · Sunday: Closed</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: form -->
+      <div class="reveal-right">
+        <div class="form-card">
+          <div class="form-heading">Send Us a Message</div>
+          <div class="form-sub">We'll get back to you within 2 business hours.</div>
+
+          <div class="form-success" id="form-success" role="alert" aria-live="polite">
+            ✓ Your message was sent! We'll be in touch very soon.
+          </div>
+
+          <form id="contact-form" novalidate>
+            <div class="form-row">
+              <div class="fg">
+                <label for="cf-fn">First Name <span>*</span></label>
+                <input class="fi" type="text" id="cf-fn" name="first_name" placeholder="Jane" required autocomplete="given-name">
+              </div>
+              <div class="fg">
+                <label for="cf-ln">Last Name <span>*</span></label>
+                <input class="fi" type="text" id="cf-ln" name="last_name" placeholder="Smith" required autocomplete="family-name">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="fg">
+                <label for="cf-email">Email <span>*</span></label>
+                <input class="fi" type="email" id="cf-email" name="email" placeholder="jane@email.com" required autocomplete="email">
+              </div>
+              <div class="fg">
+                <label for="cf-phone">Phone</label>
+                <input class="fi" type="tel" id="cf-phone" name="phone" placeholder="(206) 555-0190" autocomplete="tel">
+              </div>
+            </div>
+            <div class="fg">
+              <label for="cf-service">I'm interested in</label>
+              <select class="fsel" id="cf-service" name="service">
+                <option value="">Select a service…</option>
+                <option value="regular">Regular Maintenance Cleaning</option>
+                <option value="deep">Deep Clean</option>
+                <option value="moveinout">Move In / Move Out</option>
+                <option value="airbnb">Short-Term Rental / Airbnb</option>
+                <option value="construction">Post-Construction</option>
+                <option value="commercial">Commercial Cleaning</option>
+                <option value="join">Joining as a Cleaner</option>
+                <option value="other">General Question</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label for="cf-msg">Message <span>*</span></label>
+              <textarea class="fta" id="cf-msg" name="message" placeholder="Tell us about your space, your schedule, or ask anything…" required></textarea>
+            </div>
+            <button type="submit" class="fsubmit" id="fsubmit">Send Message →</button>
+            <p class="fprivacy">We never share your information. See our <a href="#">Privacy Policy</a>.</p>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ════════════════════════
+     FOOTER
+════════════════════════ -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+
+      <!-- Brand -->
+      <div>
+        <a href="sparkle_landing.html" class="nav__logo" style="display:inline-flex">
+          <span class="nav__logo-star">✦</span>Sparkle
+        </a>
+        <p class="footer-tagline">Seattle's premier cleaning marketplace. Connecting trusted professionals with clients who care deeply about their space.</p>
+        <div class="footer-socials">
+          <a href="#" class="social-btn" aria-label="Instagram">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>
+          </a>
+          <a href="#" class="social-btn" aria-label="Facebook">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/></svg>
+          </a>
+          <a href="#" class="social-btn" aria-label="TikTok">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.18 8.18 0 004.78 1.53V6.79a4.85 4.85 0 01-1.01-.1z"/></svg>
+          </a>
+          <a href="#" class="social-btn" aria-label="X / Twitter">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <!-- For Clients -->
+      <div>
+        <div class="footer-col-title">For Clients</div>
+        <ul class="footer-links">
+          <li><a href="#how-it-works">How It Works</a></li>
+          <li><a href="#services">Browse Services</a></li>
+          <li><a href="sparkle_full.html?role=client">Book a Cleaning</a></li>
+          <li><a href="#how-it-works">How It Works</a></li>
+          <li><a href="#why-sparkle">Why Sparkle</a></li>
+        </ul>
+      </div>
+
+      <!-- For Cleaners -->
+      <div>
+        <div class="footer-col-title">For Cleaners</div>
+        <ul class="footer-links">
+          <li><a href="sparkle_full.html?role=cleaner">Join Sparkle</a></li>
+          <li><a href="sparkle_full.html?role=cleaner">Join as a Cleaner</a></li>
+          <li><a href="sparkle_full.html?role=cleaner">Cleaner Dashboard</a></li>
+          <li><a href="sparkle_full.html?role=cleaner">Payouts &amp; Earnings</a></li>
+          <li><a href="sparkle_full.html?role=cleaner">Background Check</a></li>
+        </ul>
+      </div>
+
+      <!-- Company -->
+      <div>
+        <div class="footer-col-title">Company</div>
+        <ul class="footer-links">
+          <li><a href="#">About Us</a></li>
+          <li><a href="#blog">Journal</a></li>
+          <li><a href="#contact">Contact</a></li>
+          <li><a href="#">Careers</a></li>
+          <li><a href="#">Press</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <div class="footer-copy">© 2026 Sparkle Technologies, Inc. · Seattle, WA · All rights reserved.</div>
+      <div class="footer-legal">
+        <a href="#">Privacy Policy</a>
+        <a href="#">Terms of Service</a>
+        <a href="#">Cookie Policy</a>
+        <a href="#">Accessibility</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+
+<script src="sparkle_api.js"></script>
+<script>
+'use strict';
+
+// ── Navbar scroll effect ──────────────────────────────
+const nav = document.getElementById('main-nav');
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('scrolled', window.scrollY > 48);
+}, { passive: true });
+
+// ── Mobile drawer ─────────────────────────────────────
+const burger = document.getElementById('nav-burger');
+const drawer = document.getElementById('nav-drawer');
+
+burger.addEventListener('click', () => {
+  const open = drawer.classList.toggle('open');
+  burger.setAttribute('aria-expanded', String(open));
+  document.body.style.overflow = open ? 'hidden' : '';
+});
+
+function closeDrawer() {
+  drawer.classList.remove('open');
+  burger.setAttribute('aria-expanded', 'false');
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && drawer.classList.contains('open')) closeDrawer();
+});
+
+// ── Intersection Observer — scroll reveal ─────────────
+const revealOpts = { threshold: 0.12, rootMargin: '0px 0px -48px 0px' };
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+      observer.unobserve(e.target);
+    }
+  });
+}, revealOpts);
+
+document.querySelectorAll('.reveal, .reveal-left, .reveal-right').forEach(el => {
+  observer.observe(el);
+});
+
+// ── Contact form ──────────────────────────────────────
+const CF_SERVICE_LABELS = {
+  regular: 'Regular Maintenance Cleaning',
+  deep: 'Deep Clean',
+  moveinout: 'Move In / Move Out',
+  airbnb: 'Short-Term Rental / Airbnb',
+  construction: 'Post-Construction',
+  commercial: 'Commercial Cleaning',
+  join: 'Joining as a Cleaner',
+  other: 'General Question',
+};
+
+document.getElementById('contact-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+
+  const fn   = document.getElementById('cf-fn');
+  const ln   = document.getElementById('cf-ln');
+  const em   = document.getElementById('cf-email');
+  const phone = document.getElementById('cf-phone');
+  const service = document.getElementById('cf-service');
+  const msg  = document.getElementById('cf-msg');
+  const btn  = document.getElementById('fsubmit');
+
+  // Clear previous error states
+  [fn, em, msg].forEach(el => el.classList.remove('err'));
+
+  // Validate required fields
+  let firstErr = null;
+  if (!fn.value.trim())  { fn.classList.add('err');  firstErr = firstErr || fn; }
+  if (!em.value.trim() || !em.value.includes('@')) { em.classList.add('err'); firstErr = firstErr || em; }
+  if (!msg.value.trim()) { msg.classList.add('err'); firstErr = firstErr || msg; }
+
+  if (firstErr) {
+    firstErr.focus();
+    // Auto-clear error styling on input
+    [fn, em, msg].forEach(el => {
+      el.addEventListener('input', () => el.classList.remove('err'), { once: true });
+    });
+    return;
+  }
+
+  btn.textContent = 'Sending…';
+  btn.disabled = true;
+
+  const subject = service.value
+    ? `Website inquiry — ${CF_SERVICE_LABELS[service.value] || service.value}`
+    : 'Website contact form';
+
+  try {
+    await SparkleAPI.createSupportTicket({
+      name: `${fn.value.trim()} ${ln.value.trim()}`.trim(),
+      email: em.value.trim(),
+      phone: phone.value.trim() || undefined,
+      subject,
+      message: msg.value.trim(),
+    });
+
+    const successEl = document.getElementById('form-success');
+    this.style.display = 'none';
+    successEl.style.display = 'block';
+    successEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch (err) {
+    btn.textContent = 'Send Message →';
+    btn.disabled = false;
+    alert(err.message || 'Something went wrong. Please try again.');
+  }
+});
+
+// ── Smooth scroll for anchor links (handles fixed nav offset) ──
+document.querySelectorAll('a[href^="#"]').forEach(link => {
+  link.addEventListener('click', e => {
+    const id = link.getAttribute('href').slice(1);
+    if (!id) return;
+    const target = document.getElementById(id);
+    if (!target) return;
+    e.preventDefault();
+    const offset = 80; // nav height
+    const top = target.getBoundingClientRect().top + window.scrollY - offset;
+    window.scrollTo({ top, behavior: 'smooth' });
+    closeDrawer();
+  });
+});
+</script>
+</body>
+</html>
