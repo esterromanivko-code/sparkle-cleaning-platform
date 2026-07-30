@@ -21,7 +21,7 @@ const router = express.Router();
 // GET /api/profile/cleaner/:id  — public cleaner profile (any user can view)
 router.get('/cleaner/:id', (req, res) => {
   const user = db.prepare(
-    'SELECT id, first_name, last_name, city, zip, created_at FROM users WHERE id = ? AND role = ?'
+    'SELECT id, first_name, last_name, city, zip, avatar_url, created_at FROM users WHERE id = ? AND role = ?'
   ).get(req.params.id, 'cleaner');
   if (!user) return res.status(404).json({ error: 'Cleaner not found' });
 
@@ -34,7 +34,7 @@ router.get('/cleaner/:id', (req, res) => {
   `).all(user.id);
 
   res.json({
-    user:     { id: user.id, first_name: user.first_name, city: user.city, created_at: user.created_at },
+    user:     { id: user.id, first_name: user.first_name, city: user.city, avatar_url: user.avatar_url, created_at: user.created_at },
     profile:  { ...profile, password_hash: undefined },
     services: services.map(s => s.service),
     reviews,
@@ -85,7 +85,7 @@ router.get('/cleaners', requireAuth, (req, res) => {
   const { service, min_rate, max_rate, verified_only } = req.query;
 
   let sql = `
-    SELECT u.id, u.first_name, u.city,
+    SELECT u.id, u.first_name, u.city, u.avatar_url,
            cp.hourly_rate, cp.avg_rating, cp.total_jobs,
            cp.is_verified, cp.is_pro, cp.badge_tier,
            cp.lockout_fee_enabled, cp.lockout_fee_amount

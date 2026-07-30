@@ -552,6 +552,30 @@ window.SparkleAPI = (function () {
     return json;
   }
 
+  // ─── Profile photo ──────────────────────────────────────────────────────────
+
+  /**
+   * Upload the signed-in user's profile photo (any role).
+   * @param {File} file  image file — the backend accepts JPG/PNG/GIF/WebP/HEIC up to 10MB
+   * @returns {{ url: string }} url is root-relative, e.g. /uploads/profiles/<uuid>.jpg
+   */
+  async function uploadProfilePhoto(file) {
+    const fd = new FormData();
+    fd.append('photo', file);
+    const res  = await apiFetch('/api/upload/profile-photo', { method: 'POST', body: fd });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Could not upload your photo');
+    return json;
+  }
+
+  /** Remove the signed-in user's profile photo. */
+  async function deleteProfilePhoto() {
+    const res  = await apiFetch('/api/upload/profile-photo', { method: 'DELETE' });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Could not remove your photo');
+    return json;
+  }
+
   // ─── Credentials (license & insurance verification) ─────────────────────────
 
   /** Cleaner: own documents plus the derived badge_tier. */
@@ -681,6 +705,8 @@ window.SparkleAPI = (function () {
     replyToTicket,
     getAllTickets,
     updateTicketStatus,
+    uploadProfilePhoto,
+    deleteProfilePhoto,
     getMyCredentials,
     uploadCredential,
     deleteCredential,

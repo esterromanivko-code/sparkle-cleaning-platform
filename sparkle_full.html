@@ -217,6 +217,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
 .profile-top{display:flex;align-items:center;gap:12px;margin-bottom:1rem}
 .badge-verified{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--bd);background:var(--bl);border:1px solid #B5D4F4;border-radius:20px;padding:2px 8px}
 .badge-pro{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--gold);background:var(--goldl);border:1px solid #E8D080;border-radius:20px;padding:2px 8px;font-weight:500}
+/* Profile photos — same footprint as .av so they drop in wherever initials show */
+.av-photo{border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--s100);display:block}
+.av-edit{position:relative;display:inline-block}
+.av-edit input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.av-edit-hint{position:absolute;bottom:-2px;right:-2px;background:var(--g);color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;border:2px solid var(--surf);pointer-events:none}
 /* Credential badges — rendered by badgeTierHtml() from cleaner_profiles.badge_tier */
 .badge-licensed{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--pud);background:var(--pul);border:1px solid #C4B3E8;border-radius:20px;padding:2px 8px}
 .badge-insured{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--gd);background:var(--gl);border:1px solid var(--gm);border-radius:20px;padding:2px 8px}
@@ -1595,6 +1600,27 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+// ── Avatars ───────────────────────────────────────────────────────────────────
+// The backend stores root-relative photo paths (/uploads/profiles/<uuid>.jpg) so
+// the value stays correct whichever host serves it. Resolve against the API base.
+function avatarSrc(url) {
+  if (!url) return '';
+  if (/^https?:\/\//i.test(url)) return url;          // legacy absolute values
+  return SparkleAPI.getApiBase() + url;
+}
+
+// Renders a photo when one exists, otherwise the existing initials circle.
+// `cls` is the colour class (av-g / av-b / av-p) used for the initials fallback.
+function avatarHtml(user, cls = 'av-g', sizePx = 48, extraStyle = '') {
+  const style = `width:${sizePx}px;height:${sizePx}px;${extraStyle}`;
+  const url   = avatarSrc(user?.avatar_url);
+  if (url) {
+    return `<img class="av-photo" style="${style}" src="${escapeHtml(url)}" alt=""
+                 onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'av ${cls}',style:'${style}',textContent:'${escapeHtml(user?.initials || '')}'}))">`;
+  }
+  return `<div class="av ${cls}" style="${style};font-size:${Math.round(sizePx / 3)}px">${escapeHtml(user?.initials || '')}</div>`;
+}
+
 // Single source of truth for rendering a cleaner's credential badge.
 // Driven by cleaner_profiles.badge_tier, which only lib/badges.js writes.
 function badgeTierHtml(tier) {
@@ -1808,6 +1834,7 @@ function loginWithData(apiUser, apiProfile = null) {
     phone:    apiUser.phone || '',
     city:     apiUser.city || '',
     zip:      apiUser.zip || '',
+    avatarUrl: apiUser.avatar_url || null,
     isReal:   true,   // flag: real session (not demo)
   };
   currentProfile = apiProfile || currentProfile;
@@ -1929,6 +1956,7 @@ function setupApp() {
   // Topbar
   document.getElementById('topbar-av').textContent = u.initials;
   document.getElementById('topbar-av').className = 'av ' + u.avClass;
+  refreshTopbarAvatar(u.avatarUrl);
   document.getElementById('topbar-name').textContent = u.name;
   // Role indicators
   document.getElementById('pill-cleaner').style.display = u.role==='cleaner'?'flex':'none';
@@ -3119,7 +3147,11 @@ function loadCleanerProfile() {
       <div class="pg-sub">Your public profile and rate settings</div>
       <div class="card">
         <div class="profile-top">
-          <div class="av-lg av-g" style="width:52px;height:52px;font-size:18px">${escapeHtml(u.initials || '')}</div>
+          <label class="av-edit" title="Change your photo">
+            ${avatarHtml({ avatar_url: data?.user?.avatar_url, initials: u.initials }, 'av-g', 52)}
+            <input type="file" accept="image/*" id="profile-photo-input" onchange="uploadProfilePhoto(this)">
+            <span class="av-edit-hint">✎</span>
+          </label>
           <div>
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
               <div style="font-size:15px;font-weight:500">${escapeHtml(u.fullName || u.name || '')}</div>
@@ -3151,6 +3183,85 @@ function loadCleanerProfile() {
     if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
     page.innerHTML = `<div class="pg-title">My profile</div><div class="alert warn">Could not load profile: ${escapeHtml(err.message)}</div>`;
   });
+}
+
+// ══════════════════════════════════════
+// PROFILE PHOTO (all roles)
+// ══════════════════════════════════════
+async function uploadProfilePhoto(input) {
+  const file = input?.files?.[0];
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) { showToast('Choose an image file.', 'warn'); input.value = ''; return; }
+  if (file.size > 10 * 1024 * 1024)    { showToast('That image is over 10MB — please pick a smaller one.', 'warn'); input.value = ''; return; }
+
+  // Optimistic preview so the change feels instant while the upload runs.
+  const label   = input.closest('.av-edit');
+  const imgEl   = label?.querySelector('img, .av');
+  const preview = URL.createObjectURL(file);
+  if (imgEl) {
+    const img = document.createElement('img');
+    img.className = 'av-photo';
+    img.style.cssText = imgEl.style.cssText;
+    img.src = preview;
+    imgEl.replaceWith(img);
+  }
+
+  try {
+    const { url } = await SparkleAPI.uploadProfilePhoto(file);
+    currentUser.avatarUrl = url;
+    refreshTopbarAvatar(url);
+    showToast('Profile photo updated.', 'success');
+  } catch (err) {
+    if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+    showToast(err.message, 'error');
+    // Roll the optimistic preview back to whatever the server actually has.
+    if (currentUser?.role === 'cleaner') loadCleanerProfile();
+    else loadClientSettings();
+  } finally {
+    URL.revokeObjectURL(preview);
+    if (input) input.value = '';
+  }
+}
+
+async function removeProfilePhoto() {
+  showConfirm({
+    title: 'Remove your photo?',
+    body: 'Your profile will show your initials instead. You can upload a new photo any time.',
+    confirmLabel: 'Remove',
+    confirmClass: 'danger',
+    onConfirm: async () => {
+      try {
+        await SparkleAPI.deleteProfilePhoto();
+        currentUser.avatarUrl = null;
+        refreshTopbarAvatar(null);
+        showToast('Photo removed.', 'success');
+        if (currentUser?.role === 'cleaner') loadCleanerProfile();
+        else loadClientSettings();
+      } catch (err) {
+        if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+        showToast(err.message, 'error');
+      }
+    },
+  });
+}
+
+// The topbar avatar is a plain div of initials in the static HTML; swap it for an
+// <img> when a photo exists so the change is visible everywhere at once.
+function refreshTopbarAvatar(url) {
+  const el = document.getElementById('topbar-av');
+  if (!el) return;
+  const src = avatarSrc(url);
+  if (src) {
+    el.style.backgroundImage = `url("${src}")`;
+    el.style.backgroundSize  = 'cover';
+    el.style.backgroundPosition = 'center';
+    el.style.color = 'transparent';
+  } else {
+    el.style.backgroundImage = '';
+    el.style.color = '';
+    el.textContent = currentUser?.initials || '';
+  }
 }
 
 // ══════════════════════════════════════
@@ -3414,7 +3525,7 @@ function loadFindCleaners() {
 
       return `<div class="card cleaner-card" data-verified="${c.is_verified ? 'true' : 'false'}" data-rating="${rating}" data-price="${rate}">
         <div class="profile-top">
-          <div class="av-lg av-g" style="width:48px;height:48px">${escapeHtml(initials)}</div>
+          ${avatarHtml({ avatar_url: c.avatar_url, initials }, 'av-g', 48)}
           <div style="flex:1">
             <div class="row c">
               <div style="display:flex;align-items:center;gap:8px">
@@ -4426,6 +4537,19 @@ function loadClientSettings() {
     <div class="pg-sub">Account, notifications, and preferences</div>
     <div class="card">
       <div class="sect-title" style="margin-bottom:.875rem">Account</div>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:1rem">
+        <label class="av-edit" title="Add a photo">
+          ${avatarHtml({ avatar_url: user.avatarUrl, initials: user.initials }, 'av-b', 52)}
+          <input type="file" accept="image/*" onchange="uploadProfilePhoto(this)">
+          <span class="av-edit-hint">✎</span>
+        </label>
+        <div>
+          <div style="font-size:13px;font-weight:500">Profile photo</div>
+          <div class="meta">Optional — helps cleaners recognise you at the door.</div>
+          ${user.avatarUrl ? `<button class="btn sm" style="margin-top:6px" onclick="removeProfilePhoto()">Remove photo</button>` : ''}
+        </div>
+      </div>
+      <div class="divider"></div>
       <div class="frow"><label class="flbl">Name</label><div class="f2"><input class="inp" id="client-first-name" value="${escapeHtml(user.fullName?.split(' ')[0] || user.name || '')}"><input class="inp" id="client-last-name" value="${escapeHtml((user.fullName?.split(' ').slice(1).join(' ') || '').replace(/\.$/, ''))}"></div></div>
       <div class="frow"><label class="flbl">Email</label><input class="inp" id="client-email" type="email" value="${escapeHtml(user.email || '')}"></div>
       <div class="frow"><label class="flbl">Phone</label><input class="inp" id="client-phone" type="tel" value="${escapeHtml(user.phone || currentProfile?.phone || '')}"></div>

@@ -447,6 +447,21 @@ router.post('/upload/profile-photo', requireAuth, handleSingleUpload, (req, res)
 
   const url = getFileUrl(req.file.filename, 'profiles');
 
+  // Replacing a photo: drop the previous file and row, or every re-upload leaks
+  // another image onto the volume and only the newest is ever referenced.
+  {
+    const fs   = require('fs');
+    const path = require('path');
+    const prior = db.prepare(
+      `SELECT filename FROM file_uploads WHERE user_id = ? AND type = 'profile_photo'`
+    ).all(req.user.id);
+    prior.forEach(p => {
+      if (p.filename === req.file.filename) return;
+      try { fs.unlinkSync(path.join(UPLOAD_DIR, 'profiles', path.basename(p.filename))); } catch {}
+    });
+    db.prepare(`DELETE FROM file_uploads WHERE user_id = ? AND type = 'profile_photo'`).run(req.user.id);
+  }
+
   // Save to file_uploads table
   const uploadId = uuid();
   db.prepare(`
@@ -533,6 +548,28 @@ router.get('/upload/profile-photo/:user_id', requireAuth, (req, res) => {
 
   if (!photo) return res.status(404).json({ error: 'No profile photo' });
   res.json(photo);
+});
+
+// DELETE /api/upload/profile-photo
+// Remove the signed-in user's own profile photo and clear their avatar.
+// MUST be declared before /upload/:upload_id or the param route swallows it.
+router.delete('/upload/profile-photo', requireAuth, (req, res) => {
+  const fs   = require('fs');
+  const path = require('path');
+
+  const uploads = db.prepare(
+    `SELECT * FROM file_uploads WHERE user_id = ? AND type = 'profile_photo'`
+  ).all(req.user.id);
+
+  uploads.forEach(u => {
+    const filePath = path.join(UPLOAD_DIR, 'profiles', path.basename(u.filename));
+    try { fs.unlinkSync(filePath); } catch {}
+  });
+
+  db.prepare(`DELETE FROM file_uploads WHERE user_id = ? AND type = 'profile_photo'`).run(req.user.id);
+  db.prepare('UPDATE users SET avatar_url = NULL WHERE id = ?').run(req.user.id);
+
+  res.json({ message: 'Profile photo removed' });
 });
 
 // DELETE /api/upload/:upload_id

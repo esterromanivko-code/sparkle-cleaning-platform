@@ -220,4 +220,34 @@ async function sendCredentialRejected(to, firstName, docLabel, reason) {
   return sendEmail({ to, subject: `Action needed: your ${docLabel} — Sparkle`, html });
 }
 
-module.exports = { sendEmail, sendPasswordReset, send2FASetupEmail, send2FACode, sendWelcomeEmail, sendSupportTicketReceived, sendSupportReply, sendCredentialApproved, sendCredentialRejected };
+// ── Credential Expiring Soon Email ────────────────────────────────────────────
+async function sendCredentialExpiringSoon(to, firstName, docLabel, expiresOn, daysLeft) {
+  const html = baseTemplate(`
+    <div class="header"><div class="logo">Sparkle</div></div>
+    <div class="body">
+      <div class="title">Your ${docLabel.toLowerCase()} expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}</div>
+      <div class="text">Hi ${firstName}, your ${docLabel.toLowerCase()} on file expires on <strong>${expiresOn}</strong>.</div>
+      <div class="text">Upload a renewal before then and your badge stays live the whole time — we'll only swap it over once the new document is approved. If it lapses, the badge comes down until you re-verify.</div>
+      <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/app" class="btn">Upload a renewal</a>
+    </div>
+    <div class="footer">© 2025 Sparkle Inc. · Seattle, WA · This email was sent to ${to}</div>
+  `);
+  return sendEmail({ to, subject: `Your ${docLabel.toLowerCase()} expires in ${daysLeft} days — Sparkle`, html });
+}
+
+// ── Credential Expired Email ──────────────────────────────────────────────────
+async function sendCredentialExpired(to, firstName, docLabel) {
+  const html = baseTemplate(`
+    <div class="header"><div class="logo">Sparkle</div></div>
+    <div class="body">
+      <div class="title">Your ${docLabel.toLowerCase()} has expired</div>
+      <div class="text">Hi ${firstName}, the ${docLabel.toLowerCase()} we had on file has passed its expiry date, so your verification badge has been removed and you'll rank lower in client search until it's back.</div>
+      <div class="text">Upload a current document and we'll review it within one business day.</div>
+      <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/app" class="btn">Upload a current document</a>
+    </div>
+    <div class="footer">© 2025 Sparkle Inc. · Seattle, WA · This email was sent to ${to}</div>
+  `);
+  return sendEmail({ to, subject: `Your ${docLabel.toLowerCase()} expired — Sparkle`, html });
+}
+
+module.exports = { sendEmail, sendPasswordReset, send2FASetupEmail, send2FACode, sendWelcomeEmail, sendSupportTicketReceived, sendSupportReply, sendCredentialApproved, sendCredentialRejected, sendCredentialExpiringSoon, sendCredentialExpired };

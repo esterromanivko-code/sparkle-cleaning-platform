@@ -73,8 +73,49 @@ if (process.env.NODE_ENV === 'production') {
   }
 }
 
+// ═══════════════════════════════════════════════════
+//  PERSISTENCE CHECK — refuse to silently lose data
+// ═══════════════════════════════════════════════════
+// Railway (and most container hosts) give each deploy a fresh filesystem. Anything
+// written inside the app directory is destroyed on the next deploy — including the
+// SQLite database and every uploaded document. The fix is a mounted Volume with
+// DB_PATH / UPLOAD_DIR / BACKUP_DIR pointed at it. This check makes a
+// misconfiguration loud instead of silent-and-catastrophic.
+{
+  const path = require('path');
+  const appDir = __dirname;
+  const isEphemeral = p => !p || path.resolve(p).startsWith(appDir);
+  const unsafe = [
+    ['DB_PATH',    process.env.DB_PATH],
+    ['UPLOAD_DIR', process.env.UPLOAD_DIR],
+    ['BACKUP_DIR', process.env.BACKUP_DIR],
+  ].filter(([, v]) => isEphemeral(v)).map(([k]) => k);
+
+  if (unsafe.length && process.env.NODE_ENV === 'production') {
+    console.error(`
+  ╔══════════════════════════════════════════════════════════════════════╗
+  ║  ⚠️   DATA LOSS WARNING — ${unsafe.join(', ').padEnd(42)}║
+  ╠══════════════════════════════════════════════════════════════════════╣
+  ║  These paths are inside the container and will be WIPED on every     ║
+  ║  deploy, taking the database and all uploaded documents with them.   ║
+  ║                                                                      ║
+  ║  Fix: attach a Volume mounted at /data, then set:                    ║
+  ║      DB_PATH=/data/sparkle.db                                        ║
+  ║      UPLOAD_DIR=/data/uploads                                        ║
+  ║      BACKUP_DIR=/data/backups                                        ║
+  ╚══════════════════════════════════════════════════════════════════════╝
+`);
+    // Opt-out for anyone who genuinely wants throwaway storage.
+    if (process.env.ALLOW_EPHEMERAL_STORAGE !== 'true') {
+      console.error('  Refusing to start. Set ALLOW_EPHEMERAL_STORAGE=true to override.\n');
+      process.exit(1);
+    }
+  }
+}
+
 require('./db');
 const { startScheduledBackups, listBackups, backupDatabase } = require('./lib/backup');
+const { startCredentialExpirySweep } = require('./lib/credentialExpiry');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -138,6 +179,39 @@ app.use(sanitizeInput);
 app.use(detectSuspiciousActivity);
 
 app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString(), version: '1.0.0' }));
+
+// ═══════════════════════════════════════════════════
+//  STATIC UPLOADS — profile photos and job photos only
+// ═══════════════════════════════════════════════════
+// SECURITY: mounted per-subdirectory ON PURPOSE. Never mount UPLOAD_DIR itself —
+// it also contains uploads/documents, the licence and insurance scans, which carry
+// licence numbers and home addresses and must only ever be reachable through the
+// authenticated owner-or-admin route in routes/credentials.js.
+{
+  const path = require('path');
+  const { UPLOAD_DIR } = require('./lib/uploads');
+  const publicDirs = ['profiles', 'jobs', 'reviews'];   // NOT 'documents'
+  const opts = {
+    index:  false,
+    dotfiles: 'deny',
+    setHeaders: res => {
+      res.set('X-Content-Type-Options', 'nosniff');
+      // Set explicitly: the global cache middleware above stamps every non-/api
+      // GET with `private, no-store`, which would otherwise defeat caching here.
+      res.set('Cache-Control', 'public, max-age=604800');
+      // helmet defaults every response to Cross-Origin-Resource-Policy: same-origin.
+      // The frontend is served from a different origin (Netlify -> Railway, or
+      // :4200 -> :3001 locally), so without this the browser refuses to render
+      // these images even though the request itself succeeds with a 200.
+      res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    },
+  };
+  publicDirs.forEach(dir => {
+    app.use(`/uploads/${dir}`, express.static(path.join(UPLOAD_DIR, dir), opts));
+  });
+  // Anything else under /uploads (notably /uploads/documents) is a hard 404.
+  app.use('/uploads', (req, res) => res.status(404).json({ error: 'Not found' }));
+}
 
 // ── Admin-only: backup status & manual trigger ───────────────────────────────
 app.get('/api/admin/backups', (req, res) => {
@@ -209,7 +283,8 @@ app.listen(PORT, () => {
   ✅  Sparkle backend running on port ${PORT}
   📋  Fees: Client 8% / Business 10% / BG Check $40 / Instant cashout $10
   `);
-  startScheduledBackups(); // Start daily automated database backups
+  startScheduledBackups();        // Daily automated database backups
+  startCredentialExpirySweep();   // Daily licence/insurance expiry warnings + downgrades
 });
 
 module.exports = app;

@@ -4,9 +4,28 @@
 
 const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
+const fs   = require('fs');
 
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'sparkle.db');
-const db = new DatabaseSync(DB_PATH);
+
+// Create the containing directory first. When DB_PATH points at a mounted volume
+// (DB_PATH=/data/sparkle.db) the mount root exists, but a nested path like
+// /data/db/sparkle.db would otherwise fail with a bare "unable to open database
+// file" that gives no hint about the real cause.
+try {
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+} catch (err) {
+  console.error(`[DB] Could not create the directory for DB_PATH (${DB_PATH}): ${err.message}`);
+}
+
+let db;
+try {
+  db = new DatabaseSync(DB_PATH);
+} catch (err) {
+  console.error(`\n❌  FATAL: could not open the database at ${DB_PATH}\n    ${err.message}`);
+  console.error('    Check that DB_PATH points somewhere writable — on Railway that means a mounted Volume.\n');
+  process.exit(1);
+}
 
 // Enable WAL mode for better concurrent reads
 db.exec('PRAGMA journal_mode = WAL');
