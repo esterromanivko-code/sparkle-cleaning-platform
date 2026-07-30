@@ -49,6 +49,8 @@ db.exec(`
     avg_rating          REAL NOT NULL DEFAULT 0,
     total_jobs          INTEGER NOT NULL DEFAULT 0,
     total_earnings      REAL NOT NULL DEFAULT 0,
+    badge_tier          TEXT NOT NULL DEFAULT 'none',  -- none|licensed|insured|licensed_and_insured
+
     stripe_connect_id   TEXT,                         -- for payouts
     payout_bank_last4   TEXT,
     created_at          TEXT NOT NULL DEFAULT (datetime('now')),
@@ -167,6 +169,32 @@ db.exec(`
     submitted_at        TEXT NOT NULL DEFAULT (datetime('now')),
     completed_at        TEXT,
     expires_at          TEXT                          -- annual renewal
+  );
+
+  -- CLEANER CREDENTIALS (business license + certificate of insurance)
+  -- One row per document SUBMISSION, so history is preserved: a renewal inserts a
+  -- new row and the prior row is marked 'superseded' once the replacement is approved.
+  -- NOTE: SQLite cannot alter a CHECK constraint and CREATE TABLE IF NOT EXISTS is a
+  -- no-op on an existing DB, so both enums below must be complete from day one.
+  CREATE TABLE IF NOT EXISTS cleaner_credentials (
+    id            TEXT PRIMARY KEY,
+    cleaner_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    doc_type      TEXT NOT NULL CHECK(doc_type IN ('license','coi')),
+    status        TEXT NOT NULL DEFAULT 'pending'
+                  CHECK(status IN ('pending','approved','rejected','expired','superseded')),
+    filename      TEXT NOT NULL,        -- uuid.ext on disk; NEVER the original name
+    original_name TEXT,
+    mimetype      TEXT,
+    size_bytes    INTEGER,
+    issuer        TEXT,                 -- issuing state / insurance carrier
+    policy_number TEXT,                 -- SENSITIVE — never returned on a public route
+    expires_at    TEXT,                 -- ISO date (YYYY-MM-DD); admin may correct on approve
+    review_notes  TEXT,                 -- rejection reason, shown to the cleaner
+    reviewed_by   TEXT REFERENCES users(id),
+    reviewed_at   TEXT,
+    warned_30d_at TEXT,                 -- dedupe marker for the 30-day expiry warning
+    is_current    INTEGER NOT NULL DEFAULT 1,   -- 0 once superseded by a newer approval
+    submitted_at  TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
   -- RECURRING SERIES
@@ -416,11 +444,22 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_mileage_cleaner ON mileage_logs(cleaner_id, created_at);
   CREATE INDEX IF NOT EXISTS idx_mileage_job ON mileage_logs(job_id);
   CREATE INDEX IF NOT EXISTS idx_mileage_date ON mileage_logs(created_at);
+  CREATE INDEX IF NOT EXISTS idx_cred_cleaner ON cleaner_credentials(cleaner_id, doc_type, is_current);
+  CREATE INDEX IF NOT EXISTS idx_cred_pending ON cleaner_credentials(status, submitted_at);
+  CREATE INDEX IF NOT EXISTS idx_cred_expiry  ON cleaner_credentials(status, expires_at);
 `);
 
 // Safe migration: add email_verified column if it doesn't exist yet
 try {
   db.exec("ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0");
+} catch { /* Column already exists — that's fine */ }
+
+// Safe migration: add badge_tier to cleaner_profiles if it doesn't exist yet.
+// The CREATE TABLE above only covers fresh databases; this covers the live one.
+// No CHECK constraint by design — recomputeBadgeTier() in lib/badges.js is the
+// only writer, so the enum is enforced in exactly one place.
+try {
+  db.exec("ALTER TABLE cleaner_profiles ADD COLUMN badge_tier TEXT NOT NULL DEFAULT 'none'");
 } catch { /* Column already exists — that's fine */ }
 
 module.exports = db;

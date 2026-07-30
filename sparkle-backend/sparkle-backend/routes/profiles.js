@@ -87,7 +87,7 @@ router.get('/cleaners', requireAuth, (req, res) => {
   let sql = `
     SELECT u.id, u.first_name, u.city,
            cp.hourly_rate, cp.avg_rating, cp.total_jobs,
-           cp.is_verified, cp.is_pro,
+           cp.is_verified, cp.is_pro, cp.badge_tier,
            cp.lockout_fee_enabled, cp.lockout_fee_amount
     FROM users u
     JOIN cleaner_profiles cp ON cp.user_id = u.id
@@ -97,7 +97,18 @@ router.get('/cleaners', requireAuth, (req, res) => {
   if (verified_only === 'true') { sql += ' AND cp.is_verified = 1'; }
   if (min_rate) { sql += ' AND cp.hourly_rate >= ?'; params.push(parseFloat(min_rate)); }
   if (max_rate) { sql += ' AND cp.hourly_rate <= ?'; params.push(parseFloat(max_rate)); }
-  sql += ' ORDER BY cp.is_pro DESC, cp.is_verified DESC, cp.avg_rating DESC LIMIT 50';
+  // Pro members keep their paid placement, then credentials drive the order:
+  // Licensed & Insured = 3 pts, a single badge = 1 pt, none = 0, plus avg rating.
+  // Badge points stay in sync with TIER_POINTS in lib/badges.js.
+  sql += `
+    ORDER BY cp.is_pro DESC,
+             (CASE cp.badge_tier
+                WHEN 'licensed_and_insured' THEN 3
+                WHEN 'licensed'             THEN 1
+                WHEN 'insured'              THEN 1
+                ELSE 0 END) + COALESCE(cp.avg_rating, 0) DESC,
+             cp.is_verified DESC
+    LIMIT 50`;
 
   let cleaners = db.prepare(sql).all(...params);
 

@@ -107,6 +107,15 @@ const supportLimiter = rateLimit({
   message:  { error: 'Too many support requests. Please wait before submitting again.' }
 });
 
+// Credential document uploads — 15MB each and they hit persistent disk, so the
+// general apiLimiter (200/min) is far too loose. Prevents volume exhaustion.
+const credentialUploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max:      10,
+  store:    redisStore || undefined,
+  message:  { error: 'Too many document uploads. Please wait before trying again.' }
+});
+
 // ══════════════════════════════════════════════════════
 //  2. INPUT SANITIZATION — strip dangerous characters
 //     Prevents XSS (cross-site scripting) attacks
@@ -284,6 +293,7 @@ module.exports = {
   messageLimiter,
   apiLimiter,
   supportLimiter,
+  credentialUploadLimiter,
   sanitizeInput,
   securityHeaders,
   detectSuspiciousActivity,

@@ -46,6 +46,7 @@ const bidRoutes           = require('./routes/bids');
 const emailVerifyRoutes   = require('./routes/emailVerification');
 const mileageRoutes      = require('./routes/mileage');
 const supportRoutes      = require('./routes/support');
+const credentialRoutes   = require('./routes/credentials');
 
 // ═══════════════════════════════════════════════════
 //  STARTUP VALIDATION — refuse to run without critical config
@@ -184,6 +185,8 @@ app.use('/api/bids',                    bidRoutes);
 app.use('/api/mileage',                 mileageRoutes);
 app.use('/api/verify-email',            emailVerifyRoutes);
 app.use('/api/support',                 supportRoutes);
+app.use('/api/credentials',             credentialRoutes);
+// NOTE: keep new mounts ABOVE this line — it is a catch-all on /api.
 app.use('/api',                         profileRoutes);
 
 app.use((req, res) => res.status(404).json({ error: `Route ${req.method} ${req.path} not found` }));

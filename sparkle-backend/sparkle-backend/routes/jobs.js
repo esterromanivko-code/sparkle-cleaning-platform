@@ -67,7 +67,8 @@ router.get('/my-bookings', requireAuth, requireRole('client'), (req, res) => {
            u.first_name || ' ' || u.last_name AS cleaner_name,
            cp.avg_rating AS cleaner_rating,
            cp.is_verified,
-           cp.is_pro
+           cp.is_pro,
+           cp.badge_tier
     FROM jobs j
     LEFT JOIN users u ON u.id = j.cleaner_id
     LEFT JOIN cleaner_profiles cp ON cp.user_id = j.cleaner_id

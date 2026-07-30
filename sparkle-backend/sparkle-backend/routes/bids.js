@@ -127,7 +127,7 @@ router.get('/job/:job_id', requireAuth, requireRole('client', 'admin'), (req, re
   const bids = db.prepare(`
     SELECT b.*,
            u.first_name, u.last_name, u.city, u.avatar_url,
-           cp.hourly_rate, cp.avg_rating, cp.total_jobs, cp.is_verified, cp.is_pro,
+           cp.hourly_rate, cp.avg_rating, cp.total_jobs, cp.is_verified, cp.is_pro, cp.badge_tier,
            (b.amount * ${1 + BOOKING_FEE_PCT}) as client_total,
            (b.amount - b.success_fee) as cleaner_receives
     FROM bids b

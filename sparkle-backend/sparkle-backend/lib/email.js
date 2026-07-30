@@ -186,4 +186,38 @@ async function sendSupportReply(to, name, replyBody, ticketId) {
   return sendEmail({ to, subject: 'Sparkle support replied to your ticket', html });
 }
 
-module.exports = { sendEmail, sendPasswordReset, send2FASetupEmail, send2FACode, sendWelcomeEmail, sendSupportTicketReceived, sendSupportReply };
+// ── Credential Approved Email ─────────────────────────────────────────────────
+async function sendCredentialApproved(to, firstName, docLabel, fullyVerified) {
+  const html = baseTemplate(`
+    <div class="header"><div class="logo">Sparkle</div></div>
+    <div class="body">
+      <div class="title">Your ${docLabel} is verified ✅</div>
+      <div class="text">Hi ${firstName}, we've reviewed and approved your ${docLabel.toLowerCase()}.</div>
+      <div class="text">${fullyVerified
+        ? "You're now <strong>fully verified</strong> — the Licensed &amp; Insured badge is live on your profile, and you'll rank higher when clients search for cleaners."
+        : 'Your badge is live on your profile. Add your other document to earn the full <strong>Licensed &amp; Insured</strong> badge and rank even higher in search.'
+      }</div>
+      <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/app" class="btn">View my profile</a>
+    </div>
+    <div class="footer">© 2025 Sparkle Inc. · Seattle, WA · This email was sent to ${to}</div>
+  `);
+  return sendEmail({ to, subject: `Your ${docLabel} is verified — Sparkle`, html });
+}
+
+// ── Credential Rejected Email ─────────────────────────────────────────────────
+async function sendCredentialRejected(to, firstName, docLabel, reason) {
+  const html = baseTemplate(`
+    <div class="header"><div class="logo">Sparkle</div></div>
+    <div class="body">
+      <div class="title">We couldn't verify your ${docLabel}</div>
+      <div class="text">Hi ${firstName}, we reviewed the ${docLabel.toLowerCase()} you submitted but weren't able to approve it. Here's why:</div>
+      <div class="text" style="background:#F8F8F6;border-radius:10px;padding:16px;white-space:pre-wrap;">${reason}</div>
+      <div class="text">You can upload a corrected document any time — there's no penalty, and your account is unaffected.</div>
+      <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/app" class="btn">Upload a new document</a>
+    </div>
+    <div class="footer">© 2025 Sparkle Inc. · Seattle, WA · This email was sent to ${to}</div>
+  `);
+  return sendEmail({ to, subject: `Action needed: your ${docLabel} — Sparkle`, html });
+}
+
+module.exports = { sendEmail, sendPasswordReset, send2FASetupEmail, send2FACode, sendWelcomeEmail, sendSupportTicketReceived, sendSupportReply, sendCredentialApproved, sendCredentialRejected };
