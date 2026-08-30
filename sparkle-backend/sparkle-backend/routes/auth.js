@@ -17,6 +17,65 @@ const router = express.Router();
 // attacker's window is tiny. Frontend refreshes silently via /auth/refresh.
 const ACCESS_EXPIRY = '15m';
 
+// POST /api/auth/bootstrap-admin — create the FIRST admin on a fresh database.
+//
+// Why this exists: scripts/create-admin.js writes straight to the database, which
+// works locally but not on a container host where the DB lives on a mounted volume
+// and there is no shell. Without this there is no way to create the first admin on
+// a fresh deploy.
+//
+// Three independent locks, so this is safe to leave deployed:
+//   1. Inert unless ADMIN_BOOTSTRAP_TOKEN is set in the environment.
+//   2. Refuses once ANY admin exists — it can only ever run once.
+//   3. Requires the token, compared in constant time.
+// It also sits behind authLimiter (10 attempts / 15 min) via the /api/auth mount.
+//
+// Delete the ADMIN_BOOTSTRAP_TOKEN variable once you have signed in.
+router.post('/bootstrap-admin', [
+  body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
+  body('password').isLength({ min: 12 }).withMessage('Password must be 12+ characters'),
+  body('first_name').trim().notEmpty(),
+  body('last_name').trim().notEmpty(),
+], async (req, res) => {
+  const expected = process.env.ADMIN_BOOTSTRAP_TOKEN;
+  if (!expected) {
+    return res.status(404).json({ error: 'Not found' });   // feature disabled
+  }
+
+  const admins = db.prepare(`SELECT COUNT(*) AS count FROM users WHERE role = 'admin'`).get().count;
+  if (admins > 0) {
+    return res.status(409).json({ error: 'An admin already exists. Remove ADMIN_BOOTSTRAP_TOKEN.' });
+  }
+
+  const crypto   = require('crypto');
+  const provided = String(req.body.token || '');
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(403).json({ error: 'Invalid bootstrap token' });
+  }
+
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(422).json({ errors: errors.array() });
+
+  const { email, password, first_name, last_name } = req.body;
+  if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) {
+    return res.status(409).json({ error: 'That email is already registered' });
+  }
+
+  const id = uuid();
+  const password_hash = await bcrypt.hash(password, 12);
+  db.prepare(
+    'INSERT INTO users (id,role,first_name,last_name,email,password_hash,email_verified) VALUES (?,?,?,?,?,?,1)'
+  ).run(id, 'admin', first_name, last_name, email, password_hash);
+
+  console.log(`[BOOTSTRAP] Admin account created: ${email}`);
+  res.status(201).json({
+    message: 'Admin created. Sign in normally, then delete ADMIN_BOOTSTRAP_TOKEN from your environment.',
+    email,
+  });
+});
+
 const registerRules = [
   body('first_name').trim().notEmpty().withMessage('First name required'),
   body('last_name').trim().notEmpty().withMessage('Last name required'),
