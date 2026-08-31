@@ -217,6 +217,18 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
 .profile-top{display:flex;align-items:center;gap:12px;margin-bottom:1rem}
 .badge-verified{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--bd);background:var(--bl);border:1px solid #B5D4F4;border-radius:20px;padding:2px 8px}
 .badge-pro{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--gold);background:var(--goldl);border:1px solid #E8D080;border-radius:20px;padding:2px 8px;font-weight:500}
+/* Profile photos — same footprint as .av so they drop in wherever initials show */
+.av-photo{border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--s100);display:block}
+.av-edit{position:relative;display:inline-block}
+.av-edit input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.av-edit-hint{position:absolute;bottom:-2px;right:-2px;background:var(--g);color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;border:2px solid var(--surf);pointer-events:none}
+/* Credential badges — rendered by badgeTierHtml() from cleaner_profiles.badge_tier */
+.badge-licensed{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--pud);background:var(--pul);border:1px solid #C4B3E8;border-radius:20px;padding:2px 8px}
+.badge-insured{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--gd);background:var(--gl);border:1px solid var(--gm);border-radius:20px;padding:2px 8px}
+.badge-li{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--gold);background:var(--goldl);border:1px solid #E8D080;border-radius:20px;padding:2px 8px;font-weight:500}
+/* Document viewer (admin credential review) */
+.doc-frame{width:100%;height:520px;border:1px solid var(--bdr);border-radius:var(--rad);background:var(--s100)}
+.doc-img{max-width:100%;max-height:520px;display:block;margin:0 auto;border-radius:var(--rad)}
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--s200);border-radius:3px}
 /* Keyboard focus indicators — visible only when navigating by keyboard */
 :focus-visible{outline:2px solid var(--g);outline-offset:2px;border-radius:var(--rad)}
@@ -1526,11 +1538,54 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
   </div>
 </div>
 
+<div class="page" id="page-a-credentials">
+  <div class="pg-title">License &amp; insurance</div>
+  <div class="pg-sub">Review the documents cleaners submit to earn their verification badge</div>
+  <div class="f2" style="margin-bottom:1rem">
+    <select class="inp" id="cred-status-filter" onchange="loadAdminCredentials()">
+      <option value="pending">Awaiting review</option>
+      <option value="approved">Approved</option>
+      <option value="rejected">Rejected</option>
+      <option value="expired">Expired</option>
+    </select>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>Cleaner</th><th>Document</th><th>Submitted</th><th>Expires</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="cred-queue-body">
+          <tr><td colspan="6" style="text-align:center;color:var(--tx2);padding:1.5rem">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card" id="cred-preview" style="display:none">
+    <div class="row c" style="margin-bottom:.75rem">
+      <div>
+        <div class="sect-title" id="cred-preview-title">Document</div>
+        <div class="meta" id="cred-preview-sub"></div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn sm" id="cred-download-btn">Download</button>
+        <button class="btn sm" onclick="closeCredPreview()">Close</button>
+      </div>
+    </div>
+    <div id="cred-preview-body"></div>
+  </div>
+</div>
+
     </div><!-- /content -->
   </div><!-- /layout -->
 </div><!-- /app -->
 
 <!-- Sparkle API client — loads before main script so SparkleAPI is available to all functions -->
+<script>
+  // Production backend. Skipped on localhost so local development automatically
+  // talks to the local server on :3001 instead of the deployed one.
+  if (!['localhost', '127.0.0.1'].includes(location.hostname)) {
+    window.__SPARKLE_API_BASE__ = 'https://noble-flow-sparkle.up.railway.app';
+  }
+</script>
 <script src="sparkle_api.js"></script>
 <script>
 // ══════════════════════════════════════
@@ -1543,6 +1598,36 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+// ── Avatars ───────────────────────────────────────────────────────────────────
+// The backend stores root-relative photo paths (/uploads/profiles/<uuid>.jpg) so
+// the value stays correct whichever host serves it. Resolve against the API base.
+function avatarSrc(url) {
+  if (!url) return '';
+  if (/^https?:\/\//i.test(url)) return url;          // legacy absolute values
+  return SparkleAPI.getApiBase() + url;
+}
+
+// Renders a photo when one exists, otherwise the existing initials circle.
+// `cls` is the colour class (av-g / av-b / av-p) used for the initials fallback.
+function avatarHtml(user, cls = 'av-g', sizePx = 48, extraStyle = '') {
+  const style = `width:${sizePx}px;height:${sizePx}px;${extraStyle}`;
+  const url   = avatarSrc(user?.avatar_url);
+  if (url) {
+    return `<img class="av-photo" style="${style}" src="${escapeHtml(url)}" alt=""
+                 onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'av ${cls}',style:'${style}',textContent:'${escapeHtml(user?.initials || '')}'}))">`;
+  }
+  return `<div class="av ${cls}" style="${style};font-size:${Math.round(sizePx / 3)}px">${escapeHtml(user?.initials || '')}</div>`;
+}
+
+// Single source of truth for rendering a cleaner's credential badge.
+// Driven by cleaner_profiles.badge_tier, which only lib/badges.js writes.
+function badgeTierHtml(tier) {
+  if (tier === 'licensed_and_insured') return '<span class="badge-li">🏅 Licensed &amp; Insured</span>';
+  if (tier === 'licensed')             return '<span class="badge-licensed">📜 Licensed</span>';
+  if (tier === 'insured')              return '<span class="badge-insured">🛡️ Insured</span>';
+  return '';
 }
 
 // ══════════════════════════════════════
@@ -1749,6 +1834,7 @@ function loginWithData(apiUser, apiProfile = null) {
     phone:    apiUser.phone || '',
     city:     apiUser.city || '',
     zip:      apiUser.zip || '',
+    avatarUrl: apiUser.avatar_url || null,
     isReal:   true,   // flag: real session (not demo)
   };
   currentProfile = apiProfile || currentProfile;
@@ -1870,6 +1956,7 @@ function setupApp() {
   // Topbar
   document.getElementById('topbar-av').textContent = u.initials;
   document.getElementById('topbar-av').className = 'av ' + u.avClass;
+  refreshTopbarAvatar(u.avatarUrl);
   document.getElementById('topbar-name').textContent = u.name;
   // Role indicators
   document.getElementById('pill-cleaner').style.display = u.role==='cleaner'?'flex':'none';
@@ -1981,6 +2068,7 @@ function buildSidebar(role) {
       ${navItem('a-support',icons.msg,'Support')}
       ${navItem('a-disputes',icons.shield,'Disputes','12','nb-r')}
       ${navItem('a-bgchecks',icons.shield,'Background checks','34','nb-a')}
+      ${navItem('a-credentials',icons.shield,'License & insurance')}
       ${navItem('a-users',icons.people,'User management')}
       ${navItem('a-notifs',icons.bell,'Push notifications')}
     </div>
@@ -2094,6 +2182,9 @@ function showPage(id) {
   if (id === 'cl-recurring')  loadClientRecurring();
   if (id === 'cl-find')       loadFindCleaners();
   if (id === 'a-support')     loadAdminSupport();
+  if (id === 'a-credentials') loadAdminCredentials();
+  // Release any document blob when navigating away from the review page.
+  if (id !== 'a-credentials') closeCredPreview();
 
   // Close mobile sidebar after navigation
   closeMobileSidebar();
@@ -2878,6 +2969,11 @@ function loadCleanerDashboard() {
 
     const bgBanner = profile.is_verified ? '' : `<div class="alert warn" style="margin-top:.5rem">🛡️ Complete your <strong>background check</strong> to earn your Verified badge and get 3× more bookings. <a href="#" onclick="showPage('c-bgcheck');return false" style="color:var(--ad)">Start now — $30 →</a></div>`;
 
+    const tier = profile.badge_tier || 'none';
+    const credBanner = tier === 'licensed_and_insured'
+      ? `<div class="alert success" style="margin-top:.5rem">🏅 <strong>You're fully verified.</strong> Your Licensed &amp; Insured badge is live on your profile and you rank higher in client search.</div>`
+      : `<div class="alert info" style="margin-top:.5rem">📄 <strong>Get more bookings</strong> — add your ${tier === 'licensed' ? 'insurance certificate' : tier === 'insured' ? 'business license' : 'license and insurance'} to earn a verification badge and rank higher in search. <a href="#" onclick="showPage('c-profile');return false" style="color:var(--bd)">Upload now →</a></div>`;
+
     page.innerHTML = `
       <div class="pg-title">Good morning, ${firstName} 👋</div>
       <div class="pg-sub">Here's your Sparkle overview for today</div>
@@ -2897,7 +2993,11 @@ function loadCleanerDashboard() {
           ${nearbyHtml}
         </div>
       </div>
-      ${bgBanner}`;
+      ${bgBanner}
+      ${credBanner}`;
+  }).catch(err => {
+    if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+    page.innerHTML = `<div class="pg-title">Dashboard</div><div class="alert warn">Could not load your dashboard: ${escapeHtml(err.message)}</div>`;
   });
 }
 
@@ -3047,12 +3147,17 @@ function loadCleanerProfile() {
       <div class="pg-sub">Your public profile and rate settings</div>
       <div class="card">
         <div class="profile-top">
-          <div class="av-lg av-g" style="width:52px;height:52px;font-size:18px">${escapeHtml(u.initials || '')}</div>
+          <label class="av-edit" title="Change your photo">
+            ${avatarHtml({ avatar_url: data?.user?.avatar_url, initials: u.initials }, 'av-g', 52)}
+            <input type="file" accept="image/*" id="profile-photo-input" onchange="uploadProfilePhoto(this)">
+            <span class="av-edit-hint">✎</span>
+          </label>
           <div>
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
               <div style="font-size:15px;font-weight:500">${escapeHtml(u.fullName || u.name || '')}</div>
               ${profile.is_verified ? '<span class="badge-verified">🛡️ Verified</span>' : ''}
               ${profile.is_pro ? '<span class="badge-pro">⭐ Pro</span>' : ''}
+              ${badgeTierHtml(profile.badge_tier)}
             </div>
             <div class="stars">${stars} <span style="font-size:12px;color:var(--tx2);font-weight:400">${jobs ? rating.toFixed(1) + ' · ' + jobs + ' job' + (jobs === 1 ? '' : 's') : 'No jobs completed yet'}</span></div>
             <div style="font-size:12px;color:var(--tx2);margin-top:2px">${escapeHtml(location)}${since ? ' · Member since ' + escapeHtml(since) : ''}</div>
@@ -3070,10 +3175,234 @@ function loadCleanerProfile() {
         <label class="flbl" style="margin-bottom:8px">Services I offer</label>
         <div class="svc-grid" id="profile-services">${svcHtml}</div>
         <button class="btn primary lg" onclick="saveCleanerProfile(this)">Save changes</button>
-      </div>`;
+      </div>
+      <div id="credentials-card"><div class="card" style="color:var(--tx2);font-size:13px">Loading verification documents…</div></div>`;
+
+    loadMyCredentials();
   }).catch(err => {
     if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
     page.innerHTML = `<div class="pg-title">My profile</div><div class="alert warn">Could not load profile: ${escapeHtml(err.message)}</div>`;
+  });
+}
+
+// ══════════════════════════════════════
+// PROFILE PHOTO (all roles)
+// ══════════════════════════════════════
+async function uploadProfilePhoto(input) {
+  const file = input?.files?.[0];
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) { showToast('Choose an image file.', 'warn'); input.value = ''; return; }
+  if (file.size > 10 * 1024 * 1024)    { showToast('That image is over 10MB — please pick a smaller one.', 'warn'); input.value = ''; return; }
+
+  // Optimistic preview so the change feels instant while the upload runs.
+  const label   = input.closest('.av-edit');
+  const imgEl   = label?.querySelector('img, .av');
+  const preview = URL.createObjectURL(file);
+  if (imgEl) {
+    const img = document.createElement('img');
+    img.className = 'av-photo';
+    img.style.cssText = imgEl.style.cssText;
+    img.src = preview;
+    imgEl.replaceWith(img);
+  }
+
+  try {
+    const { url } = await SparkleAPI.uploadProfilePhoto(file);
+    currentUser.avatarUrl = url;
+    refreshTopbarAvatar(url);
+    showToast('Profile photo updated.', 'success');
+  } catch (err) {
+    if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+    showToast(err.message, 'error');
+    // Roll the optimistic preview back to whatever the server actually has.
+    if (currentUser?.role === 'cleaner') loadCleanerProfile();
+    else loadClientSettings();
+  } finally {
+    URL.revokeObjectURL(preview);
+    if (input) input.value = '';
+  }
+}
+
+async function removeProfilePhoto() {
+  showConfirm({
+    title: 'Remove your photo?',
+    body: 'Your profile will show your initials instead. You can upload a new photo any time.',
+    confirmLabel: 'Remove',
+    confirmClass: 'danger',
+    onConfirm: async () => {
+      try {
+        await SparkleAPI.deleteProfilePhoto();
+        currentUser.avatarUrl = null;
+        refreshTopbarAvatar(null);
+        showToast('Photo removed.', 'success');
+        if (currentUser?.role === 'cleaner') loadCleanerProfile();
+        else loadClientSettings();
+      } catch (err) {
+        if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+        showToast(err.message, 'error');
+      }
+    },
+  });
+}
+
+// The topbar avatar is a plain div of initials in the static HTML; swap it for an
+// <img> when a photo exists so the change is visible everywhere at once.
+function refreshTopbarAvatar(url) {
+  const el = document.getElementById('topbar-av');
+  if (!el) return;
+  const src = avatarSrc(url);
+  if (src) {
+    el.style.backgroundImage = `url("${src}")`;
+    el.style.backgroundSize  = 'cover';
+    el.style.backgroundPosition = 'center';
+    el.style.color = 'transparent';
+  } else {
+    el.style.backgroundImage = '';
+    el.style.color = '';
+    el.textContent = currentUser?.initials || '';
+  }
+}
+
+// ══════════════════════════════════════
+// CLEANER — VERIFICATION DOCUMENTS
+// ══════════════════════════════════════
+const CRED_META = {
+  license: { icon: '📜', title: 'Business license',       issuerLbl: 'Issuing authority', issuerEx: 'e.g. State of Washington' },
+  coi:     { icon: '🛡️', title: 'Certificate of insurance', issuerLbl: 'Insurance carrier', issuerEx: 'e.g. Thimble, NEXT' },
+};
+const CRED_STATUS = {
+  pending:  { label: 'Under review', tag: 'amber' },
+  approved: { label: '✓ Verified',   tag: 'green' },
+  rejected: { label: 'Not approved', tag: 'red'   },
+  expired:  { label: 'Expired',      tag: 'red'   },
+};
+
+async function loadMyCredentials() {
+  const host = document.getElementById('credentials-card');
+  if (!host) return;
+  try {
+    const data = await SparkleAPI.getMyCredentials();
+    host.innerHTML = credentialsCardHtml(data.documents || []);
+  } catch (err) {
+    if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+    host.innerHTML = `<div class="card"><div class="alert warn" style="margin:0">Could not load your documents: ${escapeHtml(err.message)}</div></div>`;
+  }
+}
+
+function credentialsCardHtml(docs) {
+  const blocks = Object.keys(CRED_META).map(type => {
+    const meta = CRED_META[type];
+    // Newest first from the API, so the first match is the live one for this type.
+    const doc  = docs.find(d => d.doc_type === type);
+    const st   = doc ? (CRED_STATUS[doc.status] || { label: doc.status, tag: '' }) : null;
+
+    // A cleaner can upload unless something is already awaiting review.
+    const canUpload = !doc || doc.status !== 'pending';
+
+    let statusLine = 'Not submitted yet';
+    let expiryNote = '';
+    if (doc) {
+      if (doc.status === 'approved' && doc.expires_at) {
+        const days = Math.ceil((new Date(doc.expires_at) - new Date()) / 86400000);
+        statusLine = `Valid until ${escapeHtml(doc.expires_at)}`;
+        if (days <= 30) {
+          expiryNote = `<div class="alert warn" style="margin:.5rem 0 0;font-size:12px">This expires in ${days} day${days === 1 ? '' : 's'} — upload a renewal to keep your badge.</div>`;
+        }
+      } else if (doc.status === 'pending') {
+        statusLine = `Submitted ${escapeHtml((doc.submitted_at || '').slice(0, 10))} — usually reviewed within 1 business day`;
+      } else if (doc.status === 'expired') {
+        statusLine = `Expired ${escapeHtml(doc.expires_at || '')}`;
+      } else {
+        statusLine = `Reviewed ${escapeHtml((doc.reviewed_at || '').slice(0, 10))}`;
+      }
+    }
+
+    const rejectNote = (doc && doc.status === 'rejected' && doc.review_notes)
+      ? `<div class="alert error" style="margin:.5rem 0 0;font-size:12px"><strong>Why it wasn't approved:</strong> ${escapeHtml(doc.review_notes)}</div>`
+      : '';
+
+    const withdraw = (doc && doc.status === 'pending')
+      ? `<button class="btn sm" style="margin-top:.625rem" onclick="withdrawCredential('${escapeHtml(doc.id)}',this)">Withdraw</button>`
+      : '';
+
+    const form = canUpload ? `
+      <div class="divider"></div>
+      <div class="f2">
+        <div class="frow"><label class="flbl">Document (PDF or photo, max 15MB)</label>
+          <input class="inp" type="file" id="cred-file-${type}" accept=".pdf,image/*"></div>
+        <div class="frow"><label class="flbl">Expiry date</label>
+          <input class="inp" type="date" id="cred-exp-${type}"></div>
+      </div>
+      <div class="frow"><label class="flbl">${meta.issuerLbl} (optional)</label>
+        <input class="inp" id="cred-issuer-${type}" placeholder="${meta.issuerEx}"></div>
+      <button class="btn primary sm" onclick="uploadCredentialDoc('${type}',this)">Upload for review</button>` : '';
+
+    return `
+      <div class="card-sm">
+        <div class="row c">
+          <div>
+            <div style="font-size:13px;font-weight:500">${meta.icon} ${meta.title}</div>
+            <div class="meta">${statusLine}</div>
+          </div>
+          <span class="tag ${st ? st.tag : ''}">${st ? st.label : 'Not submitted'}</span>
+        </div>
+        ${expiryNote}${rejectNote}${withdraw}${form}
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="card">
+      <div class="sect-title" style="margin-bottom:.375rem">Verification documents</div>
+      <div class="meta" style="margin-bottom:.875rem">Cleaners with a license and insurance badge rank higher in client search and get more bookings. Your documents are private — only Sparkle staff can view them.</div>
+      ${blocks}
+    </div>`;
+}
+
+async function uploadCredentialDoc(docType, btn) {
+  const fileEl = document.getElementById(`cred-file-${docType}`);
+  const expEl  = document.getElementById(`cred-exp-${docType}`);
+  const issEl  = document.getElementById(`cred-issuer-${docType}`);
+
+  const file = fileEl?.files?.[0];
+  if (!file)          { showToast('Choose a document to upload first.', 'warn'); fileEl?.focus(); return; }
+  if (!expEl?.value)  { showToast('Enter the expiry date shown on the document.', 'warn'); expEl?.focus(); return; }
+  if (expEl.value <= new Date().toISOString().slice(0, 10)) {
+    showToast('That expiry date has already passed.', 'warn'); expEl.focus(); return;
+  }
+
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Uploading…';
+  try {
+    await SparkleAPI.uploadCredential(docType, file, {
+      expires_at: expEl.value,
+      issuer:     issEl?.value?.trim() || undefined,
+    });
+    showToast("Submitted for review — we'll let you know within 1 business day.", 'success');
+    loadMyCredentials();
+  } catch (err) {
+    if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+    showToast(err.message, 'error');
+    btn.disabled = false; btn.textContent = original;
+  }
+}
+
+function withdrawCredential(id, btn) {
+  showConfirm({
+    title: 'Withdraw this document?',
+    body: "It will be removed from Sparkle's review queue and deleted. You can upload a new one any time.",
+    confirmLabel: 'Withdraw',
+    confirmClass: 'danger',
+    onConfirm: async () => {
+      try {
+        await SparkleAPI.deleteCredential(id);
+        showToast('Document withdrawn.', 'success');
+        loadMyCredentials();
+      } catch (err) {
+        if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+        showToast(err.message, 'error');
+      }
+    },
   });
 }
 
@@ -3196,13 +3525,14 @@ function loadFindCleaners() {
 
       return `<div class="card cleaner-card" data-verified="${c.is_verified ? 'true' : 'false'}" data-rating="${rating}" data-price="${rate}">
         <div class="profile-top">
-          <div class="av-lg av-g" style="width:48px;height:48px">${escapeHtml(initials)}</div>
+          ${avatarHtml({ avatar_url: c.avatar_url, initials }, 'av-g', 48)}
           <div style="flex:1">
             <div class="row c">
               <div style="display:flex;align-items:center;gap:8px">
                 <div style="font-size:14px;font-weight:500">${escapeHtml(name)}</div>
                 ${c.is_verified ? '<span class="badge-verified">🛡️ Verified</span>' : ''}
                 ${c.is_pro ? '<span class="badge-pro">⭐ Pro</span>' : ''}
+                ${badgeTierHtml(c.badge_tier)}
               </div>
               <div style="font-size:15px;font-weight:500;color:var(--gd)">$${rate}/hr</div>
             </div>
@@ -4207,6 +4537,19 @@ function loadClientSettings() {
     <div class="pg-sub">Account, notifications, and preferences</div>
     <div class="card">
       <div class="sect-title" style="margin-bottom:.875rem">Account</div>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:1rem">
+        <label class="av-edit" title="Add a photo">
+          ${avatarHtml({ avatar_url: user.avatarUrl, initials: user.initials }, 'av-b', 52)}
+          <input type="file" accept="image/*" onchange="uploadProfilePhoto(this)">
+          <span class="av-edit-hint">✎</span>
+        </label>
+        <div>
+          <div style="font-size:13px;font-weight:500">Profile photo</div>
+          <div class="meta">Optional — helps cleaners recognise you at the door.</div>
+          ${user.avatarUrl ? `<button class="btn sm" style="margin-top:6px" onclick="removeProfilePhoto()">Remove photo</button>` : ''}
+        </div>
+      </div>
+      <div class="divider"></div>
       <div class="frow"><label class="flbl">Name</label><div class="f2"><input class="inp" id="client-first-name" value="${escapeHtml(user.fullName?.split(' ')[0] || user.name || '')}"><input class="inp" id="client-last-name" value="${escapeHtml((user.fullName?.split(' ').slice(1).join(' ') || '').replace(/\.$/, ''))}"></div></div>
       <div class="frow"><label class="flbl">Email</label><input class="inp" id="client-email" type="email" value="${escapeHtml(user.email || '')}"></div>
       <div class="frow"><label class="flbl">Phone</label><input class="inp" id="client-phone" type="tel" value="${escapeHtml(user.phone || currentProfile?.phone || '')}"></div>
@@ -4678,6 +5021,185 @@ async function adminUpdateTicketStatus() {
     await refreshAdminSupportList();
   } catch (err) {
     showToast(err.message, 'error');
+  }
+}
+
+// ══════════════════════════════════════
+// ADMIN — LICENSE & INSURANCE REVIEW
+// ══════════════════════════════════════
+let adminCredState = { documents: [], blobUrl: null };
+
+async function loadAdminCredentials() {
+  const body = document.getElementById('cred-queue-body');
+  if (!body) return;
+
+  // Demo mode: the loaders all no-op without a real session, so show sample rows.
+  if (!currentUser?.isReal) {
+    body.innerHTML = `
+      <tr><td><div style="font-weight:500">Jordan M.</div><div class="meta">Seattle</div></td><td>📜 License</td><td>Today</td><td>2027-06-30</td><td><span class="tag amber">Under review</span></td><td><button class="btn sm" disabled>View</button></td></tr>
+      <tr><td><div style="font-weight:500">Aisha L.</div><div class="meta">Renton</div></td><td>🛡️ Insurance</td><td>Yesterday</td><td>2026-11-01</td><td><span class="tag amber">Under review</span></td><td><button class="btn sm" disabled>View</button></td></tr>
+      <tr><td colspan="6" style="text-align:center;color:var(--tx2);padding:1rem">Sign in with a real admin account to review live documents.</td></tr>`;
+    return;
+  }
+
+  const status = document.getElementById('cred-status-filter')?.value || 'pending';
+  body.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--tx2);padding:1.5rem">Loading…</td></tr>`;
+  closeCredPreview();
+
+  try {
+    const data = await SparkleAPI.getPendingCredentials(status);
+    adminCredState.documents = data.documents || [];
+    renderCredentialQueue(status);
+  } catch (err) {
+    if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+    body.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--rd);padding:1.5rem">${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function renderCredentialQueue(status) {
+  const body = document.getElementById('cred-queue-body');
+  if (!body) return;
+
+  if (!adminCredState.documents.length) {
+    body.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--tx2);padding:1.5rem">No ${escapeHtml(status)} documents right now.</td></tr>`;
+    return;
+  }
+
+  body.innerHTML = adminCredState.documents.map(d => {
+    const meta = CRED_META[d.doc_type] || { icon: '📄', title: d.doc_type };
+    const st   = CRED_STATUS[d.status] || { label: d.status, tag: '' };
+    const name = `${d.first_name || ''} ${d.last_name || ''}`.trim() || 'Cleaner';
+    const acts = d.status === 'pending'
+      ? `<button class="btn sm" onclick="viewCredentialDoc('${escapeHtml(d.id)}')">View</button>
+         <button class="btn primary sm" onclick="approveCredentialDoc('${escapeHtml(d.id)}')">Approve</button>
+         <button class="btn danger sm" onclick="rejectCredentialDoc('${escapeHtml(d.id)}')">Reject</button>`
+      : `<button class="btn sm" onclick="viewCredentialDoc('${escapeHtml(d.id)}')">View</button>`;
+
+    return `<tr>
+      <td><div style="font-weight:500">${escapeHtml(name)}</div><div class="meta">${escapeHtml(d.city || d.email || '')}</div></td>
+      <td>${meta.icon} ${escapeHtml(meta.title)}${d.issuer ? `<div class="meta">${escapeHtml(d.issuer)}</div>` : ''}</td>
+      <td>${escapeHtml((d.submitted_at || '').slice(0, 10))}</td>
+      <td>${escapeHtml(d.expires_at || '—')}</td>
+      <td><span class="tag ${st.tag}">${escapeHtml(st.label)}</span></td>
+      <td><div style="display:flex;gap:4px;flex-wrap:wrap">${acts}</div></td>
+    </tr>`;
+  }).join('');
+}
+
+// The document route requires an Authorization header, which a plain <iframe src>
+// or <img src> cannot send — and securityHeaders sets X-Frame-Options: DENY on the
+// API origin anyway. So fetch the bytes with the token and render a same-origin
+// blob: URL instead.
+async function viewCredentialDoc(id) {
+  const doc  = adminCredState.documents.find(d => d.id === id);
+  const host = document.getElementById('cred-preview');
+  const bodyEl = document.getElementById('cred-preview-body');
+  if (!doc || !host || !bodyEl) return;
+
+  const name = `${doc.first_name || ''} ${doc.last_name || ''}`.trim();
+  document.getElementById('cred-preview-title').textContent = (CRED_META[doc.doc_type]?.title) || 'Document';
+  document.getElementById('cred-preview-sub').textContent   = `${name} · expires ${doc.expires_at || '—'}`;
+  host.style.display = '';
+  bodyEl.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--tx2)">Loading document…</div>`;
+
+  try {
+    const res  = await SparkleAPI.getCredentialFile(id);
+    const blob = await res.blob();
+
+    // Release the previous document before replacing it, or each view leaks
+    // its buffer for the life of the page.
+    if (adminCredState.blobUrl) URL.revokeObjectURL(adminCredState.blobUrl);
+    adminCredState.blobUrl = URL.createObjectURL(blob);
+
+    bodyEl.innerHTML = blob.type === 'application/pdf'
+      ? `<iframe class="doc-frame" src="${adminCredState.blobUrl}"></iframe>`
+      : `<img class="doc-img" src="${adminCredState.blobUrl}" alt="Submitted document">`;
+
+    const dl = document.getElementById('cred-download-btn');
+    if (dl) dl.onclick = () => {
+      const a = document.createElement('a');
+      a.href = adminCredState.blobUrl;
+      a.download = doc.original_name || `${doc.doc_type}-${doc.id}`;
+      a.click();
+    };
+  } catch (err) {
+    if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+    bodyEl.innerHTML = `<div class="alert warn" style="margin:0">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function closeCredPreview() {
+  const host = document.getElementById('cred-preview');
+  if (host) host.style.display = 'none';
+  const bodyEl = document.getElementById('cred-preview-body');
+  if (bodyEl) bodyEl.innerHTML = '';
+  if (adminCredState.blobUrl) {
+    URL.revokeObjectURL(adminCredState.blobUrl);
+    adminCredState.blobUrl = null;
+  }
+}
+
+function approveCredentialDoc(id) {
+  const doc = adminCredState.documents.find(d => d.id === id);
+  if (!doc) return;
+  showConfirm({
+    title: 'Approve this document?',
+    body: `The cleaner's badge goes live immediately and they'll rank higher in client search. Expiry on file: ${doc.expires_at || 'none'}. Make sure that matches the document.`,
+    confirmLabel: 'Approve',
+    onConfirm: async () => {
+      try {
+        const r = await SparkleAPI.approveCredential(id);
+        showToast(`Approved — badge is now "${r.badge_tier.replace(/_/g, ' ')}"`, 'success');
+        closeCredPreview();
+        loadAdminCredentials();
+      } catch (err) {
+        if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+        showToast(err.message, 'error');
+      }
+    },
+  });
+}
+
+// The reject reason is required and is shown verbatim to the cleaner, so it needs
+// a real text field rather than showConfirm's static body.
+function rejectCredentialDoc(id) {
+  const row = document.getElementById(`cred-reject-${id}`);
+  if (row) { row.remove(); return; }   // toggle closed
+
+  const btn = document.querySelector(`#cred-queue-body button[onclick*="rejectCredentialDoc('${id}')"]`);
+  const tr  = btn?.closest('tr');
+  if (!tr) return;
+
+  const editor = document.createElement('tr');
+  editor.id = `cred-reject-${id}`;
+  editor.innerHTML = `
+    <td colspan="6" style="background:var(--s100)">
+      <label class="flbl">Why can't this be approved? The cleaner will see this message.</label>
+      <div style="display:flex;gap:6px;align-items:flex-start">
+        <input class="inp" id="cred-reject-input-${id}" placeholder="e.g. The certificate expired in 2024 — please upload a current one." style="flex:1">
+        <button class="btn danger sm" onclick="submitCredentialRejection('${escapeHtml(id)}',this)">Send rejection</button>
+        <button class="btn sm" onclick="rejectCredentialDoc('${escapeHtml(id)}')">Cancel</button>
+      </div>
+    </td>`;
+  tr.after(editor);
+  document.getElementById(`cred-reject-input-${id}`)?.focus();
+}
+
+async function submitCredentialRejection(id, btn) {
+  const input  = document.getElementById(`cred-reject-input-${id}`);
+  const reason = input?.value?.trim();
+  if (!reason) { showToast('Enter a reason so the cleaner knows what to fix.', 'warn'); input?.focus(); return; }
+
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    await SparkleAPI.rejectCredential(id, reason);
+    showToast('Rejected — the cleaner has been notified with your reason.', 'success');
+    closeCredPreview();
+    loadAdminCredentials();
+  } catch (err) {
+    if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+    showToast(err.message, 'error');
+    btn.disabled = false; btn.textContent = 'Send rejection';
   }
 }
 

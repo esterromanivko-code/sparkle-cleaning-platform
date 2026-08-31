@@ -1,8 +1,6 @@
 # Claude Code session files
 .claude/
 
-# Backend lives in its own separate repo
-sparkle-backend/
 sparkle-backend-final.zip
 
 # OS junk

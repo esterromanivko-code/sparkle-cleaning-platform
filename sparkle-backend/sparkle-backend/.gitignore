@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Environment — NEVER commit secrets
+.env
+
+# SQLite database files (Railway uses a Volume for persistence)
+*.db
+*.db-shm
+*.db-wal
+
+# Uploaded user files
+uploads/
+
+# Logs
+*.log
+logs/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

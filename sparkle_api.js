@@ -102,18 +102,25 @@ window.SparkleAPI = (function () {
    * Mobile: 15-second timeout, proper error messages
    */
   async function apiFetch(path, options = {}, _retry = false) {
-    const token = getAccessToken();
+    const token  = getAccessToken();
+    const isForm = options.body instanceof FormData;
     const headers = {
-      'Content-Type': 'application/json',
+      // Never set Content-Type for FormData — the browser has to generate the
+      // multipart boundary itself. Setting it manually leaves multer with a body
+      // it can't parse, and req.file comes back undefined.
+      ...(isForm ? {} : { 'Content-Type': 'application/json' }),
       ...(options.headers || {}),
     };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
     let res;
     try {
-      // Mobile timeout: 15 seconds (longer than desktop due to slower networks)
+      // Mobile timeout: 15 seconds (longer than desktop due to slower networks).
+      // File uploads and document downloads need far more — a 10MB scan on a phone
+      // connection blows straight through 15s.
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
+      const timeoutMs  = options.timeoutMs || (isForm ? 90000 : 15000);
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
       res = await fetch(`${BASE}${path}`, {
         ...options,
@@ -545,6 +552,121 @@ window.SparkleAPI = (function () {
     return json;
   }
 
+  // ─── Profile photo ──────────────────────────────────────────────────────────
+
+  /**
+   * Upload the signed-in user's profile photo (any role).
+   * @param {File} file  image file — the backend accepts JPG/PNG/GIF/WebP/HEIC up to 10MB
+   * @returns {{ url: string }} url is root-relative, e.g. /uploads/profiles/<uuid>.jpg
+   */
+  async function uploadProfilePhoto(file) {
+    const fd = new FormData();
+    fd.append('photo', file);
+    const res  = await apiFetch('/api/upload/profile-photo', { method: 'POST', body: fd });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Could not upload your photo');
+    return json;
+  }
+
+  /** Remove the signed-in user's profile photo. */
+  async function deleteProfilePhoto() {
+    const res  = await apiFetch('/api/upload/profile-photo', { method: 'DELETE' });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Could not remove your photo');
+    return json;
+  }
+
+  // ─── Credentials (license & insurance verification) ─────────────────────────
+
+  /** Cleaner: own documents plus the derived badge_tier. */
+  async function getMyCredentials() {
+    const res = await apiFetch('/api/credentials/mine');
+    if (!res.ok) throw new Error('Failed to load your documents');
+    return res.json();
+  }
+
+  /**
+   * Cleaner: upload a verification document.
+   * @param {'license'|'coi'} docType
+   * @param {File}   file
+   * @param {{ expires_at: string, issuer?: string, policy_number?: string }} meta
+   */
+  async function uploadCredential(docType, file, meta = {}) {
+    const fd = new FormData();
+    fd.append('document', file);
+    fd.append('expires_at', meta.expires_at || '');
+    if (meta.issuer)        fd.append('issuer', meta.issuer);
+    if (meta.policy_number) fd.append('policy_number', meta.policy_number);
+
+    // No Content-Type header — apiFetch detects FormData and lets the browser
+    // set the multipart boundary.
+    const res  = await apiFetch(`/api/credentials/${encodeURIComponent(docType)}`, {
+      method: 'POST',
+      body: fd,
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      const msg = json.errors?.[0]?.msg || json.error || 'Upload failed';
+      throw new Error(msg);
+    }
+    return json;
+  }
+
+  /** Cleaner: withdraw a document that is still awaiting review. */
+  async function deleteCredential(id) {
+    const res  = await apiFetch(`/api/credentials/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Failed to withdraw document');
+    return json;
+  }
+
+  /**
+   * Fetch a document's bytes (owner or admin).
+   * Returns the raw Response — the caller does `.blob()`. A plain <img>/<iframe>
+   * src cannot carry the Authorization header, so the viewer must go through
+   * fetch -> blob -> URL.createObjectURL.
+   */
+  async function getCredentialFile(id) {
+    const res = await apiFetch(`/api/credentials/${encodeURIComponent(id)}/file`, { timeoutMs: 60000 });
+    if (!res.ok) throw new Error('Could not open the document');
+    return res;
+  }
+
+  /** Admin: the review queue for a given status (default 'pending'). */
+  async function getPendingCredentials(status = 'pending') {
+    const res = await apiFetch(`/api/credentials/admin/queue?status=${encodeURIComponent(status)}`);
+    if (!res.ok) throw new Error('Failed to load the review queue');
+    return res.json();
+  }
+
+  /** Admin: approve a document, optionally correcting the expiry date. */
+  async function approveCredential(id, expiresAt) {
+    const res  = await apiFetch(`/api/credentials/admin/${encodeURIComponent(id)}/approve`, {
+      method: 'POST',
+      body: JSON.stringify(expiresAt ? { expires_at: expiresAt } : {}),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      const msg = json.errors?.[0]?.msg || json.error || 'Failed to approve document';
+      throw new Error(msg);
+    }
+    return json;
+  }
+
+  /** Admin: reject a document with a reason the cleaner will see. */
+  async function rejectCredential(id, reason) {
+    const res  = await apiFetch(`/api/credentials/admin/${encodeURIComponent(id)}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      const msg = json.errors?.[0]?.msg || json.error || 'Failed to reject document';
+      throw new Error(msg);
+    }
+    return json;
+  }
+
   // ─── Public API ─────────────────────────────────────────────────────────────
   return {
     isRealSession,
@@ -583,5 +705,14 @@ window.SparkleAPI = (function () {
     replyToTicket,
     getAllTickets,
     updateTicketStatus,
+    uploadProfilePhoto,
+    deleteProfilePhoto,
+    getMyCredentials,
+    uploadCredential,
+    deleteCredential,
+    getCredentialFile,
+    getPendingCredentials,
+    approveCredential,
+    rejectCredential,
   };
 })();

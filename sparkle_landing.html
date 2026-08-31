@@ -1120,6 +1120,13 @@ footer{background:var(--navy);padding:72px 0 36px}
 </footer>
 
 
+<script>
+  // Production backend. Skipped on localhost so local development automatically
+  // talks to the local server on :3001 instead of the deployed one.
+  if (!['localhost', '127.0.0.1'].includes(location.hostname)) {
+    window.__SPARKLE_API_BASE__ = 'https://noble-flow-sparkle.up.railway.app';
+  }
+</script>
 <script src="sparkle_api.js"></script>
 <script>
 'use strict';
