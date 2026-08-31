@@ -168,20 +168,35 @@ app.use((req, res, next) => {
 // request — the API answered fine to curl while the real site got CORS errors.
 // Origins are normalised here, a comma-separated list is supported, and Netlify
 // branch/preview subdomains of the configured host are allowed.
-const stripTrailingSlash = u => String(u || '').trim().replace(/\/+$/, '');
+// Match on HOSTNAME, not the full origin string. FRONTEND_URL is hand-entered in a
+// dashboard, so it routinely differs from the real browser origin by a trailing
+// slash, a path, or http:// vs https:// — Netlify even reports its own primary URL
+// as http:// while serving over https. Any of those mismatches silently killed
+// every browser request while curl kept working. Comparing hosts removes that
+// whole class of misconfiguration without widening the allowlist to other sites.
+function hostOf(value) {
+  const s = String(value || '').trim();
+  if (!s) return null;
+  try {
+    return new URL(/^https?:\/\//i.test(s) ? s : `https://${s}`).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
 
-const ALLOWED_ORIGINS = [
-  ...String(process.env.FRONTEND_URL || '').split(',').map(stripTrailingSlash),
-  'http://localhost:3000',
-  'http://localhost:4200',
-  'http://localhost:5173',
-].filter(Boolean);
+const ALLOWED_HOSTS = new Set([
+  ...String(process.env.FRONTEND_URL || '').split(',').map(hostOf),
+  ...String(process.env.CORS_EXTRA_ORIGINS || '').split(',').map(hostOf),
+  'localhost',
+  '127.0.0.1',
+].filter(Boolean));
 
-// e.g. https://sparkle.netlify.app also permits https://deploy-preview-3--sparkle.netlify.app
-const NETLIFY_PREVIEW_PATTERNS = ALLOWED_ORIGINS
-  .map(o => /^https:\/\/([a-z0-9-]+)\.netlify\.app$/i.exec(o)?.[1])
+// A configured Netlify host also permits its branch and deploy-preview subdomains,
+// e.g. deploy-preview-3--sparkle.netlify.app for sparkle.netlify.app.
+const NETLIFY_PREVIEW_PATTERNS = [...ALLOWED_HOSTS]
+  .map(h => /^([a-z0-9-]+)\.netlify\.app$/i.exec(h)?.[1])
   .filter(Boolean)
-  .map(site => new RegExp(`^https://[a-z0-9-]+--${site}\\.netlify\\.app$`, 'i'));
+  .map(site => new RegExp(`^[a-z0-9-]+--${site}\\.netlify\\.app$`, 'i'));
 
 const _rejectedOrigins = new Set();
 
@@ -191,15 +206,15 @@ app.use(cors({
     if (!origin) return cb(null, true);
     if (process.env.NODE_ENV !== 'production') return cb(null, true);
 
-    const o = stripTrailingSlash(origin);
-    if (ALLOWED_ORIGINS.includes(o)) return cb(null, true);
-    if (NETLIFY_PREVIEW_PATTERNS.some(re => re.test(o))) return cb(null, true);
+    const host = hostOf(origin);
+    if (host && ALLOWED_HOSTS.has(host)) return cb(null, true);
+    if (host && NETLIFY_PREVIEW_PATTERNS.some(re => re.test(host))) return cb(null, true);
 
-    // Log each unknown origin once — this is otherwise very hard to diagnose,
-    // since the browser only reports a generic CORS failure.
-    if (!_rejectedOrigins.has(o)) {
-      _rejectedOrigins.add(o);
-      console.warn(`[CORS] Rejected origin: ${o}  (allowed: ${ALLOWED_ORIGINS.join(', ') || 'none'})`);
+    // Log each unknown origin once — otherwise this is very hard to diagnose,
+    // since the browser only ever reports a generic CORS failure.
+    if (!_rejectedOrigins.has(origin)) {
+      _rejectedOrigins.add(origin);
+      console.warn(`[CORS] Rejected origin: ${origin}  (allowed hosts: ${[...ALLOWED_HOSTS].join(', ') || 'none'})`);
     }
     cb(null, false);
   },
@@ -214,7 +229,14 @@ app.use('/api', apiLimiter);
 app.use(sanitizeInput);
 app.use(detectSuspiciousActivity);
 
-app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString(), version: '1.0.0' }));
+app.get('/health', (req, res) => res.json({
+  status:  'ok',
+  time:    new Date().toISOString(),
+  version: '1.0.0',
+  // Public frontend hostnames only — no secrets. Included because a CORS
+  // misconfiguration is otherwise invisible from outside the container.
+  cors_allowed_hosts: [...ALLOWED_HOSTS],
+}));
 
 // ═══════════════════════════════════════════════════
 //  STATIC UPLOADS — profile photos and job photos only
