@@ -93,11 +93,26 @@ async function requireCaptcha(req, res, next) {
 
 // ── Strict mode: block on verification failure even if Cloudflare unreachable
 // Use on highest-risk endpoints like /register where bot signups are most costly
+let _warnedUnconfigured = false;
+
 async function requireCaptchaStrict(req, res, next) {
   const secretKey = process.env.TURNSTILE_SECRET_KEY;
   if (!secretKey || secretKey === 'TURNSTILE_SECRET_KEY_HERE') {
     if (process.env.NODE_ENV !== 'production') return next(); // skip in dev
-    return res.status(503).json({ error: 'CAPTCHA not configured' });
+    // Previously this returned 503, which made registration impossible on any
+    // production deploy without Turnstile configured — the sign-up form was
+    // simply dead. Fail open instead (matching requireCaptcha above) and warn
+    // loudly, so an unconfigured CAPTCHA degrades bot protection rather than
+    // taking down the product.
+    if (!_warnedUnconfigured) {
+      _warnedUnconfigured = true;
+      console.warn(
+        '\n⚠️  [CAPTCHA] TURNSTILE_SECRET_KEY is not set — bot protection on ' +
+        'registration is DISABLED.\n' +
+        '   Set it up at dash.cloudflare.com → Turnstile before real launch.\n'
+      );
+    }
+    return next();
   }
 
   const token    = req.body?.cf_turnstile_response || req.headers['x-cf-turnstile-response'];

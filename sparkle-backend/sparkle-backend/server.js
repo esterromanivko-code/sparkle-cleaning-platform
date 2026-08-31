@@ -162,10 +162,46 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── CORS ─────────────────────────────────────────────────────────────────────
+// The previous version compared origins with a bare `includes()`, so a
+// FRONTEND_URL that differed by a trailing slash silently rejected every browser
+// request — the API answered fine to curl while the real site got CORS errors.
+// Origins are normalised here, a comma-separated list is supported, and Netlify
+// branch/preview subdomains of the configured host are allowed.
+const stripTrailingSlash = u => String(u || '').trim().replace(/\/+$/, '');
+
+const ALLOWED_ORIGINS = [
+  ...String(process.env.FRONTEND_URL || '').split(',').map(stripTrailingSlash),
+  'http://localhost:3000',
+  'http://localhost:4200',
+  'http://localhost:5173',
+].filter(Boolean);
+
+// e.g. https://sparkle.netlify.app also permits https://deploy-preview-3--sparkle.netlify.app
+const NETLIFY_PREVIEW_PATTERNS = ALLOWED_ORIGINS
+  .map(o => /^https:\/\/([a-z0-9-]+)\.netlify\.app$/i.exec(o)?.[1])
+  .filter(Boolean)
+  .map(site => new RegExp(`^https://[a-z0-9-]+--${site}\\.netlify\\.app$`, 'i'));
+
+const _rejectedOrigins = new Set();
+
 app.use(cors({
   origin: (origin, cb) => {
-    const allowed = [process.env.FRONTEND_URL||'http://localhost:3000','http://localhost:3000','http://localhost:5173'];
-    cb(null, !origin || allowed.includes(origin) || process.env.NODE_ENV !== 'production');
+    // No Origin header: curl, server-to-server, native apps, same-origin.
+    if (!origin) return cb(null, true);
+    if (process.env.NODE_ENV !== 'production') return cb(null, true);
+
+    const o = stripTrailingSlash(origin);
+    if (ALLOWED_ORIGINS.includes(o)) return cb(null, true);
+    if (NETLIFY_PREVIEW_PATTERNS.some(re => re.test(o))) return cb(null, true);
+
+    // Log each unknown origin once — this is otherwise very hard to diagnose,
+    // since the browser only reports a generic CORS failure.
+    if (!_rejectedOrigins.has(o)) {
+      _rejectedOrigins.add(o);
+      console.warn(`[CORS] Rejected origin: ${o}  (allowed: ${ALLOWED_ORIGINS.join(', ') || 'none'})`);
+    }
+    cb(null, false);
   },
   credentials: true,
   allowedHeaders: ['Content-Type','Authorization'],
