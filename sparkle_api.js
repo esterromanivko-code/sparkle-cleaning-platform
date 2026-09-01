@@ -667,6 +667,55 @@ window.SparkleAPI = (function () {
     return json;
   }
 
+  // ─── Admin console ──────────────────────────────────────────────────────────
+
+  /** Shared helper: GET an admin endpoint and unwrap JSON. */
+  async function adminGet(path, label) {
+    const res = await apiFetch(path);
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      throw new Error(j.error || `Failed to load ${label}`);
+    }
+    return res.json();
+  }
+
+  /** Shared helper: POST to an admin endpoint and unwrap JSON. */
+  async function adminPost(path, body, label) {
+    const res = await apiFetch(path, { method: 'POST', body: JSON.stringify(body || {}) });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.errors?.[0]?.msg || json.error || `Failed to ${label}`);
+    return json;
+  }
+
+  /** Platform-wide counts for the admin dashboard. */
+  function getAdminDashboard() {
+    return adminGet('/api/admin/dashboard', 'dashboard stats');
+  }
+
+  /** Paginated user list. filters: { role, status, search, page, limit } */
+  function getAdminUsers(filters = {}) {
+    const p = new URLSearchParams();
+    Object.entries(filters).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') p.set(k, v); });
+    const qs = p.toString();
+    return adminGet(`/api/admin/users${qs ? '?' + qs : ''}`, 'users');
+  }
+
+  const banUser       = (id, reason) => adminPost(`/api/admin/users/${encodeURIComponent(id)}/ban`, { reason }, 'ban user');
+  const reinstateUser = (id)         => adminPost(`/api/admin/users/${encodeURIComponent(id)}/reinstate`, {}, 'reinstate user');
+  const flagUser      = (id)         => adminPost(`/api/admin/users/${encodeURIComponent(id)}/flag`, {}, 'flag user');
+
+  const getDisputes   = ()                        => adminGet('/api/admin/disputes', 'disputes');
+  const resolveDisputeApi = (id, resolution, ruling) =>
+    adminPost(`/api/admin/disputes/${encodeURIComponent(id)}/resolve`, { resolution, ruling }, 'resolve dispute');
+
+  /** Send an in-app notification to an audience: all | cleaners | clients | unverified */
+  const sendPlatformNotification = (audience, title, body, type) =>
+    adminPost('/api/admin/notify', { audience, title, body, type }, 'send notification');
+
+  const getBgCheckQueue  = ()            => adminGet('/api/background-check/admin/queue', 'background checks');
+  const approveBgCheck   = (id)          => adminPost(`/api/background-check/admin/${encodeURIComponent(id)}/approve`, {}, 'approve background check');
+  const rejectBgCheck    = (id, reason)  => adminPost(`/api/background-check/admin/${encodeURIComponent(id)}/reject`, { reason }, 'reject background check');
+
   // ─── Public API ─────────────────────────────────────────────────────────────
   return {
     isRealSession,
@@ -705,6 +754,17 @@ window.SparkleAPI = (function () {
     replyToTicket,
     getAllTickets,
     updateTicketStatus,
+    getAdminDashboard,
+    getAdminUsers,
+    banUser,
+    reinstateUser,
+    flagUser,
+    getDisputes,
+    resolveDispute: resolveDisputeApi,
+    sendPlatformNotification,
+    getBgCheckQueue,
+    approveBgCheck,
+    rejectBgCheck,
     uploadProfilePhoto,
     deleteProfilePhoto,
     getMyCredentials,

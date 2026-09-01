@@ -357,7 +357,7 @@ router.post('/admin/:id/approve', requireAuth, requireRole('admin'), (req, res) 
   db.prepare(`
     UPDATE background_checks
     SET overall_status = 'clear', id_status = 'clear', criminal_status = 'clear',
-        completed_at = datetime(' + "'now'" + '), expires_at = ?
+        completed_at = datetime('now'), expires_at = ?
     WHERE id = ?
   `).run(expiresAt, check.id);
 
@@ -386,7 +386,7 @@ router.post('/admin/:id/reject', requireAuth, requireRole('admin'), (req, res) =
   if (!check) return res.status(404).json({ error: 'Check not found' });
 
   db.prepare(`
-    UPDATE background_checks SET overall_status = 'suspended', completed_at = datetime(' + "'now'" + ') WHERE id = ?
+    UPDATE background_checks SET overall_status = 'suspended', completed_at = datetime('now') WHERE id = ?
   `).run(check.id);
 
   // Ban the cleaner from taking jobs (but don't delete their account)

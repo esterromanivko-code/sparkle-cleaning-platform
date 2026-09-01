@@ -1479,8 +1479,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
       <tbody>
         <tr><td><div style="font-weight:500">Jordan Martinez</div><div style="font-size:11px;color:var(--tx2)">jordan@example.com</div></td><td><span class="tag green">Cleaner</span></td><td>★ 4.9</td><td><span class="badge-verified">🛡️ Verified</span></td><td><button class="btn sm" onclick="adminViewUser(this)">View</button></td></tr>
         <tr><td><div style="font-weight:500">Sarah K.</div><div style="font-size:11px;color:var(--tx2)">sarah@example.com</div></td><td><span class="tag blue">Client</span></td><td>★ 4.9</td><td><span class="tag green">Active</span></td><td><button class="btn sm" onclick="adminViewUser(this)">View</button></td></tr>
-        <tr><td><div style="font-weight:500">Mark H.</div><div style="font-size:11px;color:var(--tx2)">markh@example.com</div></td><td><span class="tag green">Cleaner</span></td><td>★ 3.1</td><td><span class="tag red">Banned</span></td><td><button class="btn sm" onclick="adminViewUser(this)">View</button><button class="btn primary sm" style="margin-left:4px" onclick="adminReinstateUser(this,'Mark H.')">Reinstate</button></td></tr>
-        <tr><td><div style="font-weight:500">Alex P.</div><div style="font-size:11px;color:var(--tx2)">alexp@example.com</div></td><td><span class="tag blue">Client</span></td><td>★ 2.8</td><td><span class="tag amber">Flagged</span></td><td><button class="btn sm" onclick="adminViewUser(this)">View</button><button class="btn danger sm" style="margin-left:4px" onclick="adminBanUser(this,'Alex P.')">Ban</button></td></tr>
+        <tr><td><div style="font-weight:500">Mark H.</div><div style="font-size:11px;color:var(--tx2)">markh@example.com</div></td><td><span class="tag green">Cleaner</span></td><td>★ 3.1</td><td><span class="tag red">Banned</span></td><td><button class="btn sm" onclick="adminViewUser(this)">View</button><button class="btn primary sm" style="margin-left:4px" onclick="demoAdminReinstateUser(this,'Mark H.')">Reinstate</button></td></tr>
+        <tr><td><div style="font-weight:500">Alex P.</div><div style="font-size:11px;color:var(--tx2)">alexp@example.com</div></td><td><span class="tag blue">Client</span></td><td>★ 2.8</td><td><span class="tag amber">Flagged</span></td><td><button class="btn sm" onclick="adminViewUser(this)">View</button><button class="btn danger sm" style="margin-left:4px" onclick="demoAdminBanUser(this,'Alex P.')">Ban</button></td></tr>
       </tbody>
     </table>
     </div>
@@ -1490,7 +1490,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
 <div class="page" id="page-a-notifs">
   <div class="pg-title">Push notifications</div>
   <div class="pg-sub">Send announcements and alerts to your users</div>
-  <div class="card"><div class="sect-title" style="margin-bottom:.875rem">Compose notification</div><div class="frow"><label class="flbl">Audience</label><select class="inp"><option>All users</option><option>All cleaners</option><option>All clients</option><option>Cleaners in Seattle</option><option>Unverified cleaners</option></select></div><div class="frow"><label class="flbl">Title</label><input class="inp" value="Earn more with recurring clients"></div><div class="frow"><label class="flbl">Message</label><textarea class="inp" rows="3">Set up a recurring schedule and earn a steady income — plus a 10% recurring bonus. Set it up today!</textarea></div><div class="f2"><div class="frow"><label class="flbl">Delivery</label><select class="inp"><option>Send now</option><option>Schedule</option></select></div><div class="frow"><label class="flbl">Channel</label><select class="inp"><option>In-app + push</option><option>In-app only</option><option>Email</option><option>All channels</option></select></div></div><div class="alert warn" style="font-size:12px">This will send to <strong>2,418 cleaners</strong>. Preview before sending.</div><div style="display:flex;gap:8px"><button class="btn sm" onclick="previewNotif()">Preview</button><button class="btn primary sm" onclick="this.textContent='Sent ✓';this.disabled=true">Send notification</button></div></div>
+  <div class="card"><div class="sect-title" style="margin-bottom:.875rem">Compose notification</div><div class="frow"><label class="flbl">Audience</label><select class="inp" id="notif-audience"><option value="all">All users</option><option value="cleaners">All cleaners</option><option value="clients">All clients</option><option value="unverified">Unverified cleaners</option></select></div><div class="frow"><label class="flbl">Title</label><input class="inp" id="notif-title" placeholder="Earn more with recurring clients"></div><div class="frow"><label class="flbl">Message</label><textarea class="inp" id="notif-body" rows="3" placeholder="Write the message your users will see…"></textarea></div><div class="f2"><div class="frow"><label class="flbl">Delivery</label><select class="inp"><option>Send now</option><option>Schedule</option></select></div><div class="frow"><label class="flbl">Channel</label><select class="inp"><option>In-app + push</option><option>In-app only</option><option>Email</option><option>All channels</option></select></div></div><div class="alert warn" style="font-size:12px">This sends a real in-app notification to every user in the selected audience. It cannot be unsent.</div><div style="display:flex;gap:8px"><button class="btn sm" onclick="previewNotif()">Preview</button><button class="btn primary sm" onclick="sendNotif(this)">Send notification</button></div></div>
   <div class="divider"></div>
   <div class="sect-title" style="margin-bottom:.75rem">Recent sends</div>
   <div class="card-sm"><div class="row c"><div><div style="font-size:13px;font-weight:500">New: Recurring bookings</div><div style="font-size:11px;color:var(--tx2)">All users · Apr 20 · 11,159 sent · 68% open rate</div></div><span class="tag green">Sent</span></div></div>
@@ -2183,6 +2183,10 @@ function showPage(id) {
   if (id === 'cl-find')       loadFindCleaners();
   if (id === 'a-support')     loadAdminSupport();
   if (id === 'a-credentials') loadAdminCredentials();
+  if (id === 'a-dashboard')   loadAdminDashboard();
+  if (id === 'a-users')       loadAdminUsers();
+  if (id === 'a-disputes')    loadAdminDisputes();
+  if (id === 'a-bgchecks')    loadAdminBgChecks();
   // Release any document blob when navigating away from the review page.
   if (id !== 'a-credentials') closeCredPreview();
 
@@ -4757,7 +4761,7 @@ function adminReviewBgCheck(name) {
   showToast('Opening background check review for ' + name + '…', 'info');
 }
 
-function adminReinstateUser(btn, name) {
+function demoAdminReinstateUser(btn, name) {
   const capturedBtn = btn;
   showConfirm({
     title: 'Reinstate ' + name + '?',
@@ -4774,7 +4778,7 @@ function adminReinstateUser(btn, name) {
   });
 }
 
-function adminBanUser(btn, name) {
+function demoAdminBanUser(btn, name) {
   const capturedBtn = btn;
   showConfirm({
     title: 'Ban ' + name + '?',
@@ -4788,6 +4792,367 @@ function adminBanUser(btn, name) {
       if (badge) { badge.className = 'tag red'; badge.textContent = 'Banned'; }
       showToast(name + ' has been banned.', 'info');
     }
+  });
+}
+
+// ══════════════════════════════════════
+// ADMIN — LIVE DATA (dashboard, users, disputes, background checks)
+// ══════════════════════════════════════
+// These pages ship with hardcoded sample markup so the demo tour looks complete.
+// For a real signed-in admin the loaders below replace that markup entirely with
+// data from the API — otherwise the console would keep reporting invented figures
+// no matter how many people actually sign up.
+
+let adminUsersState = { users: [], total: 0, page: 1, limit: 50 };
+
+function adminNum(n) {
+  return (n === null || n === undefined) ? '0' : Number(n).toLocaleString();
+}
+function adminMoney(n) {
+  return '$' + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+function adminStat(label, value, extra = '') {
+  return `<div class="stat"><div class="stat-lbl">${escapeHtml(label)}</div><div class="stat-val"${extra}>${value}</div></div>`;
+}
+// Shared empty state — a brand-new platform has nothing in most of these tables,
+// and a blank panel reads as breakage rather than "nothing here yet".
+function adminEmpty(msg) {
+  return `<div class="card" style="text-align:center;color:var(--tx2);padding:2rem 1rem">${escapeHtml(msg)}</div>`;
+}
+function adminError(title, err) {
+  if (err?.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return ''; }
+  return `<div class="pg-title">${escapeHtml(title)}</div><div class="alert warn">Could not load: ${escapeHtml(err?.message || 'unknown error')}</div>`;
+}
+
+// ── Dashboard ────────────────────────────────────────────────────────────────
+async function loadAdminDashboard() {
+  if (!currentUser?.isReal) return;               // demo mode keeps the sample markup
+  const page = document.getElementById('page-a-dashboard');
+  if (!page) return;
+
+  page.innerHTML = `<div class="pg-title">Platform overview</div><div class="pg-sub">Loading live figures…</div>`;
+  try {
+    const { stats } = await SparkleAPI.getAdminDashboard();
+    const u = stats.users || {}, j = stats.jobs || {}, r = stats.revenue || {};
+    const b = stats.bgchecks || {}, d = stats.disputes || {}, p = stats.pro_members || {};
+
+    page.innerHTML = `
+      <div class="pg-title">Platform overview</div>
+      <div class="pg-sub">Live figures from your database</div>
+      <div class="stats-grid">
+        ${adminStat('Active cleaners', adminNum(u.cleaners))}
+        ${adminStat('Active clients',  adminNum(u.clients))}
+        ${adminStat('Jobs this month', adminNum(j.this_month))}
+        ${adminStat('Open disputes',   adminNum(d.open), d.open > 0 ? ' class="stat-val red"' : '')}
+      </div>
+      <div class="stats-grid" style="margin-top:10px">
+        ${adminStat('Platform revenue', adminMoney(r.total))}
+        ${adminStat('Jobs completed',   adminNum(j.completed))}
+        ${adminStat('Pro members',      adminNum(p.active))}
+        ${adminStat('BG checks pending',adminNum(b.pending), b.pending > 0 ? ' class="stat-val amber"' : '')}
+      </div>
+      <div class="card" style="margin-top:1rem">
+        <div class="sect-title" style="margin-bottom:.75rem">Needs your attention</div>
+        ${(d.open || b.pending || u.flagged)
+          ? `<div style="display:flex;flex-direction:column;gap:8px">
+              ${d.open    ? `<div class="row c"><div>⚖️ ${adminNum(d.open)} open dispute${d.open==1?'':'s'}</div><button class="btn sm" onclick="showPage('a-disputes')">Review</button></div>` : ''}
+              ${b.pending ? `<div class="row c"><div>🛡️ ${adminNum(b.pending)} background check${b.pending==1?'':'s'} pending</div><button class="btn sm" onclick="showPage('a-bgchecks')">Review</button></div>` : ''}
+              ${u.flagged ? `<div class="row c"><div>🚩 ${adminNum(u.flagged)} flagged user${u.flagged==1?'':'s'}</div><button class="btn sm" onclick="showPage('a-users')">Review</button></div>` : ''}
+             </div>`
+          : `<div style="color:var(--tx2);font-size:13px">Nothing needs attention right now.</div>`}
+      </div>
+      <div class="card">
+        <div class="sect-title" style="margin-bottom:.5rem">Totals</div>
+        <div class="meta">${adminNum(u.total)} total users · ${adminNum(j.total)} jobs all time · ${adminNum(u.banned)} banned · ${adminNum(b.cleared)} verified cleaners</div>
+      </div>`;
+
+    refreshAdminBadges(stats);
+  } catch (err) {
+    const html = adminError('Platform overview', err);
+    if (html) page.innerHTML = html;
+  }
+}
+
+// Sidebar counts shipped as hardcoded strings ('12', '34'); drive them from real data.
+function refreshAdminBadges(stats) {
+  const set = (navId, count, cls) => {
+    const nav = document.getElementById('nav-' + navId);
+    if (!nav) return;
+    let badge = nav.querySelector('.nav-badge');
+    if (!count) { if (badge) badge.remove(); return; }
+    if (!badge) {
+      badge = document.createElement('span');
+      nav.appendChild(badge);
+    }
+    badge.className = 'nav-badge ' + cls;
+    badge.textContent = count > 99 ? '99+' : String(count);
+  };
+  set('a-disputes',    stats?.disputes?.open || 0,   'nb-r');
+  set('a-bgchecks',    stats?.bgchecks?.pending || 0,'nb-a');
+  set('a-credentials', stats?.credentials_pending || 0, 'nb-a');
+}
+
+// ── User management ──────────────────────────────────────────────────────────
+async function loadAdminUsers() {
+  if (!currentUser?.isReal) return;
+  const page = document.getElementById('page-a-users');
+  if (!page) return;
+
+  const search = document.getElementById('admin-user-search')?.value || '';
+  const role   = document.getElementById('admin-user-role')?.value   || '';
+  const status = document.getElementById('admin-user-status')?.value || '';
+
+  page.innerHTML = `
+    <div class="pg-title">User management</div>
+    <div class="pg-sub">All cleaners, clients, and flags</div>
+    <div class="f2" style="margin-bottom:1rem">
+      <input class="inp" id="admin-user-search" placeholder="Search by name or email…" value="${escapeHtml(search)}"
+             onkeydown="if(event.key==='Enter')loadAdminUsers()">
+      <div class="f2">
+        <select class="inp" id="admin-user-role" onchange="loadAdminUsers()">
+          <option value="">All roles</option>
+          <option value="cleaner" ${role==='cleaner'?'selected':''}>Cleaners</option>
+          <option value="client"  ${role==='client'?'selected':''}>Clients</option>
+        </select>
+        <select class="inp" id="admin-user-status" onchange="loadAdminUsers()">
+          <option value="">All statuses</option>
+          <option value="flagged" ${status==='flagged'?'selected':''}>Flagged</option>
+          <option value="banned"  ${status==='banned'?'selected':''}>Banned</option>
+        </select>
+      </div>
+    </div>
+    <div id="admin-users-body"><div class="card" style="text-align:center;color:var(--tx2)">Loading users…</div></div>`;
+
+  try {
+    const data = await SparkleAPI.getAdminUsers({ search, role, status, limit: 50 });
+    adminUsersState = { users: data.users || [], total: data.total || 0, page: data.page || 1, limit: data.limit || 50 };
+    renderAdminUsers();
+  } catch (err) {
+    const body = document.getElementById('admin-users-body');
+    if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+    if (body) body.innerHTML = `<div class="alert warn">Could not load users: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderAdminUsers() {
+  const body = document.getElementById('admin-users-body');
+  if (!body) return;
+  const users = adminUsersState.users;
+
+  if (!users.length) {
+    body.innerHTML = adminEmpty('No users match those filters yet.');
+    return;
+  }
+
+  const rows = users.map(u => {
+    const name   = `${u.first_name || ''} ${u.last_name || ''}`.trim() || '—';
+    const rating = u.avg_rating ? Number(u.avg_rating).toFixed(1) + ' ★' : '—';
+    const tag    = !u.is_active ? '<span class="tag red">Banned</span>'
+                 : u.is_flagged ? '<span class="tag amber">Flagged</span>'
+                 : u.is_verified ? '<span class="tag green">Verified</span>'
+                 : '<span class="tag">Active</span>';
+    const actions = !u.is_active
+      ? `<button class="btn sm" onclick="adminReinstateUser('${u.id}')">Reinstate</button>`
+      : `<button class="btn sm" onclick="adminFlagUser('${u.id}')">Flag</button>
+         <button class="btn sm danger" onclick="adminBanUser('${u.id}','${escapeHtml(name).replace(/'/g, "\\'")}')">Ban</button>`;
+    return `<tr>
+      <td><div style="font-weight:500">${escapeHtml(name)}</div>
+          <div style="font-size:11px;color:var(--tx2)">${escapeHtml(u.email || '')}</div></td>
+      <td style="text-transform:capitalize">${escapeHtml(u.role || '')}</td>
+      <td>${rating}</td>
+      <td>${tag}</td>
+      <td>${actions}</td>
+    </tr>`;
+  }).join('');
+
+  body.innerHTML = `
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>User</th><th>Role</th><th>Rating</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+    <div class="meta">Showing ${users.length} of ${adminNum(adminUsersState.total)} users</div>`;
+}
+
+async function adminBanUser(id, name) {
+  showConfirm({
+    title: 'Ban this user?',
+    body: `${name || 'This user'} will be signed out and blocked from using Sparkle. They'll be notified and can appeal through support.`,
+    confirmLabel: 'Ban user',
+    confirmClass: 'danger',
+    onConfirm: async () => {
+      try {
+        await SparkleAPI.banUser(id, 'Your account has been suspended. Contact support to appeal.');
+        showToast('User banned.', 'success');
+        loadAdminUsers();
+      } catch (err) {
+        if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+        showToast(err.message, 'error');
+      }
+    },
+  });
+}
+
+async function adminReinstateUser(id) {
+  try {
+    await SparkleAPI.reinstateUser(id);
+    showToast('User reinstated.', 'success');
+    loadAdminUsers();
+  } catch (err) {
+    if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+    showToast(err.message, 'error');
+  }
+}
+
+async function adminFlagUser(id) {
+  try {
+    await SparkleAPI.flagUser(id);
+    showToast('User flagged for review.', 'success');
+    loadAdminUsers();
+  } catch (err) {
+    if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+    showToast(err.message, 'error');
+  }
+}
+
+// ── Disputes ─────────────────────────────────────────────────────────────────
+async function loadAdminDisputes() {
+  if (!currentUser?.isReal) return;
+  const page = document.getElementById('page-a-disputes');
+  if (!page) return;
+
+  page.innerHTML = `<div class="pg-title">Disputes</div><div class="pg-sub">Loading…</div>`;
+  try {
+    const { disputes } = await SparkleAPI.getDisputes();
+    const open = (disputes || []).filter(d => d.status !== 'resolved');
+
+    page.innerHTML = `
+      <div class="pg-title">Disputes</div>
+      <div class="pg-sub">${open.length ? `${open.length} awaiting a decision` : 'Lockout fees, damage claims, and no-shows'}</div>
+      ${!disputes?.length ? adminEmpty('No disputes have been filed yet.') : disputes.map(d => {
+        const resolved = d.status === 'resolved';
+        return `<div class="card">
+          <div class="row c" style="margin-bottom:.5rem">
+            <div>
+              <div style="font-size:13px;font-weight:500">${escapeHtml(d.type || 'Dispute')} · ${escapeHtml(d.service_type || 'job')}</div>
+              <div class="meta">${escapeHtml(d.filed_by_name || '')} (${escapeHtml(d.filed_by_role || '')}) vs ${escapeHtml(d.against_name || '')} (${escapeHtml(d.against_role || '')})</div>
+            </div>
+            <span class="tag ${resolved ? 'green' : 'red'}">${resolved ? 'Resolved' : 'Open'}</span>
+          </div>
+          ${d.description ? `<div style="font-size:13px;color:var(--tx2);margin-bottom:.5rem">${escapeHtml(d.description)}</div>` : ''}
+          ${resolved
+            ? `<div style="font-size:13px;color:var(--gd)">✓ ${escapeHtml(d.resolution || 'Resolved')}</div>`
+            : `<div class="actions">
+                 <button class="btn sm" onclick="adminResolveDispute('${d.id}','cleaner')">Rule for cleaner</button>
+                 <button class="btn sm" onclick="adminResolveDispute('${d.id}','client')">Rule for client (refund)</button>
+               </div>`}
+        </div>`;
+      }).join('')}`;
+  } catch (err) {
+    const html = adminError('Disputes', err);
+    if (html) page.innerHTML = html;
+  }
+}
+
+async function adminResolveDispute(id, ruling) {
+  const forClient = ruling === 'client';
+  showConfirm({
+    title: forClient ? 'Rule for the client?' : 'Rule for the cleaner?',
+    body: forClient
+      ? 'The fee will be refunded to the client and both parties notified. This cannot be undone.'
+      : 'The fee stands and is paid to the cleaner. Both parties will be notified. This cannot be undone.',
+    confirmLabel: 'Confirm ruling',
+    onConfirm: async () => {
+      try {
+        await SparkleAPI.resolveDispute(id,
+          forClient ? 'Fee refunded to the client.' : 'Fee upheld and paid to the cleaner.',
+          ruling);
+        showToast('Dispute resolved — both parties notified.', 'success');
+        loadAdminDisputes();
+      } catch (err) {
+        if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+        showToast(err.message, 'error');
+      }
+    },
+  });
+}
+
+// ── Background checks ────────────────────────────────────────────────────────
+const BG_STATUS_TAGS = { pending: 'amber', clear: 'green', consider: 'red', suspended: 'red', dispute: 'red' };
+
+async function loadAdminBgChecks() {
+  if (!currentUser?.isReal) return;
+  const page = document.getElementById('page-a-bgchecks');
+  if (!page) return;
+
+  page.innerHTML = `<div class="pg-title">Background checks</div><div class="pg-sub">Loading…</div>`;
+  try {
+    const { checks } = await SparkleAPI.getBgCheckQueue();
+    const rows = (checks || []).map(c => {
+      const name = `${c.first_name || ''} ${c.last_name || ''}`.trim() || '—';
+      const st   = c.overall_status || 'pending';
+      const act  = st === 'pending' || st === 'consider'
+        ? `<button class="btn sm" onclick="adminApproveBgCheck('${c.id}')">Approve</button>
+           <button class="btn sm danger" onclick="adminRejectBgCheck('${c.id}')">Reject</button>`
+        : '—';
+      return `<tr>
+        <td><div style="font-weight:500">${escapeHtml(name)}</div>
+            <div style="font-size:11px;color:var(--tx2)">${escapeHtml(c.email || '')}</div></td>
+        <td>${escapeHtml(c.city || '—')}</td>
+        <td>${escapeHtml(c.id_status || '—')}</td>
+        <td><span class="tag ${BG_STATUS_TAGS[st] || ''}">${escapeHtml(st)}</span></td>
+        <td>${act}</td>
+      </tr>`;
+    }).join('');
+
+    page.innerHTML = `
+      <div class="pg-title">Background checks</div>
+      <div class="pg-sub">Identity and criminal screening results</div>
+      ${!checks?.length ? adminEmpty('No cleaners have started a background check yet.') : `
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead><tr><th>Cleaner</th><th>City</th><th>ID check</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>`}`;
+  } catch (err) {
+    const html = adminError('Background checks', err);
+    if (html) page.innerHTML = html;
+  }
+}
+
+async function adminApproveBgCheck(id) {
+  try {
+    await SparkleAPI.approveBgCheck(id);
+    showToast('Background check approved — Verified badge is live.', 'success');
+    loadAdminBgChecks();
+  } catch (err) {
+    if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+    showToast(err.message, 'error');
+  }
+}
+
+async function adminRejectBgCheck(id) {
+  showConfirm({
+    title: 'Reject this background check?',
+    body: 'The cleaner will be notified and their account suspended pending review.',
+    confirmLabel: 'Reject',
+    confirmClass: 'danger',
+    onConfirm: async () => {
+      try {
+        await SparkleAPI.rejectBgCheck(id, 'Your background check could not be verified. Contact support to appeal.');
+        showToast('Background check rejected.', 'success');
+        loadAdminBgChecks();
+      } catch (err) {
+        if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+        showToast(err.message, 'error');
+      }
+    },
   });
 }
 
@@ -5216,10 +5581,39 @@ function previewNotif() {
 }
 
 function sendNotif(btn) {
-  const audience = document.querySelector('#page-a-notifs select.inp')?.value || 'All users';
-  btn.textContent = 'Sent ✓';
-  btn.disabled = true;
-  showToast('Notification sent to ' + audience + '!', 'success');
+  const audience = document.getElementById('notif-audience')?.value || 'all';
+  const title    = (document.getElementById('notif-title')?.value || '').trim();
+  const body     = (document.getElementById('notif-body')?.value  || '').trim();
+
+  if (!title || !body) { showToast('Add a title and a message before sending.', 'warn'); return; }
+
+  if (!currentUser?.isReal) {
+    // Demo mode has no backend to send through — don't pretend it worked.
+    showToast('Sign in with a real admin account to send notifications.', 'warn');
+    return;
+  }
+
+  const labels = { all: 'all users', cleaners: 'all cleaners', clients: 'all clients', unverified: 'unverified cleaners' };
+  showConfirm({
+    title: 'Send this notification?',
+    body: `It will be delivered to ${labels[audience] || audience} immediately and cannot be unsent.`,
+    confirmLabel: 'Send it',
+    onConfirm: async () => {
+      const original = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Sending…';
+      try {
+        const r = await SparkleAPI.sendPlatformNotification(audience, title, body, 'platform');
+        showToast(r.message || 'Notification sent.', 'success');
+        const t = document.getElementById('notif-title'); if (t) t.value = '';
+        const b = document.getElementById('notif-body');  if (b) b.value = '';
+      } catch (err) {
+        if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false; btn.textContent = original;
+      }
+    },
+  });
 }
 
 // ══ CONFIRM MODAL (replaces native confirm() / alert()) ════════
