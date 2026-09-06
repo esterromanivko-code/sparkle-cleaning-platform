@@ -238,6 +238,20 @@ app.get('/health', (req, res) => res.json({
   cors_allowed_hosts: [...ALLOWED_HOSTS],
 }));
 
+// ── Public runtime config ────────────────────────────────────────────────────
+// Lets the frontend discover settings without hardcoding them at build time.
+// Only ever expose PUBLIC values here. A Turnstile *site* key is designed to be
+// visible in page source; the *secret* key stays server-side and is never sent.
+// Serving it this way means CAPTCHA is configured once, in the backend's
+// environment, with no frontend edit or redeploy.
+app.get('/api/config', (req, res) => {
+  const siteKey = process.env.TURNSTILE_SITE_KEY;
+  res.set('Cache-Control', 'public, max-age=300');
+  res.json({
+    turnstile_site_key: (siteKey && siteKey !== 'TURNSTILE_SITE_KEY_HERE') ? siteKey : null,
+  });
+});
+
 // ═══════════════════════════════════════════════════
 //  STATIC UPLOADS — profile photos and job photos only
 // ═══════════════════════════════════════════════════

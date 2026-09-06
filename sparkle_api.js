@@ -149,6 +149,118 @@ window.SparkleAPI = (function () {
     return res;
   }
 
+  // ─── CAPTCHA (Cloudflare Turnstile) ──────────────────────────────────────────
+  //
+  // The backend enforces Turnstile on register, login and forgot-password, but
+  // ONLY when TURNSTILE_SECRET_KEY is set. The site key is fetched from
+  // /api/config, so CAPTCHA is switched on entirely from the backend environment
+  // — no frontend edit, no redeploy.
+  //
+  // When no site key is configured, getCaptchaToken() resolves to null, no script
+  // is loaded, and the server skips verification. That is the default state, so
+  // this code is inert until you turn Turnstile on.
+
+  const TURNSTILE_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+  let _configPromise = null;
+  let _scriptPromise = null;
+  let _widgetId = null;
+  // The widget's callbacks are bound once at render() time, but each call needs to
+  // settle its OWN promise. Route every callback through this mutable slot instead
+  // of closing over the first call's resolver — otherwise the second and every
+  // later call would wait on a resolver that already fired, and hang until timeout.
+  let _pendingResolve = null;
+
+  function _settleCaptcha(token) {
+    const resolve = _pendingResolve;
+    _pendingResolve = null;
+    if (resolve) resolve(token || null);
+  }
+
+  /** Public runtime config from the backend, fetched at most once. */
+  function getPublicConfig() {
+    if (!_configPromise) {
+      _configPromise = fetch(`${BASE}/api/config`)
+        .then(r => (r.ok ? r.json() : {}))
+        .catch(() => ({}));            // offline or old backend — behave as unconfigured
+    }
+    return _configPromise;
+  }
+
+  function loadTurnstileScript() {
+    if (_scriptPromise) return _scriptPromise;
+    _scriptPromise = new Promise((resolve, reject) => {
+      if (window.turnstile) return resolve(window.turnstile);
+      const s = document.createElement('script');
+      s.src = TURNSTILE_SRC;
+      s.async = true;
+      s.defer = true;
+      s.onload  = () => resolve(window.turnstile);
+      s.onerror = () => reject(new Error('Could not load the CAPTCHA script'));
+      document.head.appendChild(s);
+    });
+    return _scriptPromise;
+  }
+
+  /**
+   * Produce a fresh Turnstile token, or null when CAPTCHA is not configured.
+   *
+   * Tokens are single-use and short-lived, so the widget is reset before every
+   * run rather than cached. Any failure resolves to null instead of throwing:
+   * the server is the authority on whether a token was required, and a client-side
+   * hiccup should surface as the server's clear error rather than a dead button.
+   */
+  async function getCaptchaToken() {
+    let siteKey = null;
+    try {
+      ({ turnstile_site_key: siteKey } = await getPublicConfig());
+    } catch { return null; }
+    if (!siteKey) return null;                       // CAPTCHA switched off
+    if (typeof document === 'undefined') return null;
+
+    try {
+      const turnstile = await loadTurnstileScript();
+      if (!turnstile) return null;
+
+      let host = document.getElementById('sparkle-turnstile-host');
+      if (!host) {
+        host = document.createElement('div');
+        host.id = 'sparkle-turnstile-host';
+        host.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;left:-9999px';
+        document.body.appendChild(host);
+      }
+
+      return await new Promise(resolve => {
+        // Don't hang the sign-in button if Cloudflare is slow or blocked.
+        let timer = null;
+        const done = token => { if (timer) clearTimeout(timer); resolve(token || null); };
+        _pendingResolve = done;
+        timer = setTimeout(() => _settleCaptcha(null), 12000);
+
+        try {
+          if (_widgetId === null) {
+            _widgetId = turnstile.render(host, {
+              sitekey: siteKey,
+              size: 'invisible',
+              // Route through _settleCaptcha so each call settles its own promise.
+              callback:           t => _settleCaptcha(t),
+              'error-callback':   () => _settleCaptcha(null),
+              'timeout-callback': () => _settleCaptcha(null),
+              'expired-callback': () => _settleCaptcha(null),
+            });
+          } else {
+            // Tokens are single-use, so always mint a fresh one.
+            turnstile.reset(_widgetId);
+          }
+          turnstile.execute(_widgetId);
+        } catch {
+          _settleCaptcha(null);
+        }
+      });
+    } catch {
+      return null;
+    }
+  }
+
   // ─── Auth ────────────────────────────────────────────────────────────────────
 
   /**
@@ -156,9 +268,10 @@ window.SparkleAPI = (function () {
    * @param {{ first_name, last_name, email, password, role, phone?, city?, zip? }} data
    */
   async function register(data) {
+    const cf_turnstile_response = await getCaptchaToken();
     const res = await apiFetch('/api/auth/register', {
       method: 'POST',
-      body:   JSON.stringify(data),
+      body:   JSON.stringify(cf_turnstile_response ? { ...data, cf_turnstile_response } : data),
     });
     const json = await res.json();
     if (!res.ok) {
@@ -175,9 +288,10 @@ window.SparkleAPI = (function () {
    * @returns {{ access_token, refresh_token, user, profile }}
    */
   async function login(email, password) {
+    const cf_turnstile_response = await getCaptchaToken();
     const res = await apiFetch('/api/auth/login', {
       method: 'POST',
-      body:   JSON.stringify({ email, password }),
+      body:   JSON.stringify(cf_turnstile_response ? { email, password, cf_turnstile_response } : { email, password }),
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || 'Login failed');
