@@ -147,8 +147,23 @@ async function requireCaptchaStrict(req, res, next) {
       }
     );
     if (!response.data.success) {
-      audit('CAPTCHA_STRICT_FAILED', { ip: remoteIp, path: req.path });
-      return res.status(400).json({ error: 'CAPTCHA verification failed. Please try again.' });
+      const codes = response.data['error-codes'] || [];
+      audit('CAPTCHA_STRICT_FAILED', { ip: remoteIp, path: req.path, codes });
+      console.warn('[CAPTCHA] Rejected by Cloudflare:', codes.join(', ') || '(no code given)');
+
+      // Surface the reason. These codes describe the CONFIGURATION or the token,
+      // never anything secret, and without them a failure is impossible to tell
+      // apart from a mistyped key. invalid-input-secret in particular means the
+      // secret does not match the site key's widget — the single most common
+      // setup mistake, and unguessable from a generic failure message.
+      const explain =
+        codes.includes('invalid-input-secret')  ? 'The CAPTCHA secret key on the server is wrong or does not match the site key.'
+      : codes.includes('timeout-or-duplicate')  ? 'That CAPTCHA had already been used or expired. Please try again.'
+      : codes.includes('invalid-input-response')? 'The CAPTCHA response was not valid. Please refresh and try again.'
+      : codes.includes('bad-request')           ? 'The CAPTCHA request was malformed.'
+      : 'CAPTCHA verification failed. Please try again.';
+
+      return res.status(400).json({ error: explain, captcha_error: codes.join(',') || null });
     }
   } catch (err) {
     // Strict mode: fail closed on network error
