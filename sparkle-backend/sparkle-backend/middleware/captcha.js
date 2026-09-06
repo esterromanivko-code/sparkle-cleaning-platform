@@ -48,7 +48,16 @@ async function verifyTurnstileToken(token, remoteIp) {
         response: token,
         remoteip: remoteIp || '',
       }),
-      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 5000 }
+      {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        timeout: 5000,
+        // Cloudflare answers 400 for a malformed or invalid token. Axios throws on
+        // any non-2xx by default, which sent those into the "service unavailable"
+        // branch and reported an outage for what is really a failed check. Accept
+        // every status here and judge on the body, so the catch below means only
+        // one thing: Cloudflare could not be reached at all.
+        validateStatus: () => true,
+      }
     );
 
     const data = response.data;
@@ -126,7 +135,16 @@ async function requireCaptchaStrict(req, res, next) {
     const response = await axios.post(
       TURNSTILE_VERIFY_URL,
       new URLSearchParams({ secret: secretKey, response: token, remoteip: remoteIp || '' }),
-      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 5000 }
+      {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        timeout: 5000,
+        // Cloudflare answers 400 for a malformed or invalid token. Axios throws on
+        // any non-2xx by default, which sent those into the "service unavailable"
+        // branch and reported an outage for what is really a failed check. Accept
+        // every status here and judge on the body, so the catch below means only
+        // one thing: Cloudflare could not be reached at all.
+        validateStatus: () => true,
+      }
     );
     if (!response.data.success) {
       audit('CAPTCHA_STRICT_FAILED', { ip: remoteIp, path: req.path });

@@ -169,6 +169,15 @@ window.SparkleAPI = (function () {
   // of closing over the first call's resolver — otherwise the second and every
   // later call would wait on a resolver that already fired, and hang until timeout.
   let _pendingResolve = null;
+  let _captchaRequired = false;
+
+  // Turnstile can legitimately fail for a real person — an ad blocker or privacy
+  // extension blocking challenges.cloudflare.com, a locked-down network, or a
+  // browser it does not support. Without this the server replies "CAPTCHA token
+  // required", which reads like a bug rather than something the user can act on.
+  const CAPTCHA_HELP =
+    "Couldn't complete the security check. Refresh the page and try again — " +
+    'if it keeps happening, disable any ad blocker for this site or try another browser.';
 
   function _settleCaptcha(token) {
     const resolve = _pendingResolve;
@@ -216,6 +225,11 @@ window.SparkleAPI = (function () {
     } catch { return null; }
     if (!siteKey) return null;                       // CAPTCHA switched off
     if (typeof document === 'undefined') return null;
+
+    // Past this point CAPTCHA IS configured, so the server will reject a request
+    // that arrives without a token. Remember that, so callers can turn a null
+    // token into an explanation instead of the server's bare "token required".
+    _captchaRequired = true;
 
     try {
       const turnstile = await loadTurnstileScript();
@@ -269,6 +283,7 @@ window.SparkleAPI = (function () {
    */
   async function register(data) {
     const cf_turnstile_response = await getCaptchaToken();
+    if (!cf_turnstile_response && _captchaRequired) throw new Error(CAPTCHA_HELP);
     const res = await apiFetch('/api/auth/register', {
       method: 'POST',
       body:   JSON.stringify(cf_turnstile_response ? { ...data, cf_turnstile_response } : data),
@@ -289,6 +304,7 @@ window.SparkleAPI = (function () {
    */
   async function login(email, password) {
     const cf_turnstile_response = await getCaptchaToken();
+    if (!cf_turnstile_response && _captchaRequired) throw new Error(CAPTCHA_HELP);
     const res = await apiFetch('/api/auth/login', {
       method: 'POST',
       body:   JSON.stringify(cf_turnstile_response ? { email, password, cf_turnstile_response } : { email, password }),
