@@ -31,12 +31,34 @@ function requireAuth(req, res, next) {
   if (!token) {
     return res.status(401).json({ error: 'No token provided' });
   }
+
+  let payload;
   try {
-    req.user = verifyToken(token);   // { id, role, email, name }
-    next();
+    payload = verifyToken(token);   // { id, role, email, name }
   } catch {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
+
+  // A signature check alone is not enough. Tokens are issued for up to a year,
+  // so without this a user banned after signing in kept full access — including
+  // cashing out — and a rejected background check (which suspends the account)
+  // did not take effect until the token happened to expire. Login and refresh
+  // already check is_active; this closes the gap for tokens already in hand.
+  // It also makes the database, not the token, the authority on role.
+  // Required lazily so loading this middleware never opens the database early.
+  const user = require('../db')
+    .prepare('SELECT role, is_active FROM users WHERE id = ?')
+    .get(payload.id);
+
+  if (!user) {
+    return res.status(401).json({ error: 'Account no longer exists' });
+  }
+  if (!user.is_active) {
+    return res.status(403).json({ error: 'Account suspended. Contact support.', code: 'ACCOUNT_SUSPENDED' });
+  }
+
+  req.user = { ...payload, role: user.role };
+  next();
 }
 
 // ── Role guard factory ─────────────────────────────────────────────────────

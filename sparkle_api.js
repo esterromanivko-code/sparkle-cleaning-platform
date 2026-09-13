@@ -146,6 +146,19 @@ window.SparkleAPI = (function () {
       throw new Error('SESSION_EXPIRED');
     }
 
+    // 403 from a suspended account: the backend now rejects banned users on every
+    // request, not just at login. End the session through the same SESSION_EXPIRED
+    // path every screen already handles, so a suspended user is signed out rather
+    // than left in a half-working app. Signing back in shows the real reason.
+    // clone() so ordinary 403s (e.g. wrong role) keep their body for the caller.
+    if (res.status === 403) {
+      const body = await res.clone().json().catch(() => null);
+      if (body?.code === 'ACCOUNT_SUSPENDED') {
+        clearTokens();
+        throw new Error('SESSION_EXPIRED');
+      }
+    }
+
     return res;
   }
 
