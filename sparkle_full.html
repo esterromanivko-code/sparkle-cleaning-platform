@@ -1615,11 +1615,26 @@ function avatarHtml(user, cls = 'av-g', sizePx = 48, extraStyle = '') {
   const style = `width:${sizePx}px;height:${sizePx}px;${extraStyle}`;
   const url   = avatarSrc(user?.avatar_url);
   if (url) {
+    // No inline onerror. A value inside an event-handler attribute is entity-decoded
+    // back into raw quotes before the JavaScript runs, so escapeHtml cannot make it
+    // safe there. The fallback reads plain data attributes via the listener below.
     return `<img class="av-photo" style="${style}" src="${escapeHtml(url)}" alt=""
-                 onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'av ${cls}',style:'${style}',textContent:'${escapeHtml(user?.initials || '')}'}))">`;
+                 data-av-fallback="1" data-av-cls="${escapeHtml(cls)}" data-av-initials="${escapeHtml(user?.initials || '')}">`;
   }
   return `<div class="av ${cls}" style="${style};font-size:${Math.round(sizePx / 3)}px">${escapeHtml(user?.initials || '')}</div>`;
 }
+
+// A photo that fails to load falls back to the initials circle. 'error' does not
+// bubble, so this listens in the capture phase to catch any avatar <img>.
+document.addEventListener('error', e => {
+  const img = e.target;
+  if (!(img instanceof HTMLImageElement) || !img.dataset.avFallback) return;
+  const div = document.createElement('div');
+  div.className = 'av ' + (img.dataset.avCls || 'av-g');
+  div.style.cssText = img.style.cssText;
+  div.textContent = img.dataset.avInitials || '';
+  img.replaceWith(div);
+}, true);
 
 // Single source of truth for rendering a cleaner's credential badge.
 // Driven by cleaner_profiles.badge_tier, which only lib/badges.js writes.
@@ -2591,7 +2606,7 @@ function loadAvailableJobs() {
                       placeholder="Briefly describe your experience and approach…"
                       style="resize:vertical"></textarea>
             <button class="btn primary" style="margin-top:.5rem"
-                    onclick="submitBidReal('${escapeHtml(job.id)}','real-${i}','${escapeHtml(job.address || 'client')}')">
+                    onclick="submitBidReal('${escapeHtml(job.id)}','real-${i}')">
               Send quote
             </button>
           </div>
@@ -2604,7 +2619,7 @@ function loadAvailableJobs() {
 }
 
 // Real bid submission that hits the API
-async function submitBidReal(jobId, cardIdx, clientLabel) {
+async function submitBidReal(jobId, cardIdx) {
   const price = document.getElementById('bid-price-' + cardIdx)?.value;
   const msg   = document.getElementById('bid-msg-'   + cardIdx)?.value;
   if (!price || parseFloat(price) < 10) { showToast('Please enter a quote of at least $10.', 'warn'); return; }
@@ -4954,7 +4969,7 @@ function renderAdminUsers() {
     const actions = !u.is_active
       ? `<button class="btn sm" onclick="adminReinstateUser('${u.id}')">Reinstate</button>`
       : `<button class="btn sm" onclick="adminFlagUser('${u.id}')">Flag</button>
-         <button class="btn sm danger" onclick="adminBanUser('${u.id}','${escapeHtml(name).replace(/'/g, "\\'")}')">Ban</button>`;
+         <button class="btn sm danger" onclick="adminBanUser('${u.id}')">Ban</button>`;
     return `<tr>
       <td><div style="font-weight:500">${escapeHtml(name)}</div>
           <div style="font-size:11px;color:var(--tx2)">${escapeHtml(u.email || '')}</div></td>
@@ -4977,7 +4992,13 @@ function renderAdminUsers() {
     <div class="meta">Showing ${users.length} of ${adminNum(adminUsersState.total)} users</div>`;
 }
 
-async function adminBanUser(id, name) {
+async function adminBanUser(id) {
+  // The name is looked up from loaded state, never passed through onclick: anything
+  // inside an event-handler attribute is entity-decoded back into raw quotes before
+  // it runs, so a crafted name could execute script in the admin's session.
+  // showConfirm renders the body with textContent, so the name is safe there.
+  const u = adminUsersState.users.find(x => x.id === id);
+  const name = u ? `${u.first_name || ''} ${u.last_name || ''}`.trim() : '';
   showConfirm({
     title: 'Ban this user?',
     body: `${name || 'This user'} will be signed out and blocked from using Sparkle. They'll be notified and can appeal through support.`,
