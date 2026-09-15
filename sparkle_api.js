@@ -73,24 +73,35 @@ window.SparkleAPI = (function () {
   }
 
   // ─── Auto-refresh ───────────────────────────────────────────────────────────
-  async function tryRefresh() {
+  // Single-flight. Refresh tokens rotate, so when several requests get a 401 at
+  // once (a batch of photo uploads, say) only ONE refresh may run — a second one
+  // would present the already-rotated token, be rejected, and sign the user out
+  // in the middle of their work.
+  // Resolves to 'ok', 'rejected' (must sign in again) or 'offline'.
+  let refreshInFlight = null;
+  function tryRefresh() {
+    if (!refreshInFlight) {
+      refreshInFlight = doRefresh().finally(() => { refreshInFlight = null; });
+    }
+    return refreshInFlight;
+  }
+  async function doRefresh() {
     const refreshToken = getRefreshToken();
-    if (!refreshToken) return false;
+    if (!refreshToken) return 'rejected';
+    let res;
     try {
-      const res = await fetch(`${BASE}/api/auth/refresh`, {
+      res = await fetch(`${BASE}/api/auth/refresh`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ refresh_token: refreshToken }),
       });
-      if (!res.ok) { clearTokens(); return false; }
-      const data = await res.json();
-      const user = getUser(); // keep existing user object
-      setTokens(data.access_token, data.refresh_token, user);
-      return true;
     } catch {
-      clearTokens();
-      return false;
+      return 'offline';   // a dropped connection is no reason to sign someone out
     }
+    if (!res.ok) { clearTokens(); return 'rejected'; }
+    const data = await res.json();
+    setTokens(data.access_token, data.refresh_token, getUser()); // keep existing user object
+    return 'ok';
   }
 
   // ─── Core fetch with auto-refresh + MOBILE OPTIMIZATIONS ───────────────────
@@ -140,8 +151,9 @@ window.SparkleAPI = (function () {
 
     // 401: try silent token refresh once
     if (res.status === 401 && !_retry) {
-      const refreshed = await tryRefresh();
-      if (refreshed) return apiFetch(path, options, true);
+      const outcome = await tryRefresh();
+      if (outcome === 'ok') return apiFetch(path, options, true);
+      if (outcome === 'offline') throw new Error('Cannot reach Sparkle right now. Check your connection and try again.');
       clearTokens();
       throw new Error('SESSION_EXPIRED');
     }
@@ -859,6 +871,78 @@ window.SparkleAPI = (function () {
   const approveBgCheck   = (id)          => adminPost(`/api/background-check/admin/${encodeURIComponent(id)}/approve`, {}, 'approve background check');
   const rejectBgCheck    = (id, reason)  => adminPost(`/api/background-check/admin/${encodeURIComponent(id)}/reject`, { reason }, 'reject background check');
 
+  // ─── Job lifecycle, proof photos, disputes ──────────────────────────────────
+
+  /** Shared helper: send a request and unwrap JSON, keeping status/code on errors. */
+  async function jsonCall(path, options, fallback) {
+    const res  = await apiFetch(path, options);
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(json.errors?.[0]?.msg || json.error || fallback);
+      err.status = res.status;
+      err.code   = json.code;
+      err.data   = json;
+      throw err;
+    }
+    return json;
+  }
+  const post = (path, body, fallback) =>
+    jsonCall(path, { method: 'POST', body: JSON.stringify(body || {}) }, fallback);
+
+  const arriveAtJob      = (jobId) => post(`/api/jobs/${encodeURIComponent(jobId)}/arrive`, {}, 'Could not record your arrival');
+  /** Fails with code PHOTOS_REQUIRED (and err.data.counts) until ≥1 before and ≥1 after photo exist. */
+  const completeJob      = (jobId) => post(`/api/jobs/${encodeURIComponent(jobId)}/complete`, {}, 'Could not complete the job');
+  const cancelJob        = (jobId) => post(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, {}, 'Could not cancel the job');
+  /** Needs all 5 checklist items and at least one 'lockout' photo at the door. */
+  const chargeLockoutFee = (jobId, checklist) =>
+    post(`/api/jobs/${encodeURIComponent(jobId)}/lockout-fee`, { checklist }, 'Could not charge the lockout fee');
+  const getMyJobHistory  = () => jsonCall('/api/jobs/my-history', {}, 'Failed to load your recent jobs');
+
+  const getJobPhotos = (jobId) => jsonCall(`/api/job-photos/${encodeURIComponent(jobId)}`, {}, 'Failed to load photos');
+
+  /**
+   * Upload ONE photo. stage: before | after | lockout | evidence (evidence needs disputeId).
+   * clientUploadId makes a retry after a dropped connection store the photo only once.
+   */
+  function uploadJobPhoto(jobId, stage, blob, { disputeId, clientUploadId } = {}) {
+    const qs = new URLSearchParams({ stage });
+    if (disputeId)      qs.set('dispute_id', disputeId);
+    if (clientUploadId) qs.set('client_upload_id', clientUploadId);
+    const fd = new FormData();
+    fd.append('photo', blob, 'photo.jpg');
+    return jsonCall(`/api/job-photos/${encodeURIComponent(jobId)}?${qs}`,
+      { method: 'POST', body: fd, timeoutMs: 120000 }, 'Photo upload failed');
+  }
+
+  const deleteJobPhoto = (photoId, reason) => jsonCall(`/api/job-photos/photo/${encodeURIComponent(photoId)}`,
+    { method: 'DELETE', body: JSON.stringify(reason ? { reason } : {}) }, 'Could not remove the photo');
+
+  /**
+   * Photos are private, so an <img src> can't load them (it can't send the token).
+   * Takes the url / thumb_url the API returned and resolves to a Blob.
+   */
+  async function getJobPhotoBlob(url) {
+    if (!/^\/api\/job-photos\/file\//.test(url)) throw new Error('Not a job photo URL');
+    const res = await apiFetch(url, { timeoutMs: 60000 });
+    if (!res.ok) throw new Error('Could not load the photo');
+    return res.blob();
+  }
+
+  /** Client: report a problem (type quality | payment | other | lockout_fee), within 72 hours. */
+  const fileDispute = (jobId, type, description) =>
+    post('/api/disputes', { job_id: jobId, type, description }, 'Could not submit your report');
+  const getMyDisputes        = ()   => jsonCall('/api/disputes/mine', {}, 'Failed to load disputes');
+  const getDispute           = (id) => jsonCall(`/api/disputes/${encodeURIComponent(id)}`, {}, 'Failed to load the dispute');
+  const addDisputeStatement  = (id, statement) =>
+    post(`/api/disputes/${encodeURIComponent(id)}/statement`, { statement }, 'Could not save your response');
+
+  const getNotifications     = ()   => jsonCall('/api/notifications', {}, 'Failed to load notifications');
+  const markNotificationRead = (id) => post(`/api/notifications/${encodeURIComponent(id)}/read`, {}, 'Could not update notification');
+
+  const retryDisputeRefund = (id) => adminPost(`/api/admin/disputes/${encodeURIComponent(id)}/retry-refund`, {}, 'retry refund');
+  const releaseJobEarnings = (jobId, reason) =>
+    adminPost(`/api/admin/jobs/${encodeURIComponent(jobId)}/release-earnings`, { reason }, 'release earnings');
+
   // ─── Public API ─────────────────────────────────────────────────────────────
   return {
     isRealSession,
@@ -917,5 +1001,22 @@ window.SparkleAPI = (function () {
     getPendingCredentials,
     approveCredential,
     rejectCredential,
+    arriveAtJob,
+    completeJob,
+    cancelJob,
+    chargeLockoutFee,
+    getMyJobHistory,
+    getJobPhotos,
+    uploadJobPhoto,
+    deleteJobPhoto,
+    getJobPhotoBlob,
+    fileDispute,
+    getMyDisputes,
+    getDispute,
+    addDisputeStatement,
+    getNotifications,
+    markNotificationRead,
+    retryDisputeRefund,
+    releaseJobEarnings,
   };
 })();

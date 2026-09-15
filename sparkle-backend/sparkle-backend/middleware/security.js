@@ -116,6 +116,17 @@ const credentialUploadLimiter = rateLimit({
   message:  { error: 'Too many document uploads. Please wait before trying again.' }
 });
 
+// Job photo uploads — counted per signed-in user rather than per IP, so a crew on
+// one shared Wi-Fi doesn't share a budget. Mount it after requireAuth. 60 per 15
+// minutes covers ten before and ten after photos on a couple of jobs, plus retries.
+const jobPhotoUploadLimiter = rateLimit({
+  windowMs:     15 * 60 * 1000,
+  max:          60,
+  store:        redisStore || undefined,
+  keyGenerator: (req) => (req.user?.id ? `user:${req.user.id}` : rateLimit.ipKeyGenerator(req.ip)),
+  message:      { error: 'Too many photo uploads. Please wait a few minutes and try again.' }
+});
+
 // ══════════════════════════════════════════════════════
 //  2. INPUT SANITIZATION — strip dangerous characters
 //     Prevents XSS (cross-site scripting) attacks
@@ -294,6 +305,7 @@ module.exports = {
   apiLimiter,
   supportLimiter,
   credentialUploadLimiter,
+  jobPhotoUploadLimiter,
   sanitizeInput,
   securityHeaders,
   detectSuspiciousActivity,

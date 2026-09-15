@@ -243,30 +243,13 @@ async function handleProviderNoShow(jobId) {
   audit('PROVIDER_NO_SHOW', { jobId, cleanerId: job.cleaner_id, clientId: job.client_id });
 }
 
-// ─────────────────────────────────────────────────
-//  PAYOUT HOLD — release payout 24hrs after job completes
-//  Gives clients time to dispute before money moves
-// ─────────────────────────────────────────────────
-function getPayoutsReadyForRelease() {
-  return db.prepare(`
-    SELECT p.*, cp.stripe_connect_id, u.email
-    FROM payouts p
-    JOIN cleaner_profiles cp ON cp.user_id = p.cleaner_id
-    JOIN users u ON u.id = p.cleaner_id
-    WHERE p.status = 'pending'
-    AND p.type = 'job'
-    AND p.created_at <= datetime('now', '-24 hours')
-    AND p.job_id IN (
-      SELECT id FROM jobs WHERE status = 'completed'
-      AND id NOT IN (SELECT job_id FROM disputes WHERE status != 'resolved')
-    )
-  `).all();
-}
+// (The 24-hour payout hold that used to live here was removed on purpose: earnings
+// are cashable as soon as a job is completed with its photos, and refunds come out
+// of later earnings. lib/payouts.js is the single source of that rule.)
 
 module.exports = {
   validateReview,
   validateDispute,
   applyCancellationPolicy,
   handleProviderNoShow,
-  getPayoutsReadyForRelease,
 };

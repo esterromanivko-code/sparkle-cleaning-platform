@@ -14,7 +14,7 @@ const path     = require('path');
 const db       = require('../db');
 const { signToken, requireAuth } = require('../middleware/auth');
 const { sendPasswordReset, send2FASetupEmail, send2FACode } = require('../lib/email');
-const { handleSingleUpload, handleMultipleUpload, getFileUrl, UPLOAD_DIR } = require('../lib/uploads');
+const { handleSingleUpload, getFileUrl, UPLOAD_DIR } = require('../lib/uploads');
 const { createRefreshToken, verifyRefreshToken, revokeRefreshToken, revokeAllUserTokens } = require('../lib/tokens');
 const { requireCaptcha } = require('../middleware/captcha');
 const { authLimiter } = require('../middleware/security');
@@ -481,58 +481,9 @@ router.post('/upload/profile-photo', requireAuth, handleSingleUpload, (req, res)
   });
 });
 
-// POST /api/upload/job-photos/:job_id
-// Multipart form — field name: "photos" (up to 10)
-router.post('/upload/job-photos/:job_id', requireAuth, handleMultipleUpload, (req, res) => {
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).json({ error: 'No photos uploaded' });
-  }
-
-  const job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(req.params.job_id);
-  if (!job) return res.status(404).json({ error: 'Job not found' });
-
-  // Make sure the uploader is part of this job
-  const isCleaner = req.user.role === 'cleaner' && job.cleaner_id === req.user.id;
-  const isClient  = req.user.role === 'client'  && job.client_id  === req.user.id;
-  const isAdmin   = req.user.role === 'admin';
-  if (!isCleaner && !isClient && !isAdmin) {
-    return res.status(403).json({ error: 'You are not part of this job' });
-  }
-
-  const uploaded = [];
-  const insert = db.prepare(`
-    INSERT INTO file_uploads (id, user_id, job_id, type, filename, original_name, mimetype, size_bytes, url)
-    VALUES (?, ?, ?, 'job_photo', ?, ?, ?, ?, ?)
-  `);
-
-  for (const file of req.files) {
-    const url      = getFileUrl(file.filename, 'jobs');
-    const uploadId = uuid();
-    insert.run(uploadId, req.user.id, job.id, file.filename, file.originalname, file.mimetype, file.size, url);
-    uploaded.push({ upload_id: uploadId, url, filename: file.filename, size_bytes: file.size });
-  }
-
-  res.json({
-    message:  `${uploaded.length} photo${uploaded.length > 1 ? 's' : ''} uploaded`,
-    photos:   uploaded,
-    job_id:   job.id,
-  });
-});
-
-// GET /api/upload/job-photos/:job_id
-// Returns all photos for a job
-router.get('/upload/job-photos/:job_id', requireAuth, (req, res) => {
-  const photos = db.prepare(`
-    SELECT id, type, url, original_name, size_bytes, created_at,
-           u.first_name, u.role as uploader_role
-    FROM file_uploads f
-    JOIN users u ON u.id = f.user_id
-    WHERE f.job_id = ?
-    ORDER BY f.created_at ASC
-  `).all(req.params.job_id);
-
-  res.json({ photos });
-});
+// Job photos moved to routes/jobPhotos.js (/api/job-photos). The old routes here
+// stored photos in a publicly served folder and listed any job's photos to any
+// signed-in user.
 
 // GET /api/upload/profile-photo/:user_id
 // Get a user's current profile photo

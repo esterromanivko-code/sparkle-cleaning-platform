@@ -84,35 +84,9 @@ async function queueEmail(to, subject, html) {
   return addJob(EMAIL_QUEUE, { to, subject, html });
 }
 
-// Payout queue — process cleaner payouts via Stripe
-const PAYOUT_QUEUE = 'payout';
-registerHandler(PAYOUT_QUEUE, async ({ cleanerId, amount, stripeConnectId }) => {
-  const { getStripe } = require('./stripe');
-  const stripe = getStripe();
-  const db = require('../db');
-  const { v4: uuid } = require('uuid');
-
-  const transfer = await stripe.transfers.create({
-    amount:      Math.round(amount * 100),
-    currency:    'usd',
-    destination: stripeConnectId,
-    description: `Sparkle payout for cleaner ${cleanerId}`,
-  });
-
-  db.prepare(`
-    UPDATE payouts SET status = 'paid', stripe_transfer_id = ?, paid_at = datetime('now')
-    WHERE cleaner_id = ? AND status = 'pending'
-  `).run(transfer.id, cleanerId);
-
-  logger.info('[QUEUE] Payout completed', { cleanerId, amount, transferId: transfer.id });
-});
-
-async function queuePayout(cleanerId, amount, stripeConnectId) {
-  return addJob(PAYOUT_QUEUE, { cleanerId, amount, stripeConnectId }, {
-    delay: 1000,   // 1s delay before processing
-    priority: 1,   // high priority
-  });
-}
+// (There is deliberately no payout queue. Cleaner cashouts go only through
+// lib/payouts.js, which claims exactly the earnings it pays — the old handler here
+// marked every pending payout paid, including held and not-yet-earned ones.)
 
 // Notification queue — send push/in-app notifications
 const NOTIF_QUEUE = 'notification';
@@ -171,4 +145,4 @@ async function scheduleRecurringJob(seriesId, delayMs = 0) {
   return addJob(RECURRING_QUEUE, { seriesId }, { delay: delayMs });
 }
 
-module.exports = { addJob, queueEmail, queuePayout, queueNotification, scheduleRecurringJob };
+module.exports = { addJob, queueEmail, queueNotification, scheduleRecurringJob };

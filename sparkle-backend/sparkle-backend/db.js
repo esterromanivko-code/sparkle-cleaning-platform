@@ -437,6 +437,57 @@ db.exec(`
     updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  -- JOB PHOTOS — proof of work, and evidence when something goes wrong.
+  --   before / after : taken by the assigned cleaner. At least one of each is
+  --                    required before the job can be completed, and so paid.
+  --   lockout        : the cleaner's photo at the door when they could not get in.
+  --   evidence       : attached to a dispute, by either party or an admin.
+  -- These are pictures of the inside of people's homes. The files live in
+  -- UPLOAD_DIR/job-photos, which is NOT publicly served; routes/jobPhotos.js streams
+  -- them only to that job's cleaner, that job's client, and admins.
+  -- CHECK constraints can never be changed later, so every enum is complete now.
+  CREATE TABLE IF NOT EXISTS job_photos (
+    id               TEXT PRIMARY KEY,
+    job_id           TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    uploaded_by      TEXT NOT NULL REFERENCES users(id),
+    role             TEXT NOT NULL CHECK(role IN ('cleaner','client','admin')),
+    stage            TEXT NOT NULL CHECK(stage IN ('before','after','lockout','evidence')),
+    dispute_id       TEXT,
+    client_upload_id TEXT,              -- set by the app so a retried upload is stored once
+    filename         TEXT NOT NULL,     -- uuid.jpg, re-encoded so EXIF/GPS is gone; never the original name
+    thumb_filename   TEXT NOT NULL,
+    size_bytes       INTEGER,
+    created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+    deleted_at       TEXT,              -- admins soft-delete: proof is never silently destroyed
+    deleted_by       TEXT REFERENCES users(id),
+    delete_reason    TEXT,
+    -- evidence photos, and only evidence photos, belong to a dispute
+    CHECK ((stage = 'evidence') = (dispute_id IS NOT NULL)),
+    -- only the cleaner takes before/after/lockout photos
+    CHECK (stage = 'evidence' OR role = 'cleaner'),
+    -- and that dispute must be about this same job
+    FOREIGN KEY (dispute_id, job_id) REFERENCES disputes(id, job_id) ON DELETE CASCADE
+  );
+
+  -- CASHOUTS — one row per transfer to a cleaner's bank. payouts.cashout_id marks
+  -- which earnings a transfer covers, so a transfer whose outcome is unknown (the
+  -- connection dropped mid-request) is reconciled rather than paid a second time.
+  CREATE TABLE IF NOT EXISTS cashouts (
+    id                 TEXT PRIMARY KEY,
+    cleaner_id         TEXT NOT NULL REFERENCES users(id),
+    method             TEXT NOT NULL CHECK(method IN ('standard','instant')),
+    destination        TEXT NOT NULL,   -- Stripe Connect account at the time; retries must reuse it
+    gross_amount       REAL NOT NULL,   -- earnings claimed, after subtracting any refunds owed
+    fee_amount         REAL NOT NULL DEFAULT 0,
+    net_amount         REAL NOT NULL,
+    status             TEXT NOT NULL DEFAULT 'processing' CHECK(status IN ('processing','paid','failed')),
+    stripe_transfer_id TEXT,
+    instant_status     TEXT,            -- NULL for standard; pending / paid / failed for instant
+    error              TEXT,
+    created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+    completed_at       TEXT
+  );
+
   -- ALL INDEXES (must come after all table definitions)
   CREATE INDEX IF NOT EXISTS idx_jobs_client ON jobs(client_id);
   CREATE INDEX IF NOT EXISTS idx_jobs_cleaner ON jobs(cleaner_id);
@@ -466,19 +517,107 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_cred_cleaner ON cleaner_credentials(cleaner_id, doc_type, is_current);
   CREATE INDEX IF NOT EXISTS idx_cred_pending ON cleaner_credentials(status, submitted_at);
   CREATE INDEX IF NOT EXISTS idx_cred_expiry  ON cleaner_credentials(status, expires_at);
+  -- job_photos' composite foreign key needs a unique index on its target columns.
+  -- id is already the primary key, so this can never fail on existing data.
+  CREATE UNIQUE INDEX IF NOT EXISTS ux_disputes_id_job ON disputes(id, job_id);
+  CREATE INDEX IF NOT EXISTS idx_job_photos_job     ON job_photos(job_id, stage);
+  CREATE INDEX IF NOT EXISTS idx_job_photos_dispute ON job_photos(dispute_id);
+  CREATE UNIQUE INDEX IF NOT EXISTS ux_job_photos_client_upload
+    ON job_photos(job_id, uploaded_by, client_upload_id) WHERE client_upload_id IS NOT NULL;
+  CREATE INDEX IF NOT EXISTS idx_disputes_job      ON disputes(job_id, status);
+  CREATE INDEX IF NOT EXISTS idx_disputes_filed_by ON disputes(filed_by, created_at);
+  CREATE INDEX IF NOT EXISTS idx_disputes_against  ON disputes(against, created_at);
+  CREATE INDEX IF NOT EXISTS idx_payouts_job       ON payouts(job_id, type, status);
+  CREATE INDEX IF NOT EXISTS idx_cashouts_cleaner  ON cashouts(cleaner_id, created_at);
+  CREATE INDEX IF NOT EXISTS idx_cashouts_status   ON cashouts(status, created_at);
 `);
 
-// Safe migration: add email_verified column if it doesn't exist yet
-try {
-  db.exec("ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0");
-} catch { /* Column already exists — that's fine */ }
+// ── Column migrations ─────────────────────────────────────────────────────────
+// CREATE TABLE IF NOT EXISTS never alters a table that already exists, so columns
+// added after launch are added here. Only "duplicate column name" means the work
+// is already done. Anything else must stop the boot: SQLite refuses, for example,
+// ADD COLUMN ... DEFAULT (datetime('now')), and swallowing that error would leave
+// the column missing and every query that uses it broken.
+// Returns true when the column was added on this boot.
+function addColumn(table, definition) {
+  try {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
+    return true;
+  } catch (err) {
+    if (/duplicate column name/i.test(err.message)) return false;
+    throw err;
+  }
+}
 
-// Safe migration: add badge_tier to cleaner_profiles if it doesn't exist yet.
-// The CREATE TABLE above only covers fresh databases; this covers the live one.
+addColumn('users', 'email_verified INTEGER NOT NULL DEFAULT 0');
+
 // No CHECK constraint by design — recomputeBadgeTier() in lib/badges.js is the
 // only writer, so the enum is enforced in exactly one place.
+addColumn('cleaner_profiles', "badge_tier TEXT NOT NULL DEFAULT 'none'");
+
+// Before/after photos gate payment. Jobs that were already finished before this
+// rule existed can never get photos, so they are exempted once, when the column
+// first appears — never again, or a later job could slip through.
+if (addColumn('jobs', 'photos_required INTEGER NOT NULL DEFAULT 1')) {
+  db.exec("UPDATE jobs SET photos_required = 0 WHERE status IN ('completed','cancelled')");
+}
+addColumn('jobs', 'photos_verified_at TEXT');   // set by /complete once the photos were checked
+addColumn('jobs', 'completed_at TEXT');         // the 72-hour problem-report window starts here
+addColumn('jobs', 'capture_status TEXT');       // captured | failed | not_required
+
+// Older completed jobs never recorded a completion time; their last update is the
+// closest record there is. Only ever touches rows still missing one.
+db.exec("UPDATE jobs SET completed_at = updated_at WHERE status = 'completed' AND completed_at IS NULL");
+
+addColumn('disputes', "ruling TEXT CHECK(ruling IN ('cleaner','client'))");
+addColumn('disputes', 'refund_status TEXT');    // not_applicable | pending | succeeded | failed
+addColumn('disputes', 'refund_id TEXT');
+addColumn('disputes', 'refund_amount REAL');
+addColumn('disputes', 'respondent_statement TEXT');      // the cleaner's side of the story
+addColumn('disputes', 'respondent_statement_at TEXT');
+
+addColumn('payouts', 'cashout_id TEXT REFERENCES cashouts(id)');  // set while a transfer covers this row
+addColumn('payouts', 'dispute_id TEXT REFERENCES disputes(id)');  // on refund (clawback) rows
+// payouts.status can't gain a 'void' value (CHECK constraints are permanent), so a
+// voided row is status 'failed' with the reason recorded here.
+addColumn('payouts', 'void_reason TEXT');
+
+// ── Legacy payout clean-up ────────────────────────────────────────────────────
+// Choosing a bid used to create the cleaner's payout at booking time, and /complete
+// then created a second one, so a finished bid job could pay twice. The booking-
+// time row (the earlier one) carries the correct amount — the quote minus the
+// success fee. Paid rows are never touched: that money has already moved.
+db.exec(`
+  UPDATE payouts SET status = 'failed', void_reason = 'duplicate job payout'
+  WHERE type = 'job' AND status = 'pending' AND job_id IS NOT NULL
+    AND EXISTS (
+      SELECT 1 FROM payouts p2
+      WHERE p2.job_id = payouts.job_id AND p2.cleaner_id = payouts.cleaner_id
+        AND p2.type = 'job'
+        AND (p2.status = 'paid' OR (p2.status = 'pending' AND p2.rowid < payouts.rowid))
+    )
+`);
+// The same booking-time rows survived when the job was later cancelled.
+db.exec(`
+  UPDATE payouts SET status = 'failed', void_reason = 'job was cancelled'
+  WHERE type = 'job' AND status = 'pending' AND cashout_id IS NULL
+    AND job_id IN (SELECT id FROM jobs WHERE status = 'cancelled')
+`);
+// One live job payout per job, from now on. If two PAID duplicates exist the index
+// can't be built; the app still works, and the conflict needs a human to look.
 try {
-  db.exec("ALTER TABLE cleaner_profiles ADD COLUMN badge_tier TEXT NOT NULL DEFAULT 'none'");
-} catch { /* Column already exists — that's fine */ }
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_payouts_one_per_job
+           ON payouts(job_id, cleaner_id) WHERE type = 'job' AND status != 'failed'`);
+} catch (err) {
+  console.warn('[DB] Could not enforce one payout per job — duplicate paid payouts exist:', err.message);
+}
+// A client can raise one dispute per job. Same reasoning if old duplicates exist.
+try {
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ux_disputes_one_per_job ON disputes(job_id)');
+} catch (err) {
+  console.warn('[DB] Could not enforce one dispute per job — duplicates exist:', err.message);
+}
+db.exec('CREATE INDEX IF NOT EXISTS idx_payouts_cashout ON payouts(cashout_id)');
+db.exec('CREATE INDEX IF NOT EXISTS idx_jobs_completed ON jobs(status, completed_at)');
 
 module.exports = db;

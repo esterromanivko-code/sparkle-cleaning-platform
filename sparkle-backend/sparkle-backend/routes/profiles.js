@@ -401,37 +401,63 @@ router.get('/reviews/:userId', (req, res) => {
 //  EARNINGS / PAYOUTS (cleaner)
 // ══════════════════════════════════════════════════════
 
+// What is cashable, what is held and why, and the cashout itself all live in
+// lib/payouts.js, so these routes and the job routes can never disagree.
+const payoutsLib = require('../lib/payouts');
+
 // GET /api/earnings  — cleaner earnings summary
 router.get('/earnings', requireAuth, requireRole('cleaner'), (req, res) => {
+  // Voided rows (status 'failed') never count. Refund rows are negative and do.
   const payouts = db.prepare(`
-    SELECT p.*, j.service_type, j.scheduled_at
+    SELECT p.id, p.job_id, p.amount, p.type, p.status, p.paid_at, p.created_at, p.cashout_id,
+           j.service_type, j.scheduled_at
     FROM payouts p
     LEFT JOIN jobs j ON j.id = p.job_id
-    WHERE p.cleaner_id = ?
+    WHERE p.cleaner_id = ? AND p.status != 'failed'
     ORDER BY p.created_at DESC LIMIT 50
   `).all(req.user.id);
 
-  const summary = db.prepare(`
+  // Weeks run Monday–Sunday. (SQLite has no 'start of week' modifier; it silently
+  // returned NULL, which made "this week" always $0.)
+  const totals = db.prepare(`
     SELECT
-      SUM(CASE WHEN p.created_at >= date('now','start of week') THEN p.amount ELSE 0 END) as this_week,
-      SUM(CASE WHEN p.created_at >= date('now','start of month') THEN p.amount ELSE 0 END) as this_month,
-      SUM(p.amount) as total_earned,
-      SUM(CASE WHEN p.status = 'pending' THEN p.amount ELSE 0 END) as pending_payout
-    FROM payouts p WHERE p.cleaner_id = ?
+      COALESCE(SUM(CASE WHEN p.created_at >= date('now','weekday 0','-6 days') THEN p.amount END), 0) AS this_week,
+      COALESCE(SUM(CASE WHEN p.created_at >= date('now','start of month') THEN p.amount END), 0) AS this_month,
+      COALESCE(SUM(p.amount), 0) AS total_earned
+    FROM payouts p WHERE p.cleaner_id = ? AND p.status != 'failed'
   `).get(req.user.id);
+
+  const balance = payoutsLib.balanceFor(req.user.id);
+  const r2 = n => payoutsLib.dollars(payoutsLib.cents(n));
+
+  const cashouts = db.prepare(`
+    SELECT id, method, gross_amount, fee_amount, net_amount, status, instant_status, created_at, completed_at
+    FROM cashouts WHERE cleaner_id = ? ORDER BY created_at DESC LIMIT 20
+  `).all(req.user.id);
 
   const lockoutFees = db.prepare(`
     SELECT SUM(fee_amount) as total FROM lockout_fees
     WHERE cleaner_id = ? AND status = 'charged'
   `).get(req.user.id);
 
-  res.json({ payouts, summary, lockout_fees_total: lockoutFees.total || 0 });
+  res.json({
+    payouts,
+    summary: {
+      this_week:      r2(totals.this_week),
+      this_month:     r2(totals.this_month),
+      total_earned:   r2(totals.total_earned),
+      pending_payout: balance.available,   // kept for older app versions: what can be cashed out now
+    },
+    balance,
+    cashouts,
+    lockout_fees_total: lockoutFees.total || 0,
+  });
 });
 
-// POST /api/earnings/cashout  — request payout to bank
+// POST /api/earnings/cashout  — send available earnings to the cleaner's bank
 // Body: { type: 'instant' | 'standard' }
-//   instant  → processed within minutes, 0 flat fee deducted from payout
-//   standard → free, processed on next weekly batch (every Monday)
+//   instant  → within minutes, for the INSTANT_CASHOUT_FEE
+//   standard → free, 1–3 business days
 router.post('/earnings/cashout', requireAuth, requireRole('cleaner'), async (req, res) => {
   const { type = 'standard' } = req.body;
 
@@ -439,98 +465,48 @@ router.post('/earnings/cashout', requireAuth, requireRole('cleaner'), async (req
     return res.status(422).json({ error: 'type must be instant or standard' });
   }
 
-  const profile = db.prepare(
-    'SELECT stripe_connect_id FROM cleaner_profiles WHERE user_id = ?'
-  ).get(req.user.id);
-
-  if (!profile.stripe_connect_id) {
-    return res.status(422).json({
-      error: 'Bank account not connected. Add a payout account in your profile settings.'
-    });
-  }
-
-  const pending = db.prepare(`
-    SELECT SUM(amount) as total FROM payouts WHERE cleaner_id = ? AND status = 'pending'
-  `).get(req.user.id);
-
-  if (!pending.total || pending.total < 1) {
-    return res.status(422).json({ error: 'No pending earnings to cash out' });
-  }
-
-  // Fee logic
-  const INSTANT_FEE = parseFloat(process.env.INSTANT_CASHOUT_FEE || 10.00);
-  const isInstant   = type === 'instant';
-  const cashoutFee  = isInstant ? INSTANT_FEE : 0;
-  const grossAmount = pending.total;
-  const netAmount   = Math.max(0, grossAmount - cashoutFee);
-
-  if (netAmount < 1) {
-    return res.status(422).json({
-      error: `Pending balance ($${grossAmount.toFixed(2)}) is too low to cover the instant cashout fee ($${INSTANT_FEE.toFixed(2)}). Use standard payout instead.`
-    });
-  }
-
   try {
-    const stripeMethod = isInstant ? 'instant' : 'standard';
+    const c = await payoutsLib.cashout(req.user.id, type);
 
-    // Transfer net amount to cleaner (after fee deduction)
-    const transfer = await stripe.transfers.create({
-      amount:      Math.round(netAmount * 100),
-      currency:    'usd',
-      destination: profile.stripe_connect_id,
-      // Stripe supports instant payouts on eligible debit cards/bank accounts
-      ...(isInstant && { method: 'instant' }),
-      description: `Sparkle ${type} payout for cleaner ${req.user.id}`,
-      metadata: {
-        sparkle_user_id: req.user.id,
-        type:            type,
-        gross_amount:    grossAmount,
-        fee_charged:     cashoutFee,
-      }
-    });
-
-    // Mark all pending payouts as paid
-    db.prepare(`
-      UPDATE payouts SET status = 'paid', stripe_transfer_id = ?, paid_at = datetime('now')
-      WHERE cleaner_id = ? AND status = 'pending'
-    `).run(transfer.id, req.user.id);
-
-    // If instant, log the fee as platform revenue
-    if (isInstant && cashoutFee > 0) {
-      db.prepare(`
-        INSERT INTO payouts (id, cleaner_id, amount, type, status, paid_at)
-        VALUES (?, ?, ?, 'instant_fee_deduction', 'paid', datetime('now'))
-      `).run(require('uuid').v4(), req.user.id, -cashoutFee);
-    }
-
-    // Notify cleaner
-    const eta = isInstant ? 'within minutes' : 'by next Monday';
-    db.prepare(`INSERT INTO notifications (id, user_id, title, body, type) VALUES (?,?,?,?,?)`)
-      .run(require('uuid').v4(), req.user.id,
-        '💰 Payout on the way!',
-        `$${netAmount.toFixed(2)} is heading to your bank — arriving ${eta}.${isInstant ? ' ($10 instant fee applied)' : ' (Free standard payout)'}`,
-        'payout_sent'
-      );
-
-    res.json({
-      message:       `${isInstant ? 'Instant' : 'Standard'} payout initiated`,
-      gross_amount:  grossAmount,
-      fee_charged:   cashoutFee,
-      net_amount:    netAmount,
-      eta:           isInstant ? 'Within minutes' : 'Next Monday (free)',
-      transfer_id:   transfer.id,
-    });
-
-  } catch (err) {
-    console.error('Cashout error:', err);
-    // If instant not supported by their bank account, fall back gracefully
-    if (err.code === 'instant_payouts_unsupported') {
-      return res.status(422).json({
-        error: 'Instant payouts are not supported by your linked bank account. Use standard payout instead (free, every Monday).',
-        fallback: 'standard'
+    if (c.status === 'failed') {
+      return res.status(502).json({
+        error: "The payout couldn't be sent, so nothing left your balance. Please try again later or contact support.",
       });
     }
-    res.status(500).json({ error: 'Payout failed', detail: err.message });
+
+    const instantFellBack = c.method === 'instant' && c.instant_status === 'failed';
+    const details = {
+      cashout_id:     c.id,
+      status:         c.status,
+      gross_amount:   c.gross_amount,
+      fee_charged:    instantFellBack ? 0 : c.fee_amount,
+      net_amount:     c.net_amount,
+      instant_status: c.instant_status,
+    };
+
+    if (c.status === 'processing') {
+      return res.status(202).json({
+        message: "Your payout is being processed. We'll let you know as soon as it's sent.",
+        eta: 'Confirming with the bank',
+        ...details,
+      });
+    }
+
+    const instant = c.method === 'instant' && !instantFellBack;
+    res.json({
+      message:     instantFellBack
+        ? "Instant payouts aren't available for your bank, so this was sent as a free standard payout."
+        : `${instant ? 'Instant' : 'Standard'} payout initiated`,
+      eta:         instant ? 'Within minutes' : '1–3 business days (free)',
+      transfer_id: c.stripe_transfer_id,
+      ...details,
+    });
+  } catch (err) {
+    if (err instanceof payoutsLib.CashoutError) {
+      return res.status(err.status).json({ error: err.message, ...err.extra });
+    }
+    console.error('Cashout error:', err);
+    res.status(500).json({ error: 'Payout failed. Please try again.' });
   }
 });
 

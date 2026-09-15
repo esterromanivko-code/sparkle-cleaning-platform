@@ -7,6 +7,8 @@ const { v4: uuid } = require('uuid');
 const db     = require('../db');
  const { requireAuth, requireRole } = require('../middleware/auth');
 const { getStripe } = require('../lib/stripe');
+const { reverseJobEarnings, transaction } = require('../lib/payouts');
+const { notify } = require('../lib/notify');
 const stripe = getStripe();
 
 const router = express.Router();
@@ -136,43 +138,176 @@ router.get('/disputes', requireAuth, requireRole('admin'), (req, res) => {
     SELECT d.*,
            filer.first_name || ' ' || filer.last_name AS filed_by_name, filer.role AS filed_by_role,
            against.first_name || ' ' || against.last_name AS against_name, against.role AS against_role,
-           j.service_type, j.scheduled_at
+           j.service_type, j.scheduled_at, j.completed_at, j.total_charged, j.capture_status,
+           (j.stripe_payment_intent_id IS NOT NULL) AS has_card_payment,
+           (SELECT COUNT(*) FROM job_photos ph WHERE ph.job_id = d.job_id AND ph.deleted_at IS NULL
+              AND ph.stage IN ('before','after','lockout')) AS proof_photo_count,
+           (SELECT COUNT(*) FROM job_photos ph WHERE ph.dispute_id = d.id AND ph.deleted_at IS NULL) AS evidence_photo_count,
+           (SELECT COALESCE(SUM(p.amount), 0) FROM payouts p WHERE p.job_id = d.job_id
+              AND p.type IN ('job','lockout') AND p.status != 'failed') AS cleaner_earnings
     FROM disputes d
     JOIN users filer ON filer.id = d.filed_by
     JOIN users against ON against.id = d.against
     LEFT JOIN jobs j ON j.id = d.job_id
-    ORDER BY d.created_at DESC LIMIT 100
+    ORDER BY (d.status = 'resolved'), d.created_at DESC LIMIT 100
   `).all();
   res.json({ disputes });
 });
 
-// POST /api/admin/disputes/:id/resolve
-router.post('/disputes/:id/resolve', requireAuth, requireRole('admin'), (req, res) => {
-  const { resolution, ruling } = req.body; // ruling: 'cleaner' | 'client'
-  const dispute = db.prepare('SELECT * FROM disputes WHERE id = ?').get(req.params.id);
-  if (!dispute) return res.status(404).json({ error: 'Dispute not found' });
+// Refund the client for a dispute ruled in their favour. Safe to call again: the
+// idempotency key means Stripe refunds at most once however often it's retried.
+async function issueDisputeRefund(disputeId) {
+  const d = db.prepare('SELECT * FROM disputes WHERE id = ?').get(disputeId);
+  if (!d || !['pending', 'failed'].includes(d.refund_status)) return d?.refund_status || null;
+  const job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(d.job_id);
+  const setStatus = (status, refundId = null, error = null) => {
+    db.prepare('UPDATE disputes SET refund_status = ?, refund_id = COALESCE(?, refund_id) WHERE id = ?').run(status, refundId, d.id);
+    if (error) console.error('Dispute refund failed:', d.id, error);
+    return status;
+  };
 
-  db.prepare(`
-    UPDATE disputes SET status = 'resolved', resolution = ?, resolved_by = ?, resolved_at = datetime('now')
-    WHERE id = ?
-  `).run(resolution, req.user.id, dispute.id);
-
-  // Notify both parties
-  [dispute.filed_by, dispute.against].forEach(userId => {
-    db.prepare(`INSERT INTO notifications (id, user_id, title, body, type) VALUES (?,?,?,?,?)`)
-      .run(uuid(), userId, '⚖️ Dispute resolved', resolution, 'dispute_resolved');
-  });
-
-  // If lockout fee dispute and ruling is 'client' → refund the fee
-  if (dispute.type === 'lockout_fee' && ruling === 'client') {
-    const lockout = db.prepare('SELECT * FROM lockout_fees WHERE job_id = ?').get(dispute.job_id);
-    if (lockout?.stripe_charge_id) {
-      stripe.refunds.create({ charge: lockout.stripe_charge_id }).catch(console.error);
-      db.prepare('UPDATE lockout_fees SET status = ? WHERE id = ?').run('refunded', lockout.id);
+  try {
+    if (d.type === 'lockout_fee') {
+      const fee = db.prepare(`
+        SELECT * FROM lockout_fees WHERE job_id = ? AND stripe_charge_id IS NOT NULL ORDER BY created_at DESC LIMIT 1
+      `).get(job.id);
+      if (!fee) return setStatus('not_applicable');
+      const refund = await stripe.refunds.create(
+        { charge: fee.stripe_charge_id, metadata: { sparkle_dispute_id: d.id } },
+        { idempotencyKey: `dispute-refund-${d.id}` });
+      db.prepare("UPDATE lockout_fees SET status = 'refunded' WHERE id = ?").run(fee.id);
+      return setStatus('succeeded', refund.id);
     }
+
+    if (!job.stripe_payment_intent_id) return setStatus('not_applicable');
+    if (job.capture_status !== 'captured') {
+      // Never captured, so nothing was taken — releasing the authorization is the refund.
+      await stripe.paymentIntents.cancel(job.stripe_payment_intent_id, {}, { idempotencyKey: `dispute-release-${d.id}` });
+      return setStatus('succeeded');
+    }
+    const refund = await stripe.refunds.create(
+      { payment_intent: job.stripe_payment_intent_id, metadata: { sparkle_dispute_id: d.id } },
+      { idempotencyKey: `dispute-refund-${d.id}` });
+    return setStatus('succeeded', refund.id);
+  } catch (err) {
+    return setStatus('failed', null, err.message);
+  }
+}
+
+// POST /api/admin/disputes/:id/resolve
+// Body: { ruling: 'cleaner' | 'client', resolution: 'the explanation both people see' }
+// Ruling for the client refunds them (when they paid by card) and takes the
+// cleaner's earnings for that job back: voided if not yet cashed out, otherwise
+// deducted from the cleaner's next cashout. Ruling for the cleaner releases the hold.
+router.post('/disputes/:id/resolve', requireAuth, requireRole('admin'), async (req, res) => {
+  const ruling = req.body?.ruling;
+  const resolution = String(req.body?.resolution || '').trim();
+  if (!['cleaner', 'client'].includes(ruling)) {
+    return res.status(422).json({ error: 'ruling must be cleaner or client' });
+  }
+  if (resolution.length < 10) {
+    return res.status(422).json({ error: 'Explain the decision in at least 10 characters — both people will see it.' });
   }
 
-  res.json({ message: 'Dispute resolved' });
+  const outcome = transaction(() => {
+    const d = db.prepare('SELECT * FROM disputes WHERE id = ?').get(req.params.id);
+    if (!d) return { status: 404, error: 'Dispute not found' };
+    // Conditional update: two admins resolving at once can't both apply a ruling.
+    const upd = db.prepare(`
+      UPDATE disputes SET status = 'resolved', ruling = ?, resolution = ?, resolved_by = ?, resolved_at = datetime('now')
+      WHERE id = ? AND status != 'resolved'
+    `).run(ruling, resolution, req.user.id, d.id);
+    if (upd.changes !== 1) return { status: 409, error: 'This dispute has already been resolved.' };
+
+    const job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(d.job_id);
+    const isLockout = d.type === 'lockout_fee';
+    const what = isLockout ? 'lockout fee' : `${job.service_type} on ${new Date(job.scheduled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+    let earnings = null;
+    let refundAmount = null;
+
+    if (ruling === 'client') {
+      earnings = reverseJobEarnings(job.id, isLockout ? ['lockout'] : ['job', 'tip'], d.id,
+        isLockout ? 'lockout fee refunded after dispute' : 'refunded after dispute');
+      const fee = isLockout && db.prepare(`
+        SELECT * FROM lockout_fees WHERE job_id = ? AND status = 'charged' ORDER BY created_at DESC LIMIT 1
+      `).get(job.id);
+      const hasCardPayment = isLockout ? !!fee?.stripe_charge_id : !!job.stripe_payment_intent_id;
+      refundAmount = isLockout ? fee?.fee_amount ?? null : job.total_charged;
+      if (isLockout && fee && !fee.stripe_charge_id) {
+        db.prepare("UPDATE lockout_fees SET status = 'refunded' WHERE id = ?").run(fee.id);
+      }
+      db.prepare('UPDATE disputes SET refund_status = ?, refund_amount = ? WHERE id = ?')
+        .run(hasCardPayment ? 'pending' : 'not_applicable', hasCardPayment ? refundAmount : null, d.id);
+
+      const money = n => `$${Number(n).toFixed(2)}`;
+      notify(d.filed_by, '⚖️ Your report was upheld',
+        `Sparkle reviewed your report about your ${what} and sided with you.` +
+        (hasCardPayment && refundAmount ? ` A refund of ${money(refundAmount)} is on its way to your card.` : '') +
+        ` ${resolution}`, 'dispute_resolved');
+      notify(d.against, '⚖️ Dispute resolved in the client\'s favor',
+        `Sparkle reviewed the client's report about your ${what} and ruled in the client's favor.` +
+        (earnings.voided > 0 ? ` The ${money(earnings.voided)} for it won't be paid out.` : '') +
+        (earnings.clawed_back > 0 ? ` ${money(earnings.clawed_back)} will be deducted from your next cashout.` : '') +
+        ` ${resolution}`, 'dispute_resolved');
+    } else {
+      notify(d.filed_by, '⚖️ Your report was reviewed',
+        `Sparkle reviewed your report about your ${what} and found in the cleaner's favor. ${resolution}`, 'dispute_resolved');
+      notify(d.against, '⚖️ Dispute resolved in your favor',
+        `Sparkle reviewed the client's report about your ${what} and ruled in your favor. ` +
+        `Any earnings held for it are available to cash out now. ${resolution}`, 'dispute_resolved');
+    }
+    return { dispute: d, earnings };
+  });
+  if (outcome.error) return res.status(outcome.status).json({ error: outcome.error });
+
+  const refundStatus = ruling === 'client' ? await issueDisputeRefund(outcome.dispute.id) : null;
+  res.json({
+    message: refundStatus === 'failed'
+      ? 'Dispute resolved, but the refund failed — use Retry refund.'
+      : 'Dispute resolved',
+    ruling,
+    earnings:      outcome.earnings,
+    refund_status: refundStatus,
+  });
+});
+
+// POST /api/admin/disputes/:id/retry-refund
+router.post('/disputes/:id/retry-refund', requireAuth, requireRole('admin'), async (req, res) => {
+  const d = db.prepare('SELECT refund_status FROM disputes WHERE id = ?').get(req.params.id);
+  if (!d) return res.status(404).json({ error: 'Dispute not found' });
+  if (d.refund_status !== 'failed') {
+    return res.status(409).json({ error: `Nothing to retry — refund status is ${d.refund_status || 'none'}.` });
+  }
+  const refundStatus = await issueDisputeRefund(req.params.id);
+  res.status(refundStatus === 'succeeded' || refundStatus === 'not_applicable' ? 200 : 502)
+    .json({ refund_status: refundStatus });
+});
+
+// POST /api/admin/jobs/:id/release-earnings
+// Body: { reason }. Releases earnings held because the client's payment couldn't
+// be captured (Sparkle absorbs it) or because photos are missing. Open disputes
+// are released by resolving the dispute instead.
+router.post('/jobs/:id/release-earnings', requireAuth, requireRole('admin'), (req, res) => {
+  const reason = String(req.body?.reason || '').trim();
+  if (reason.length < 5) return res.status(422).json({ error: 'Give a reason for releasing these earnings.' });
+
+  const job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(req.params.id);
+  if (!job || job.status !== 'completed') return res.status(404).json({ error: 'Completed job not found' });
+
+  const result = db.prepare(`
+    UPDATE jobs SET
+      capture_status = CASE WHEN capture_status = 'failed' THEN 'waived' ELSE capture_status END,
+      photos_required = CASE WHEN photos_verified_at IS NULL THEN 0 ELSE photos_required END,
+      updated_at = datetime('now')
+    WHERE id = ? AND (capture_status = 'failed' OR (photos_required = 1 AND photos_verified_at IS NULL))
+  `).run(job.id);
+  if (result.changes !== 1) return res.status(409).json({ error: 'Nothing is held on this job (open disputes are released by resolving them).' });
+
+  console.log(`[AUDIT] Earnings released for job ${job.id} by admin ${req.user.id}: ${reason}`);
+  if (job.cleaner_id) {
+    notify(job.cleaner_id, '💰 Earnings released', `Your earnings for the ${job.service_type} job are available to cash out now.`, 'payout_available');
+  }
+  res.json({ message: 'Earnings released' });
 });
 
 // POST /api/admin/notify — send platform-wide push notification

@@ -297,6 +297,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
 .check-item.checked{background:var(--gl);border-color:var(--gm);color:var(--gd)}
 .check-item input{accent-color:var(--g);margin-top:2px;flex-shrink:0}
 
+/* JOB PHOTOS & DISPUTES */
+.jp-stage{border:1px solid var(--bdr);border-radius:var(--rad);padding:.625rem .75rem;margin-top:.625rem}
+.jp-stage-hd{display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap}
+.jp-hint{font-size:12px;color:var(--tx2);line-height:1.5}
+.jp-quote{font-size:13px;background:var(--s100);border-radius:var(--rad);padding:.5rem .75rem;margin:.25rem 0 .5rem;white-space:pre-wrap;overflow-wrap:anywhere}
+.jp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px;margin:.25rem 0 1rem}
+.jp-cell{display:flex;flex-direction:column;gap:4px;min-width:0}
+.jp-cell.jp-removed .jp-thumb{opacity:.4}
+.jp-thumb{display:block;width:100%;padding:0;border:1px solid var(--bdr);border-radius:var(--rad);overflow:hidden;background:var(--s100);aspect-ratio:1/1;cursor:zoom-in}
+.jp-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.modal.jp-wide{width:720px;max-height:90vh;overflow-y:auto}
+.jp-full-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;max-width:100%}
+.jp-full{max-width:min(1100px,94vw);max-height:84vh;object-fit:contain;border-radius:var(--rad);background:#111}
+
 /* NOTIFICATIONS PANEL */
 .notif-panel{position:fixed;top:52px;right:0;width:330px;height:calc(100vh - 52px);background:var(--surf);border-left:1px solid var(--bdr);z-index:700;transform:translateX(100%);transition:transform .25s ease;overflow-y:auto;box-shadow:var(--shl)}
 .notif-panel.open{transform:none}
@@ -728,10 +742,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
     <div class="checklist">
       <label class="check-item" onclick="toggleCheck(this,event)"><input type="checkbox"> I arrived at the client's address on time</label>
       <label class="check-item" onclick="toggleCheck(this,event)"><input type="checkbox"> I was unable to access the property (locked out or no answer)</label>
-      <label class="check-item" onclick="toggleCheck(this,event)"><input type="checkbox"> I waited the full 15-minute grace period before leaving</label>
+      <label class="check-item" onclick="toggleCheck(this,event)"><input type="checkbox"> <span>I waited the full <span id="lockout-grace-text">15-minute</span> grace period before leaving</span></label>
       <label class="check-item" onclick="toggleCheck(this,event)"><input type="checkbox"> The client did NOT cancel the appointment beforehand</label>
       <label class="check-item" onclick="toggleCheck(this,event)"><input type="checkbox"> I attempted contact via call, text, and in-app message</label>
     </div>
+    <div id="lockout-photo-row" class="jp-stage" style="display:none;margin:-.5rem 0 1rem"></div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal()">Cancel</button>
       <button class="btn warn" id="lockout-btn" disabled onclick="confirmLockout()" style="opacity:.4">Charge $35 fee</button>
@@ -1939,6 +1954,20 @@ function logout() {
   if (emailEl) emailEl.value = '';
   if (passEl)  passEl.value  = '';
   if (errEl)   errEl.style.display = 'none';
+  // A successful sign-in leaves the button disabled as "Signing in…" (the auth
+  // screen is simply hidden), so without this the next sign-in button is dead
+  // until the page is reloaded.
+  const signinBtn = document.getElementById('signin-btn');
+  if (signinBtn) { signinBtn.disabled = false; signinBtn.textContent = 'Sign in'; }
+  const onboardBtn = document.querySelector('#obs-2 .ob-btn');   // same problem after creating an account
+  if (onboardBtn) { onboardBtn.disabled = false; onboardBtn.textContent = 'Get started →'; }
+  // Stop everything still working for the account that just signed out.
+  clearInterval(notifPollTimer); notifPollTimer = null;
+  jpUploads.queue = []; jpUploads.byKey = {};
+  jpCloseGallery();
+  document.getElementById('jp-report')?.remove();
+  document.getElementById('jp-ruling')?.remove();
+  cleanerScheduleState.jobs = [];
   closeMobileSidebar();
 }
 
@@ -2247,11 +2276,57 @@ function hlJob(idx){
 // ══════════════════════════════════════
 // LOCKOUT
 // ══════════════════════════════════════
-function showLockoutModal(){
+// Real accounts: the modal is tied to one scheduled job, uses that cleaner's own
+// fee and grace period, and can't charge until there's a photo at the door.
+// Demo accounts (no jobId) keep the sample behaviour.
+let lockoutState = { jobId: null };
+function lockoutJob() {
+  return lockoutState.jobId ? cleanerScheduleState.jobs.find(j => j.id === lockoutState.jobId) || null : null;
+}
+function lockoutFeeLabel() {
+  const job = lockoutJob();
+  const fee = job ? Number(job.lockout_fee_amount || 0) : 35;
+  return `Charge $${fee % 1 ? fee.toFixed(2) : fee} fee`;
+}
+function lockoutReady() {
+  if (lockoutChecks !== 5) return false;
+  if (!lockoutState.jobId) return true;
+  const job = lockoutJob();
+  return !!job && (job.lockout_photo_count || 0) >= 1 && !jpUploadStatus('j:' + job.id).pending;
+}
+function lockoutUpdateButton() {
+  const btn = document.getElementById('lockout-btn');
+  const ok = lockoutReady();
+  btn.disabled = !ok;
+  btn.style.opacity = ok ? '1' : '.4';
+}
+function jpRefreshLockoutPhotos() {
+  const row = document.getElementById('lockout-photo-row');
+  if (!row) return;
+  const job = lockoutJob();
+  if (!job) { row.style.display = 'none'; row.innerHTML = ''; return; }
+  const n = job.lockout_photo_count || 0;
+  const up = jpUploadStatus('j:' + job.id);
+  row.style.display = '';
+  row.innerHTML = `
+    <div class="jp-stage-hd"><strong>Photo at the door</strong><span class="tag ${n ? 'green' : 'amber'}">${n ? `✓ ${n} added` : 'Required'}</span></div>
+    <div class="jp-hint">Show the front door and house number, so Sparkle can confirm you were there if the client disputes the fee.</div>
+    <div class="actions" style="margin-top:6px">${photoPickerHtml('lockout', job.id)}</div>
+    ${up.pending ? `<div class="jp-hint">⏳ Uploading…</div>` : ''}
+    ${up.failed ? `<div class="jp-hint" style="color:var(--rd)">A photo didn't upload. <button class="btn sm" data-act="retry-uploads" data-key="j:${escapeHtml(job.id)}">Retry</button></div>` : ''}`;
+  lockoutUpdateButton();
+}
+function showLockoutModal(jobId){
   lockoutChecks=0;
+  lockoutState.jobId = (currentUser?.isReal && jobId) ? jobId : null;
   document.querySelectorAll('.check-item').forEach(el=>{el.classList.remove('checked');el.querySelector('input').checked=false;});
-  document.getElementById('lockout-btn').disabled=true;document.getElementById('lockout-btn').style.opacity='.4';
+  const job = lockoutJob();
+  document.getElementById('lockout-grace-text').textContent = `${job ? (job.lockout_grace_mins || 15) : 15}-minute`;
+  document.getElementById('lockout-btn').textContent = lockoutFeeLabel();
+  jpRefreshLockoutPhotos();
+  lockoutUpdateButton();
   const modal = document.getElementById('lockout-modal');
+  if (modal._trapHandler) { modal.removeEventListener('keydown', modal._trapHandler); delete modal._trapHandler; }
   modal.classList.add('show');
   // Trap focus inside the modal
   const focusable = modal.querySelectorAll('button, input, [tabindex]:not([tabindex="-1"])');
@@ -2269,15 +2344,37 @@ function toggleCheck(el,e){
   e&&e.preventDefault();
   const cb=el.querySelector('input');cb.checked=!cb.checked;el.classList.toggle('checked',cb.checked);
   lockoutChecks=document.querySelectorAll('.check-item.checked').length;
-  const ok=lockoutChecks===5;
-  document.getElementById('lockout-btn').disabled=!ok;document.getElementById('lockout-btn').style.opacity=ok?'1':'.4';
+  lockoutUpdateButton();
 }
 function closeModal(){
   const modal = document.getElementById('lockout-modal');
   modal.classList.remove('show');
   if (modal._trapHandler) { modal.removeEventListener('keydown', modal._trapHandler); delete modal._trapHandler; }
 }
-function confirmLockout(){closeModal();setTimeout(()=>showToast('Lockout fee of $35 charged. Client notified. Will appear in earnings within 24 hours.','success'),100);}
+async function confirmLockout(){
+  const job = lockoutJob();
+  if (!job) {
+    closeModal();
+    setTimeout(()=>showToast('Lockout fee of $35 charged. Client notified. Will appear in earnings within 24 hours.','success'),100);
+    return;
+  }
+  const btn = document.getElementById('lockout-btn');
+  btn.disabled = true;
+  btn.textContent = 'Charging…';
+  try {
+    const r = await SparkleAPI.chargeLockoutFee(job.id, [true, true, true, true, true]);
+    closeModal();
+    cleanerScheduleState.jobs = cleanerScheduleState.jobs.filter(j => j.id !== job.id);
+    renderCleanerSchedule();
+    showToast(`Lockout fee of ${jpMoney(r.fee_amount)} charged. The client was notified and has 72 hours to dispute it.`, 'success');
+  } catch (err) {
+    if (err.message === 'SESSION_EXPIRED') { closeModal(); showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+    if (err.code === 'PHOTOS_REQUIRED') { job.lockout_photo_count = 0; jpRefreshLockoutPhotos(); }
+    showToast(err.message, 'error');
+    btn.textContent = lockoutFeeLabel();
+    lockoutUpdateButton();
+  }
+}
 
 // ── Frequency modal (for clients) ─────────────────────────────────────────────
 let _frequencyEditBtn = null;
@@ -2431,12 +2528,94 @@ function saveRecurringEdit() {
 // ══════════════════════════════════════
 // NOTIFICATIONS
 // ══════════════════════════════════════
+let notifPollTimer = null;
+let notifLoadToken = 0;
+
+function jpNotifEmptyHtml() {
+  return `<div style="padding:2rem 1rem;text-align:center;color:var(--tx2)"><div style="font-size:28px;margin-bottom:.5rem">🔔</div><div style="font-weight:500;margin-bottom:4px">No notifications yet</div><div style="font-size:13px">We'll let you know when something needs your attention.</div></div>`;
+}
+
+// Where tapping a notification takes you, by its type and your role.
+function jpNotifTarget(type = '') {
+  const role = currentUser?.role;
+  if (role === 'admin') return /dispute/.test(type) ? 'a-disputes' : null;
+  if (/^payout/.test(type)) return role === 'cleaner' ? 'c-earnings' : null;
+  if (/^dispute/.test(type)) return role === 'cleaner' ? 'c-earnings' : 'cl-bookings';
+  if (['review_prompt', 'lockout_fee_charged', 'cleaner_arrived', 'job_accepted'].includes(type)) return 'cl-bookings';
+  if (type === 'job_cancelled') return role === 'cleaner' ? 'c-schedule' : 'cl-bookings';
+  if (type === 'bid_chosen') return 'c-schedule';
+  return null;
+}
+
+function jpTimeAgo(s) {
+  const d = jpServerDate(s);
+  if (!d) return '';
+  const mins = Math.round((Date.now() - d.getTime()) / 60000);
+  if (mins < 1)  return 'Just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24)  return `${hrs} hr ago`;
+  const days = Math.round(hrs / 24);
+  if (days < 7)  return `${days} day${days === 1 ? '' : 's'} ago`;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+async function loadRealNotifications() {
+  const list = document.getElementById('notif-list');
+  const dot  = document.getElementById('notif-dot');
+  if (!list || !currentUser?.isReal) return;
+  const token = ++notifLoadToken;
+  let notifs;
+  try {
+    notifs = (await SparkleAPI.getNotifications()).notifications || [];
+  } catch (err) {
+    if (err.message === 'SESSION_EXPIRED') { clearInterval(notifPollTimer); notifPollTimer = null; }
+    return;   // keep whatever is showing; the next poll tries again
+  }
+  if (token !== notifLoadToken || !currentUser?.isReal) return;
+  if (dot) dot.style.display = !notifOpen && notifs.some(n => !n.is_read) ? '' : 'none';
+  if (!notifs.length) { list.innerHTML = jpNotifEmptyHtml(); return; }
+
+  // textContent only — notification text can include names people typed.
+  list.innerHTML = '';
+  notifs.forEach(n => {
+    const item = document.createElement('div');
+    item.className = 'notif-item' + (n.is_read ? '' : ' unread');
+    const titleEl = document.createElement('div');
+    titleEl.className = 'notif-title';
+    titleEl.textContent = n.title;
+    const bodyEl = document.createElement('div');
+    bodyEl.className = 'notif-body';
+    bodyEl.textContent = n.body;
+    const timeEl = document.createElement('div');
+    timeEl.className = 'notif-time';
+    timeEl.textContent = jpTimeAgo(n.sent_at);
+    item.append(titleEl, bodyEl, timeEl);
+    item.addEventListener('click', () => {
+      if (!n.is_read) {
+        n.is_read = 1;
+        item.classList.remove('unread');
+        SparkleAPI.markNotificationRead(n.id).catch(() => {});
+      }
+      const target = jpNotifTarget(n.type);
+      if (target) { showPage(target); if (notifOpen) toggleNotif(); }
+    });
+    list.appendChild(item);
+  });
+}
+
 function buildNotifs() {
   const list = document.getElementById('notif-list');
   if (currentUser?.isReal) {
-    list.innerHTML = `<div style="padding:2rem 1rem;text-align:center;color:var(--tx2)"><div style="font-size:28px;margin-bottom:.5rem">🔔</div><div style="font-weight:500;margin-bottom:4px">No notifications yet</div><div style="font-size:13px">We'll let you know when something needs your attention.</div></div>`;
     const dot = document.getElementById('notif-dot');
     if (dot) dot.style.display = 'none';
+    list.innerHTML = jpNotifEmptyHtml();
+    loadRealNotifications();
+    clearInterval(notifPollTimer);
+    notifPollTimer = setInterval(() => {
+      if (!currentUser?.isReal) { clearInterval(notifPollTimer); notifPollTimer = null; return; }
+      if (!document.hidden) loadRealNotifications();
+    }, 60000);
     return;
   }
   const notifs = currentUser.role==='cleaner'?notifsCleaner:currentUser.role==='client'?notifsClient:notifsAdmin;
@@ -2475,6 +2654,7 @@ function toggleNotif(){
   if (notifOpen) {
     document.getElementById('notif-dot').style.display = 'none';
     document.getElementById('notif-panel').focus?.();
+    if (currentUser?.isReal) loadRealNotifications();
   }
 }
 
@@ -2978,7 +3158,7 @@ function loadCleanerDashboard() {
     const todayJobs = (schedule?.jobs || []).filter(j => j.scheduled_at && new Date(j.scheduled_at).toDateString() === todayStr);
     const todayHtml = todayJobs.length ? todayJobs.map(j => {
       const time = new Date(j.scheduled_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-      return `<div class="card"><div style="font-size:13px;font-weight:500">${escapeHtml(j.service_type || 'Cleaning')}</div><div class="meta">${escapeHtml(j.address || '')} · ${escapeHtml(time)}</div><div class="tags" style="margin-top:8px"><span class="tag green">${escapeHtml(j.status || 'Confirmed')}</span></div></div>`;
+      return `<div class="card"><div style="font-size:13px;font-weight:500">${escapeHtml(j.service_type || 'Cleaning')}</div><div class="meta">${escapeHtml(j.address || '')} · ${escapeHtml(time)}</div><div class="tags" style="margin-top:8px"><span class="tag ${j.status === 'in_progress' ? 'amber' : 'green'}">${j.status === 'in_progress' ? 'In progress' : 'Confirmed'}</span></div><div class="actions"><button class="btn primary sm" onclick="showPage('c-schedule')">Open job</button></div></div>`;
     }).join('') : `<div class="card" style="color:var(--tx2)">No jobs scheduled for today.</div>`;
 
     const availableJobs = (available?.jobs || []).slice(0, 3);
@@ -3020,31 +3200,104 @@ function loadCleanerDashboard() {
   });
 }
 
+// Cleaner's upcoming and in-progress jobs. Each card walks the job through
+// I've arrived → before photos → after photos → Complete job. Completing needs at
+// least one photo of each, and that is also when the earnings become cashable.
+// Card state lives in cleanerScheduleState so uploads can re-render one card
+// without refetching, and a card survives the page re-rendering mid-upload.
+let cleanerScheduleState = { jobs: [] };
+
 function loadCleanerSchedule() {
   if (!currentUser?.isReal) return;
   const page = document.getElementById('page-c-schedule');
   if (!page) return;
-  page.innerHTML = `<div class="pg-title">My schedule</div><div class="pg-sub">Upcoming confirmed appointments</div><div class="alert info">Loading your schedule…</div>`;
+  if (!cleanerScheduleState.jobs.length) {
+    page.innerHTML = `<div class="pg-title">My schedule</div><div class="pg-sub">Upcoming confirmed appointments</div><div class="alert info">Loading your schedule…</div>`;
+  }
 
   SparkleAPI.getMySchedule().then(data => {
-    const jobs = data?.jobs || [];
-    if (!jobs.length) {
-      page.innerHTML = `
-        <div class="pg-title">My schedule</div>
-        <div class="pg-sub">Upcoming confirmed appointments</div>
-        <div class="alert info">No upcoming appointments yet. Jobs you accept will appear here.</div>`;
-      return;
-    }
-    const cards = jobs.map(j => {
-      const when = j.scheduled_at ? new Date(j.scheduled_at).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Time TBD';
-      const clientName = [j.client_first_name, j.client_last_name].filter(Boolean).join(' ') || 'Client';
-      return `<div class="card"><div class="row c"><div><div style="font-size:13px;font-weight:500">${escapeHtml(j.service_type || 'Cleaning')}</div><div class="meta">${escapeHtml(j.address || '')}</div></div><span class="tag green">${escapeHtml(j.status || 'Confirmed')}</span></div><div class="tags" style="margin-top:8px"><span class="tag blue">${escapeHtml(when)}</span></div><div class="meta" style="margin-top:6px">Client: <strong>${escapeHtml(clientName)}</strong></div><div class="actions"><button class="btn sm" onclick="startMileageTracking('${escapeHtml(j.id)}')">📍 On my way</button><button class="btn primary sm" onclick="arrivedConfirm(this)">I've arrived</button><button class="btn warn sm" onclick="showLockoutModal()">Charge lockout fee</button></div></div>`;
-    }).join('');
-    page.innerHTML = `<div class="pg-title">My schedule</div><div class="pg-sub">Upcoming confirmed appointments</div><div class="alert info">${jobs.length} job${jobs.length === 1 ? '' : 's'} upcoming. Tap "I've arrived" when on-site to notify the client automatically.</div>${cards}`;
+    cleanerScheduleState.jobs = data?.jobs || [];
+    renderCleanerSchedule();
   }).catch(err => {
     if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
     page.innerHTML = `<div class="pg-title">My schedule</div><div class="alert warn">Could not load schedule: ${escapeHtml(err.message)}</div>`;
   });
+}
+
+function renderCleanerSchedule() {
+  const page = document.getElementById('page-c-schedule');
+  if (!page) return;
+  const jobs = cleanerScheduleState.jobs;
+  const head = `<div class="pg-title">My schedule</div><div class="pg-sub">Upcoming confirmed appointments</div>`;
+  if (!jobs.length) {
+    page.innerHTML = `${head}<div class="alert info">No upcoming appointments yet. Jobs you accept will appear here.</div>`;
+    return;
+  }
+  page.innerHTML = `${head}
+    <div class="alert info">📸 Every job needs at least one <strong>before</strong> and one <strong>after</strong> photo. They're your proof if a client reports a problem — and your pay is ready to cash out as soon as the job is completed with them.</div>
+    ${jobs.map(scheduleCardHtml).join('')}`;
+}
+
+function rerenderScheduleCard(jobId) {
+  const el = document.querySelector(`[data-sched-card="${CSS.escape(jobId)}"]`);
+  if (!el) return;
+  const job = cleanerScheduleState.jobs.find(j => j.id === jobId);
+  if (job) el.outerHTML = scheduleCardHtml(job);
+  else renderCleanerSchedule();
+}
+
+// "Take photo" opens the camera on phones; "Choose photos" allows several at once.
+function photoPickerHtml(stage, jobId, extraAttrs = '') {
+  const id = escapeHtml(jobId);
+  return `<label class="btn sm">📷 Take photo<input type="file" accept="image/*" capture="environment" hidden data-photo-input="${stage}" data-job="${id}"${extraAttrs}></label>`
+       + `<label class="btn sm">🖼️ Choose photos<input type="file" accept="image/*" multiple hidden data-photo-input="${stage}" data-job="${id}"${extraAttrs}></label>`;
+}
+
+function scheduleCardHtml(j) {
+  const id = escapeHtml(j.id);
+  const when = j.scheduled_at ? new Date(j.scheduled_at).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Time TBD';
+  const started = j.status === 'in_progress';
+  const before = j.before_photo_count || 0;
+  const after  = j.after_photo_count || 0;
+  const up = jpUploadStatus('j:' + j.id);
+
+  const stage = (name, count, hint) => `
+    <div class="jp-stage">
+      <div class="jp-stage-hd"><strong>${name === 'before' ? 'Before' : 'After'} photos</strong><span class="tag ${count ? 'green' : 'amber'}">${count ? `✓ ${count} added` : 'Required'}</span></div>
+      <div class="jp-hint">${hint}</div>
+      <div class="actions" style="margin-top:6px">${photoPickerHtml(name, j.id)}</div>
+    </div>`;
+
+  const uploadLine = (up.pending || up.failed) ? `<div class="jp-hint" style="margin-top:8px">
+      ${up.pending ? `⏳ Uploading ${up.pending} photo${up.pending === 1 ? '' : 's'}… keep this page open.` : ''}
+      ${up.failed ? `<span style="color:var(--rd)">${up.failed} photo${up.failed === 1 ? '' : 's'} didn't upload.</span> <button class="btn sm" data-act="retry-uploads" data-key="j:${id}">Retry</button>` : ''}
+    </div>` : '';
+
+  let actions;
+  if (started) {
+    const ready = before >= 1 && after >= 1 && !up.pending;
+    const missing = [before < 1 && 'a before photo', after < 1 && 'an after photo'].filter(Boolean).join(' and ');
+    actions = `<button class="btn primary sm" data-act="complete" data-job="${id}"${ready ? '' : ' disabled style="opacity:.5;cursor:not-allowed"'}>✓ Complete job</button>`
+      + (ready ? '' : `<span class="jp-hint">${up.pending ? 'Waiting for photos to finish uploading' : `Add ${missing} to complete this job`}</span>`);
+  } else {
+    actions = `<button class="btn sm" onclick="startMileageTracking('${id}')">📍 On my way</button>`
+      + `<button class="btn primary sm" data-act="arrive" data-job="${id}">I've arrived</button>`
+      + (j.lockout_fee_enabled ? `<button class="btn warn sm" data-act="lockout" data-job="${id}">🔒 Locked out</button>` : '');
+  }
+  if (before + after + (j.lockout_photo_count || 0)) {
+    actions += `<button class="btn sm" data-act="gallery" data-job="${id}" data-can-delete="1">View photos</button>`;
+  }
+
+  return `<div class="card" data-sched-card="${id}">
+    <div class="row c"><div><div style="font-size:13px;font-weight:500">${escapeHtml(j.service_type || 'Cleaning')}</div><div class="meta">${escapeHtml(j.address || '')}</div></div>
+      <span class="tag ${started ? 'amber' : 'green'}">${started ? 'In progress' : 'Confirmed'}</span></div>
+    <div class="tags" style="margin-top:8px"><span class="tag blue">${escapeHtml(when)}</span></div>
+    <div class="meta" style="margin-top:6px">Client: <strong>${escapeHtml(j.client_name || 'Client')}</strong></div>
+    ${stage('before', before, started ? 'Photos of each room before you started cleaning.' : 'Take these when you arrive, before you start cleaning.')}
+    ${started ? stage('after', after, 'Photos of the same rooms once you have finished.') : ''}
+    ${uploadLine}
+    <div class="actions" style="align-items:center;flex-wrap:wrap">${actions}</div>
+  </div>`;
 }
 
 function loadCleanerRecurring() {
@@ -3067,7 +3320,10 @@ function loadClientRecurring() {
     <div class="alert info">You don't have an active recurring plan yet. <a href="#" onclick="showPage('cl-post');return false" style="color:var(--g);text-decoration:none;font-weight:500">Post a job</a> and choose a recurring frequency to get started.</div>`;
 }
 
-let cleanerEarningsState = { pending: 0 };
+let cleanerEarningsState = { pending: 0, instantFee: 10 };
+
+const PAYOUT_TYPE_LABELS = { lockout: 'Lockout fee', refund: 'Refund deducted', tip: 'Tip', pro_bonus: 'Pro bonus' };
+const CASHOUT_STATUS_TAGS = { paid: ['green', 'Sent'], processing: ['amber', 'Processing'], failed: ['red', 'Failed — returned to your balance'] };
 
 function loadCleanerEarnings() {
   if (!currentUser?.isReal) return;
@@ -3075,35 +3331,652 @@ function loadCleanerEarnings() {
   if (!page) return;
   page.innerHTML = `<div class="pg-title">Earnings &amp; payouts</div><div class="pg-sub">Loading your earnings…</div>`;
 
-  SparkleAPI.getEarnings().then(data => {
-    const summary     = data?.summary || {};
-    const payouts     = data?.payouts || [];
-    const pending     = parseFloat(summary.pending_payout || 0);
-    const thisWeek    = parseFloat(summary.this_week || 0);
-    const thisMonth   = parseFloat(summary.this_month || 0);
-    const lockoutFees = parseFloat(data?.lockout_fees_total || 0);
-    const jobsDone    = payouts.filter(p => parseFloat(p.amount || 0) > 0).length;
-    cleanerEarningsState.pending = pending;
+  Promise.all([
+    SparkleAPI.getEarnings(),
+    SparkleAPI.getMyJobHistory().catch(() => null),
+    SparkleAPI.getMyDisputes().catch(() => null),
+  ]).then(([data, history, disputeData]) => {
+    const summary  = data?.summary || {};
+    const balance  = data?.balance || { available: parseFloat(summary.pending_payout || 0), held: 0, holds: [], refunds_owed: 0, processing: 0, instant_fee: 10 };
+    const payouts  = data?.payouts || [];
+    const cashouts = data?.cashouts || [];
+    const jobs     = history?.jobs || [];
+    const disputes = (disputeData?.disputes || []).filter(d => d.against_me);
+    const available = Number(balance.available || 0);
+    cleanerEarningsState.pending    = available;
+    cleanerEarningsState.instantFee = Number(balance.instant_fee ?? 10);
+
+    const payoutCard = `<div class="payout-card"><div class="payout-lbl">Available to cash out</div><div class="payout-amt">${jpMoney(available)}</div>
+      <div class="payout-row">
+        <div><div class="payout-item-lbl">On hold</div><div class="payout-item-val">${jpMoney(balance.held)}</div></div>
+        <div><div class="payout-item-lbl">This week</div><div class="payout-item-val">$${Number(summary.this_week || 0).toFixed(0)}</div></div>
+        <div><div class="payout-item-lbl">This month</div><div class="payout-item-val">$${Number(summary.this_month || 0).toFixed(0)}</div></div>
+        <div><div class="payout-item-lbl">Lockout fees</div><div class="payout-item-val">$${Number(data?.lockout_fees_total || 0).toFixed(0)}</div></div>
+      </div></div>`;
+
+    const alerts = [
+      balance.processing > 0 && `<div class="alert info">⏳ A payout of ${jpMoney(balance.processing)} is being confirmed with the bank. We'll notify you as soon as it's sent.</div>`,
+      balance.refunds_owed > 0 && `<div class="alert warn">↩️ ${jpMoney(balance.refunds_owed)} in client refunds will come out of your next earnings.</div>`,
+    ].filter(Boolean).join('');
+
+    const disputesHtml = disputes.length ? `<div class="sect-title" style="margin:1rem 0 .5rem">Problems reported by clients</div>` + disputes.map(d => {
+      const open = d.status !== 'resolved';
+      const needsReply = open && !d.respondent_statement;
+      const tag = open
+        ? (needsReply ? '<span class="tag red">Needs your response</span>' : '<span class="tag amber">Under review</span>')
+        : `<span class="tag ${d.ruling === 'cleaner' ? 'green' : 'red'}">${d.ruling === 'cleaner' ? 'Resolved in your favor' : "Resolved in the client's favor"}</span>`;
+      return `<div class="dispute-card${open ? (needsReply ? '' : ' review') : ' resolved'}">
+        <div class="row c"><div><div style="font-size:13px;font-weight:500">${escapeHtml(DISPUTE_TYPE_LABELS[d.type] || 'Problem')} · ${escapeHtml(d.service_type || 'Job')}</div><div class="meta">Reported ${escapeHtml(jpShortDate(d.created_at))} by ${escapeHtml(d.client_name || 'the client')}</div></div>${tag}</div>
+        <div class="jp-quote">${escapeHtml(d.description)}</div>
+        <div class="actions"><button class="btn sm${needsReply ? ' primary' : ''}" data-act="dispute-view" data-dispute="${escapeHtml(d.id)}">${needsReply ? 'Respond &amp; add photos' : 'View details'}</button></div>
+      </div>`;
+    }).join('') : '';
+
+    const holdsHtml = (balance.holds || []).length ? `<div class="sect-title" style="margin:1rem 0 .5rem">On hold</div>` + balance.holds.map(h => {
+      const date = h.scheduled_at ? new Date(h.scheduled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+      return `<div class="card-sm"><div class="row c"><div><div style="font-size:13px;font-weight:500">${escapeHtml(h.type === 'job' ? (h.service_type || 'Job') : (PAYOUT_TYPE_LABELS[h.type] || 'Earnings'))}${date ? ' · ' + escapeHtml(date) : ''}</div><div style="font-size:11px;color:var(--tx2)">${escapeHtml(h.reason_label || '')}</div></div><div style="font-weight:500">${jpMoney(h.amount)}</div></div></div>`;
+    }).join('') : '';
+
+    const jobsHtml = jobs.length ? jobs.slice(0, 10).map(j => {
+      const date = jpShortDate(j.completed_at) || (j.scheduled_at ? new Date(j.scheduled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '');
+      let pay = '';
+      if (j.dispute_status && j.dispute_status !== 'resolved')  pay = '<span class="tag amber">On hold — problem reported</span>';
+      else if (j.payout_status === 'paid')                      pay = '<span class="tag green">Cashed out</span>';
+      else if (j.payout_status === 'pending' && j.payout_cashout_id) pay = '<span class="tag amber">Payout processing</span>';
+      else if (j.payout_status === 'pending')                   pay = j.capture_status === 'failed' ? '<span class="tag amber">On hold — payment issue</span>' : '<span class="tag green">Ready to cash out</span>';
+      else if (j.status === 'cancelled')                        pay = '<span class="tag">Cancelled</span>';
+      const photoCount = (j.before_photo_count || 0) + (j.after_photo_count || 0) + (j.lockout_photo_count || 0);
+      return `<div class="card-sm"><div class="row c" style="gap:8px;flex-wrap:wrap">
+        <div><div style="font-size:13px;font-weight:500">${escapeHtml(j.service_type || 'Cleaning')}${j.client_name ? ' · ' + escapeHtml(j.client_name) : ''}</div><div style="font-size:11px;color:var(--tx2)">${escapeHtml(date)} · ${j.before_photo_count || 0} before · ${j.after_photo_count || 0} after</div></div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">${j.payout_amount != null ? `<strong>${jpMoney(j.payout_amount)}</strong>` : ''}${pay}${photoCount ? `<button class="btn sm" data-act="gallery" data-job="${escapeHtml(j.id)}">Photos</button>` : ''}</div>
+      </div></div>`;
+    }).join('') : `<div class="card-sm" style="text-align:center;color:var(--tx2)">Completed jobs will show up here.</div>`;
+
+    const cashoutsHtml = cashouts.length ? `<div class="sect-title" style="margin:1rem 0 .5rem">Cashouts</div>` + cashouts.slice(0, 10).map(c => {
+      const [color, text] = CASHOUT_STATUS_TAGS[c.status] || ['', c.status];
+      const fellBack = c.method === 'instant' && c.instant_status === 'failed';
+      const how = c.method === 'instant' ? (fellBack ? ' · instant unavailable, sent as standard (fee returned)' : ' · instant') : ' · standard';
+      const fee = c.method === 'instant' && !fellBack && c.fee_amount > 0 ? ` · ${jpMoney(c.fee_amount)} fee` : '';
+      return `<div class="card-sm"><div class="row c"><div><div style="font-size:13px;font-weight:500">${jpMoney(c.net_amount)} to your bank</div><div style="font-size:11px;color:var(--tx2)">${escapeHtml(jpShortDate(c.created_at))}${how}${fee}</div></div><span class="tag ${color}">${escapeHtml(text)}</span></div></div>`;
+    }).join('') : '';
 
     const txHtml = payouts.length ? payouts.slice(0, 10).map(p => {
-      const date  = p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
-      const label = p.service_type || (p.status === 'fee' ? 'Cashout fee' : 'Payout');
-      const amt   = parseFloat(p.amount || 0);
-      return `<div class="card-sm"><div class="row c"><div><div style="font-size:13px;font-weight:500">${escapeHtml(label)}</div><div style="font-size:11px;color:var(--tx2)">${escapeHtml(date)}${p.status ? ' · ' + escapeHtml(p.status) : ''}</div></div><div style="color:${amt >= 0 ? 'var(--gd)' : 'var(--rd)'};font-weight:500">${amt >= 0 ? '+' : ''}$${Math.abs(amt).toFixed(2)}</div></div></div>`;
+      const amt = Number(p.amount || 0);
+      const label = p.type === 'job' ? (p.service_type || 'Job') : (PAYOUT_TYPE_LABELS[p.type] || 'Payout');
+      const status = p.status === 'paid' ? (amt < 0 ? 'settled' : 'cashed out') : p.cashout_id ? 'processing' : (amt < 0 ? 'owed' : 'not cashed out yet');
+      return `<div class="card-sm"><div class="row c"><div><div style="font-size:13px;font-weight:500">${escapeHtml(label)}</div><div style="font-size:11px;color:var(--tx2)">${escapeHtml(jpShortDate(p.created_at))} · ${escapeHtml(status)}</div></div><div style="color:${amt >= 0 ? 'var(--gd)' : 'var(--rd)'};font-weight:500">${amt >= 0 ? '+' : '−'}${jpMoney(Math.abs(amt))}</div></div></div>`;
     }).join('') : `<div class="card-sm" style="text-align:center;color:var(--tx2)">No transactions yet. Completed jobs will show up here.</div>`;
 
     page.innerHTML = `
       <div class="pg-title">Earnings &amp; payouts</div>
-      <div class="pg-sub">You keep 100% of your hourly wage — Sparkle never cuts into your pay.</div>
-      <div class="payout-card"><div class="payout-lbl">Available to cash out</div><div class="payout-amt">$${pending.toFixed(2)}</div><div class="payout-row"><div><div class="payout-item-lbl">This week</div><div class="payout-item-val">$${thisWeek.toFixed(0)}</div></div><div><div class="payout-item-lbl">This month</div><div class="payout-item-val">$${thisMonth.toFixed(0)}</div></div><div><div class="payout-item-lbl">Lockout fees</div><div class="payout-item-val">$${lockoutFees.toFixed(0)}</div></div><div><div class="payout-item-lbl">Jobs done</div><div class="payout-item-val">${jobsDone}</div></div></div></div>
-      <div class="f2" style="margin-bottom:1.25rem"><button class="btn primary" onclick="openCashout()"${pending < 1 ? ' disabled style="opacity:.5;cursor:not-allowed"' : ''}>Cash out now</button><div><label class="flbl">Payout to</label><select class="inp"><option>Add a payout account in Settings</option></select></div></div>
-      <div class="sect-title" style="margin-bottom:.75rem">Recent transactions</div>
+      <div class="pg-sub">Your pay for a job is ready to cash out as soon as you complete it with before and after photos.</div>
+      ${payoutCard}
+      ${alerts}
+      <div class="f2" style="margin-bottom:1.25rem"><button class="btn primary" onclick="openCashout()"${available < 1 ? ' disabled style="opacity:.5;cursor:not-allowed"' : ''}>Cash out now</button><div><label class="flbl">Payout to</label><select class="inp"><option>Add a payout account in Settings</option></select></div></div>
+      ${disputesHtml}
+      ${holdsHtml}
+      <div class="sect-title" style="margin:1rem 0 .5rem">Recent jobs</div>
+      ${jobsHtml}
+      ${cashoutsHtml}
+      <div class="sect-title" style="margin:1rem 0 .5rem">Recent transactions</div>
       ${txHtml}`;
   }).catch(err => {
     if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
     page.innerHTML = `<div class="pg-title">Earnings &amp; payouts</div><div class="alert warn">Could not load earnings: ${escapeHtml(err.message)}</div>`;
   });
 }
+
+// ══════════════════════════════════════
+// JOB PHOTOS & DISPUTES (real accounts)
+// ══════════════════════════════════════
+// Photos show the inside of clients' homes, so none of them has a public URL:
+// every image is fetched with the session token and shown through an object URL
+// that is revoked when its viewer closes.
+// Rule for this section: text people typed only reaches the page through
+// escapeHtml() or textContent, never an inline handler. Buttons carry server ids
+// in data-* attributes and go through the two delegated listeners at the end.
+
+const DISPUTE_TYPE_LABELS = { quality: 'Cleaning quality', payment: 'Payment', other: 'Other problem', lockout_fee: 'Lockout fee', no_show: 'No-show' };
+const JP_STAGE_NOUNS      = { before: 'before', after: 'after', lockout: 'lockout', evidence: 'dispute' };
+const JP_MAX_PER_STAGE    = 10;
+const JP_MAX_EDGE         = 2048;
+
+function jpMoney(n) { return '$' + (Number(n) || 0).toFixed(2); }
+// SQLite stores 'YYYY-MM-DD HH:MM:SS' in UTC with no zone marker; JS would read it as local time.
+function jpServerDate(s) {
+  if (!s) return null;
+  const d = new Date(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s) ? s.replace(' ', 'T') + 'Z' : s);
+  return isNaN(d.getTime()) ? null : d;
+}
+function jpShortDate(s)     { const d = jpServerDate(s); return d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''; }
+function jpShortDateTime(s) { const d = jpServerDate(s); return d ? d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''; }
+function jpNewUploadId() {
+  return window.crypto?.randomUUID ? crypto.randomUUID() : `u${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+}
+
+// Re-encodes a photo to a ≤2048px JPEG before upload: small enough for phone
+// data, readable by the server even when the camera shot HEIC (Safari decodes it,
+// the server can't), and with the camera's rotation baked in.
+function jpPreparePhoto(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || (file.type && !/^image\//.test(file.type))) { reject(new Error("That file isn't a photo.")); return; }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, JP_MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight));
+        const canvas = document.createElement('canvas');
+        canvas.width  = Math.max(1, Math.round(img.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error("Couldn't process that photo.")), 'image/jpeg', 0.85);
+      } catch {
+        URL.revokeObjectURL(url);
+        reject(new Error("Couldn't process that photo."));
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("This device can't open that photo format. Try the Take photo button instead."));
+    };
+    img.src = url;
+  });
+}
+
+// ── Upload queue ─────────────────────────────────────────────────────────────
+// One photo per request, two at a time. Progress is kept here, keyed by job
+// ('j:<id>') or dispute ('d:<id>'), not in the DOM, so it survives re-renders.
+// A failed upload keeps its client_upload_id, so retrying can't store it twice.
+const jpUploads = { active: 0, queue: [], byKey: {} };
+const jpEvidenceAdded = {};
+
+function jpUploadStatus(key) {
+  const s = jpUploads.byKey[key];
+  return { pending: s ? s.pending : 0, failed: s ? s.failed.length : 0 };
+}
+
+function jpApplyCounts(jobId, counts) {
+  const job = cleanerScheduleState.jobs.find(j => j.id === jobId);
+  if (!job || !counts) return;
+  job.before_photo_count  = counts.before;
+  job.after_photo_count   = counts.after;
+  job.lockout_photo_count = counts.lockout;
+}
+
+function jpQueuePhotos({ jobId, stage, disputeId }, files) {
+  if (!jobId || !JP_STAGE_NOUNS[stage] || !files.length) return;
+  const key = disputeId ? 'd:' + disputeId : 'j:' + jobId;
+  const st = jpUploads.byKey[key] || (jpUploads.byKey[key] = { pending: 0, failed: [] });
+  if (stage !== 'evidence') {
+    const job = cleanerScheduleState.jobs.find(j => j.id === jobId);
+    const queued = jpUploads.queue.filter(t => t.key === key && t.stage === stage).length;
+    const room = Math.max(0, JP_MAX_PER_STAGE - (job?.[stage + '_photo_count'] || 0) - queued);
+    if (files.length > room) {
+      showToast(room ? `Only ${room} more ${stage} photo${room === 1 ? '' : 's'} can be added (${JP_MAX_PER_STAGE} max).` : `You've already added ${JP_MAX_PER_STAGE} ${stage} photos.`, 'warn');
+      files = files.slice(0, room);
+    }
+  }
+  for (const file of files) {
+    st.pending++;
+    jpUploads.queue.push({ key, jobId, stage, disputeId, file, blob: null, clientUploadId: jpNewUploadId() });
+  }
+  jpNotifyChange(jobId, stage, disputeId);
+  jpPump();
+}
+
+function jpPump() {
+  while (jpUploads.active < 2 && jpUploads.queue.length) {
+    const task = jpUploads.queue.shift();
+    jpUploads.active++;
+    jpRunUpload(task).finally(() => { jpUploads.active--; jpPump(); });
+  }
+}
+
+async function jpRunUpload(task) {
+  const st = jpUploads.byKey[task.key] || (jpUploads.byKey[task.key] = { pending: 1, failed: [] });
+  try {
+    if (!task.blob) { task.blob = await jpPreparePhoto(task.file); task.file = null; }
+    const res = await SparkleAPI.uploadJobPhoto(task.jobId, task.stage, task.blob,
+      { disputeId: task.disputeId, clientUploadId: task.clientUploadId });
+    if (task.stage === 'evidence') jpEvidenceAdded[task.disputeId] = (jpEvidenceAdded[task.disputeId] || 0) + 1;
+    else jpApplyCounts(task.jobId, res.counts);
+  } catch (err) {
+    if (err.message === 'SESSION_EXPIRED') {
+      jpUploads.queue = [];
+      showToast('Session expired — please sign in again.', 'error');
+      logout();
+      return;
+    }
+    // A dropped connection or a server hiccup is worth retrying. A photo the server
+    // refused (unreadable, limit reached, job finished) won't upload on a retry.
+    const retryable = !err.status || err.status >= 500 || err.status === 429;
+    if (retryable && task.blob) st.failed.push(task);
+    showToast(`A ${JP_STAGE_NOUNS[task.stage]} photo didn't upload: ${err.message}`, 'error');
+  } finally {
+    st.pending = Math.max(0, st.pending - 1);
+    jpNotifyChange(task.jobId, task.stage, task.disputeId);
+  }
+}
+
+function jpRetryUploads(key) {
+  const st = jpUploads.byKey[key];
+  if (!st || !st.failed.length) return;
+  const tasks = st.failed.splice(0);
+  tasks.forEach(t => { st.pending++; jpUploads.queue.push(t); });
+  jpNotifyChange(tasks[0].jobId, tasks[0].stage, tasks[0].disputeId);
+  jpPump();
+}
+
+function jpEvidenceStatusHtml(disputeId) {
+  const s = jpUploadStatus('d:' + disputeId);
+  if (s.pending) return `⏳ Uploading ${s.pending} photo${s.pending === 1 ? '' : 's'}…`;
+  if (s.failed)  return `<span style="color:var(--rd)">${s.failed} photo${s.failed === 1 ? '' : 's'} didn't upload.</span> <button class="btn sm" data-act="retry-uploads" data-key="d:${escapeHtml(disputeId)}">Retry</button>`;
+  return '';
+}
+
+function jpNotifyChange(jobId, stage, disputeId) {
+  if (stage !== 'evidence') {
+    rerenderScheduleCard(jobId);
+    jpRefreshLockoutPhotos();
+    return;
+  }
+  document.querySelectorAll(`[data-evidence-status="${CSS.escape(disputeId)}"]`)
+    .forEach(el => { el.innerHTML = jpEvidenceStatusHtml(disputeId); });
+  if (jpUploadStatus('d:' + disputeId).pending) return;
+  const added = jpEvidenceAdded[disputeId] || 0;
+  if (!added) return;
+  jpEvidenceAdded[disputeId] = 0;
+  showToast(`${added} photo${added === 1 ? '' : 's'} added to the report.`, 'success');
+  // Refresh an open report — unless someone is halfway through typing a response.
+  if (jpGallery.disputeId === disputeId && document.getElementById('jp-gallery') && !document.getElementById('jp-statement')?.value) {
+    openDisputeView(disputeId);
+  }
+}
+
+// ── Photo viewer ─────────────────────────────────────────────────────────────
+const jpGallery = { token: 0, urls: [], jobId: null, disputeId: null, canDelete: false };
+
+function jpCloseGallery() {
+  jpGallery.token++;
+  document.getElementById('jp-full')?._close?.();
+  document.getElementById('jp-gallery')?.remove();
+  jpGallery.urls.forEach(u => URL.revokeObjectURL(u));
+  jpGallery.urls = [];
+  jpGallery.jobId = jpGallery.disputeId = null;
+}
+
+function jpOpenOverlay(titleText) {
+  jpCloseGallery();
+  const token = jpGallery.token;
+  const overlay = document.createElement('div');
+  overlay.id = 'jp-gallery';
+  overlay.className = 'modal-overlay show';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.innerHTML = `<div class="modal jp-wide">
+    <div class="row c" style="margin-bottom:.5rem"><div class="modal-title" style="margin:0"></div><button class="btn sm" data-act="gallery-close" aria-label="Close">✕</button></div>
+    <div class="jp-body"><div class="modal-sub">Loading…</div></div>
+  </div>`;
+  overlay.querySelector('.modal-title').textContent = titleText;
+  overlay.addEventListener('click', e => { if (e.target === overlay) jpCloseGallery(); });
+  overlay.addEventListener('keydown', e => { if (e.key === 'Escape') jpCloseGallery(); });
+  document.body.appendChild(overlay);
+  overlay.querySelector('[data-act="gallery-close"]').focus();
+  return { body: overlay.querySelector('.jp-body'), token };
+}
+
+function jpPhotoGridHtml(photos, { canDelete = false } = {}) {
+  return `<div class="jp-grid">${photos.map(p => `
+    <div class="jp-cell${p.deleted_at ? ' jp-removed' : ''}">
+      <button class="jp-thumb" data-act="photo-full" data-photo-url="${escapeHtml(p.url)}" aria-label="Open photo"><img data-thumb-src="${escapeHtml(p.thumb_url)}" alt=""></button>
+      <div class="jp-hint">${escapeHtml(jpShortDateTime(p.created_at))}</div>
+      ${canDelete && p.mine && !p.deleted_at ? `<button class="btn sm danger" data-act="photo-delete" data-photo-id="${escapeHtml(p.id)}">Remove</button>` : ''}
+      ${p.deleted_at ? `<div class="jp-hint">Removed by Sparkle${p.delete_reason ? ': ' + escapeHtml(p.delete_reason) : ''}</div>` : ''}
+    </div>`).join('')}</div>`;
+}
+
+function jpPhotoSectionsHtml(photos, opts = {}) {
+  const heading = (text, n) => `<div class="sect-title" style="margin:.875rem 0 .25rem">${text} · ${n}</div>`;
+  let html = '';
+  for (const [stage, title] of [['before', 'Before photos'], ['after', 'After photos'], ['lockout', 'Photos at the door']]) {
+    const list = photos.filter(p => p.stage === stage);
+    if (list.length) html += heading(title, list.length) + jpPhotoGridHtml(list, opts);
+    else if (stage !== 'lockout') html += heading(title, 0) + `<div class="jp-hint">None added.</div>`;
+  }
+  const from = { client: 'From the client', cleaner: 'From the cleaner', admin: 'From Sparkle' };
+  for (const role of ['client', 'cleaner', 'admin']) {
+    const list = photos.filter(p => p.stage === 'evidence' && p.role === role);
+    if (list.length) html += heading(`Dispute photos — ${from[role]}`, list.length) + jpPhotoGridHtml(list, opts);
+  }
+  return html;
+}
+
+function jpLoadThumbs(root, token) {
+  const imgs = [...root.querySelectorAll('img[data-thumb-src]')];
+  let next = 0;
+  const worker = async () => {
+    while (next < imgs.length) {
+      const img = imgs[next++];
+      try {
+        const blob = await SparkleAPI.getJobPhotoBlob(img.dataset.thumbSrc);
+        if (token !== jpGallery.token) return;
+        const url = URL.createObjectURL(blob);
+        jpGallery.urls.push(url);
+        img.src = url;
+        img.alt = 'Job photo';
+      } catch {
+        if (token !== jpGallery.token) return;
+        img.alt = 'Could not load';
+      }
+    }
+  };
+  for (let i = 0; i < 4; i++) worker();
+}
+
+async function jpShowFull(url) {
+  const token = jpGallery.token;
+  document.getElementById('jp-full')?._close?.();
+  const ov = document.createElement('div');
+  ov.id = 'jp-full';
+  ov.className = 'modal-overlay show';
+  ov.style.zIndex = '810';
+  ov.tabIndex = -1;
+  ov.innerHTML = `<div class="jp-full-wrap"><div class="jp-hint" style="color:#fff">Loading photo…</div></div>`;
+  let objUrl = null;
+  ov._close = () => { ov.remove(); if (objUrl) URL.revokeObjectURL(objUrl); objUrl = null; };
+  ov.addEventListener('click', () => ov._close());
+  ov.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); ov._close(); } });
+  document.body.appendChild(ov);
+  ov.focus();
+  try {
+    const blob = await SparkleAPI.getJobPhotoBlob(url);
+    if (!ov.isConnected || token !== jpGallery.token) return;
+    objUrl = URL.createObjectURL(blob);
+    const wrap = ov.querySelector('.jp-full-wrap');
+    const img = document.createElement('img');
+    img.className = 'jp-full';
+    img.alt = 'Job photo';
+    img.src = objUrl;
+    const hint = document.createElement('div');
+    hint.className = 'jp-hint';
+    hint.style.color = '#fff';
+    hint.textContent = 'Tap anywhere to close';
+    wrap.replaceChildren(img, hint);
+  } catch {
+    if (ov.isConnected) ov.querySelector('.jp-full-wrap').textContent = 'Could not load the photo.';
+  }
+}
+
+async function openJobPhotos(jobId, { canDelete = false } = {}) {
+  const { body, token } = jpOpenOverlay('Job photos');
+  jpGallery.jobId = jobId;
+  jpGallery.canDelete = canDelete;
+  try {
+    const { photos = [] } = await SparkleAPI.getJobPhotos(jobId);
+    if (token !== jpGallery.token) return;
+    body.innerHTML = `<div class="jp-hint">These photos are private — only the client, the cleaner and Sparkle can see them.</div>`
+      + (photos.length ? jpPhotoSectionsHtml(photos, { canDelete }) : `<div class="alert info" style="margin-top:.75rem">No photos have been added to this job yet.</div>`);
+    jpLoadThumbs(body, token);
+  } catch (err) {
+    if (token !== jpGallery.token) return;
+    if (err.message === 'SESSION_EXPIRED') { jpCloseGallery(); showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+    body.innerHTML = `<div class="alert warn">Could not load photos: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function openDisputeView(disputeId) {
+  const { body, token } = jpOpenOverlay('Reported problem');
+  jpGallery.disputeId = disputeId;
+  try {
+    const { dispute: d, photos = [] } = await SparkleAPI.getDispute(disputeId);
+    if (token !== jpGallery.token) return;
+    const isAdmin = currentUser?.role === 'admin';
+    const when = d.scheduled_at ? new Date(d.scheduled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    const open = d.status !== 'resolved';
+
+    let html = `<div class="row c" style="gap:8px"><div>
+        <div style="font-size:13px;font-weight:500">${escapeHtml(DISPUTE_TYPE_LABELS[d.type] || 'Problem')} · ${escapeHtml(d.service_type || 'Job')}${when ? ' · ' + escapeHtml(when) : ''}</div>
+        <div class="meta">Cleaner: ${escapeHtml(d.cleaner_name || '—')} · Client: ${escapeHtml(d.client_name || '—')}</div>
+      </div><span class="tag ${open ? 'amber' : 'green'}">${open ? 'Under review' : 'Resolved'}</span></div>
+      <div class="jp-hint" style="margin-top:.75rem">${d.filed_by_me ? 'You reported' : 'The client reported'} on ${escapeHtml(jpShortDate(d.created_at))}:</div>
+      <div class="jp-quote">${escapeHtml(d.description)}</div>`;
+
+    if (d.respondent_statement) {
+      html += `<div class="jp-hint">${d.against_me ? 'Your response' : "The cleaner's response"}:</div><div class="jp-quote">${escapeHtml(d.respondent_statement)}</div>`;
+    } else if (d.against_me && open) {
+      html += `<div class="frow" style="margin-top:.5rem"><label class="flbl" for="jp-statement">Your side of what happened</label>
+        <textarea class="inp" id="jp-statement" rows="3" maxlength="2000" placeholder="Explain what you did on this job. Sparkle reviews this together with your before and after photos."></textarea></div>
+        <button class="btn primary sm" data-act="dispute-statement" data-dispute="${escapeHtml(d.id)}">Send my response</button>`;
+    } else if (open) {
+      html += `<div class="jp-hint">The cleaner hasn't responded yet.</div>`;
+    }
+
+    if (!open) {
+      const refund = d.ruling === 'client' ? ({
+        succeeded: ` A refund${d.refund_amount ? ' of ' + jpMoney(d.refund_amount) : ''} has been issued.`,
+        pending:   ' The refund is processing.',
+        failed:    ' The refund is still being processed by Sparkle.',
+      }[d.refund_status] || '') : '';
+      const outcome = d.ruling === 'client' ? "Resolved in the client's favor." : d.ruling === 'cleaner' ? "Resolved in the cleaner's favor." : 'Resolved.';
+      html += `<div class="alert ${d.ruling === 'client' ? 'warn' : 'success'}" style="margin-top:.75rem"><strong>${outcome}</strong> ${escapeHtml(d.resolution || '')}${refund}</div>`;
+    }
+
+    if (d.can_add_evidence && !isAdmin) {
+      html += `<div class="jp-stage">
+        <div class="jp-stage-hd"><strong>Add photos</strong><span class="tag">Optional</span></div>
+        <div class="jp-hint">Up to ${Number(d.max_evidence_photos) || JP_MAX_PER_STAGE} photos ${d.against_me ? 'showing your work' : 'showing the problem'}.</div>
+        <div class="actions" style="margin-top:6px">${photoPickerHtml('evidence', d.job_id, ` data-dispute="${escapeHtml(d.id)}"`)}</div>
+        <div class="jp-hint" data-evidence-status="${escapeHtml(d.id)}">${jpEvidenceStatusHtml(d.id)}</div>
+      </div>`;
+    }
+
+    html += jpPhotoSectionsHtml(photos);
+    body.innerHTML = html;
+    jpLoadThumbs(body, token);
+  } catch (err) {
+    if (token !== jpGallery.token) return;
+    if (err.message === 'SESSION_EXPIRED') { jpCloseGallery(); showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+    body.innerHTML = `<div class="alert warn">Could not load this report: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+// ── Cleaner actions ──────────────────────────────────────────────────────────
+async function jpArrive(jobId, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    await SparkleAPI.arriveAtJob(jobId);
+    const job = cleanerScheduleState.jobs.find(j => j.id === jobId);
+    if (job) job.status = 'in_progress';
+    rerenderScheduleCard(jobId);
+    showToast("The client knows you've arrived. Take your before photos before you start cleaning.", 'success');
+  } catch (err) {
+    if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+    showToast(err.message, 'error');
+    loadCleanerSchedule();
+  }
+}
+
+function jpComplete(jobId) {
+  showConfirm({
+    title: 'Complete this job?',
+    body: "The client will see your before and after photos, and they can't be changed after this. Your pay will be ready to cash out.",
+    confirmLabel: 'Complete job',
+    onConfirm: async () => {
+      try {
+        const r = await SparkleAPI.completeJob(jobId);
+        cleanerScheduleState.jobs = cleanerScheduleState.jobs.filter(j => j.id !== jobId);
+        renderCleanerSchedule();
+        showToast(r.cashable
+          ? `🎉 Job complete — ${jpMoney(r.cleaner_earns)} is ready to cash out in Earnings.`
+          : `Job complete. Your ${jpMoney(r.cleaner_earns)} is on hold while Sparkle sorts out the client's payment.`, 'success');
+      } catch (err) {
+        if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+        if (err.code === 'PHOTOS_REQUIRED' && err.data?.counts) { jpApplyCounts(jobId, err.data.counts); rerenderScheduleCard(jobId); }
+        // On a server error the card stays, so tapping Complete again can finish the job.
+        showToast(err.message, 'error');
+      }
+    },
+  });
+}
+
+function jpDeletePhoto(photoId) {
+  const jobId = jpGallery.jobId;
+  const canDelete = jpGallery.canDelete;
+  showConfirm({
+    title: 'Remove this photo?',
+    body: 'It will be deleted from the job.',
+    confirmLabel: 'Remove',
+    confirmClass: 'danger',
+    onConfirm: async () => {
+      try {
+        const r = await SparkleAPI.deleteJobPhoto(photoId);
+        if (jobId) {
+          jpApplyCounts(jobId, r.counts);
+          rerenderScheduleCard(jobId);
+          jpRefreshLockoutPhotos();
+          openJobPhotos(jobId, { canDelete });
+        }
+      } catch (err) {
+        if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+        showToast(err.message, 'error');
+      }
+    },
+  });
+}
+
+async function jpSendStatement(disputeId, btn) {
+  const ta = document.getElementById('jp-statement');
+  const text = (ta?.value || '').trim();
+  if (text.length < 10) { showToast('Please write at least a sentence or two.', 'warn'); ta?.focus(); return; }
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  try {
+    await SparkleAPI.addDisputeStatement(disputeId, text);
+    showToast('Your response was added. Sparkle will review both sides.', 'success');
+    openDisputeView(disputeId);
+    if (_activePage?.id === 'page-c-earnings') loadCleanerEarnings();
+  } catch (err) {
+    if (err.message === 'SESSION_EXPIRED') { jpCloseGallery(); showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+    btn.disabled = false;
+    btn.textContent = 'Send my response';
+    showToast(err.message, 'error');
+  }
+}
+
+// ── Client: report a problem ─────────────────────────────────────────────────
+function openReportProblem(jobId, kind) {
+  const job = clientBookingState.jobs.find(j => j.id === jobId);
+  if (!job) return;
+  document.getElementById('jp-report')?.remove();
+  const lockout = kind === 'lockout';
+  let files = [];
+
+  const when = job.scheduled_at ? new Date(job.scheduled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+  const overlay = document.createElement('div');
+  overlay.id = 'jp-report';
+  overlay.className = 'modal-overlay show';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.innerHTML = `<div class="modal jp-wide" style="width:520px">
+    <div class="modal-title">${lockout ? 'Dispute the lockout fee' : 'Report a problem'}</div>
+    <div class="modal-sub">${escapeHtml(job.service_type || 'Cleaning')}${when ? ' · ' + escapeHtml(when) : ''}. Sparkle reviews your report alongside the cleaner's ${lockout ? 'photos from your door' : 'before and after photos'}${lockout ? '' : ", and the cleaner's pay for this job is held until then"}.</div>
+    ${lockout ? '' : `<div class="frow"><label class="flbl" for="jp-report-type">What went wrong?</label>
+      <select class="inp" id="jp-report-type"><option value="quality">The cleaning wasn't done properly</option><option value="payment">I was charged the wrong amount</option><option value="other">Something else</option></select></div>`}
+    <div class="frow"><label class="flbl" for="jp-report-desc">${lockout ? 'What happened?' : 'Tell us what happened'}</label>
+      <textarea class="inp" id="jp-report-desc" rows="4" maxlength="2000"></textarea>
+      <div class="jp-hint" id="jp-report-count">At least 20 characters</div></div>
+    <div class="frow"><label class="flbl">Photos <span style="font-weight:400;color:var(--tx2)">(optional)</span></label>
+      <div class="actions" style="margin-top:0"><label class="btn sm">📷 Take photo<input type="file" accept="image/*" capture="environment" hidden id="jp-report-cam"></label><label class="btn sm">🖼️ Choose photos<input type="file" accept="image/*" multiple hidden id="jp-report-files"></label></div>
+      <div class="jp-hint" id="jp-report-photos">No photos added.</div></div>
+    <div class="modal-actions"><button class="btn" id="jp-report-cancel">Cancel</button><button class="btn primary" id="jp-report-submit">Submit report</button></div>
+  </div>`;
+
+  const desc = overlay.querySelector('#jp-report-desc');
+  desc.placeholder = lockout
+    ? 'For example: I was home and answered the door, or I cancelled the day before.'
+    : "For example: the kitchen floor wasn't mopped and the bathroom mirror was left dirty.";
+  const count = overlay.querySelector('#jp-report-count');
+  desc.addEventListener('input', () => {
+    const n = desc.value.trim().length;
+    count.textContent = n < 20 ? `At least 20 characters (${n} so far)` : `${n} / 2000`;
+  });
+
+  const photosEl = overlay.querySelector('#jp-report-photos');
+  const addFiles = input => {
+    files.push(...input.files);
+    input.value = '';
+    if (files.length > JP_MAX_PER_STAGE) {
+      showToast(`You can attach up to ${JP_MAX_PER_STAGE} photos.`, 'warn');
+      files = files.slice(0, JP_MAX_PER_STAGE);
+    }
+    photosEl.textContent = files.length
+      ? `${files.length} photo${files.length === 1 ? '' : 's'} added — they upload after you submit.`
+      : 'No photos added.';
+  };
+  overlay.querySelector('#jp-report-cam').addEventListener('change', e => addFiles(e.target));
+  overlay.querySelector('#jp-report-files').addEventListener('change', e => addFiles(e.target));
+
+  overlay.querySelector('#jp-report-cancel').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('keydown', e => { if (e.key === 'Escape') overlay.remove(); });
+
+  const submit = overlay.querySelector('#jp-report-submit');
+  submit.addEventListener('click', async () => {
+    const description = desc.value.trim();
+    if (description.length < 20) { showToast('Please describe the problem in at least 20 characters.', 'warn'); desc.focus(); return; }
+    const type = lockout ? 'lockout_fee' : overlay.querySelector('#jp-report-type').value;
+    submit.disabled = true;
+    submit.textContent = 'Submitting…';
+    try {
+      const { dispute } = await SparkleAPI.fileDispute(job.id, type, description);
+      overlay.remove();
+      if (files.length) jpQueuePhotos({ jobId: job.id, stage: 'evidence', disputeId: dispute.id }, files);
+      showToast(files.length
+        ? `Report submitted. Uploading ${files.length} photo${files.length === 1 ? '' : 's'}…`
+        : "Report submitted. Sparkle will review it and let you know what's decided.", 'success');
+      loadMyBookings();
+    } catch (err) {
+      if (err.message === 'SESSION_EXPIRED') { overlay.remove(); showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+      submit.disabled = false;
+      submit.textContent = 'Submit report';
+      showToast(err.message, 'error');
+    }
+  });
+
+  document.body.appendChild(overlay);
+  desc.focus();
+}
+
+// ── Delegated listeners ──────────────────────────────────────────────────────
+document.addEventListener('change', e => {
+  const input = e.target;
+  if (!(input instanceof HTMLInputElement) || !input.dataset.photoInput) return;
+  const files = [...(input.files || [])];
+  input.value = '';   // lets the same photo be picked again after a failure
+  jpQueuePhotos({ jobId: input.dataset.job, stage: input.dataset.photoInput, disputeId: input.dataset.dispute || null }, files);
+});
+
+document.addEventListener('click', e => {
+  const el = e.target.closest?.('[data-act]');
+  if (!el || el.disabled) return;
+  const d = el.dataset;
+  switch (d.act) {
+    case 'arrive':             return jpArrive(d.job, el);
+    case 'complete':           return jpComplete(d.job);
+    case 'lockout':            return showLockoutModal(d.job);
+    case 'retry-uploads':      return jpRetryUploads(d.key);
+    case 'gallery':            return openJobPhotos(d.job, { canDelete: d.canDelete === '1' });
+    case 'gallery-close':      return jpCloseGallery();
+    case 'photo-full':         return jpShowFull(d.photoUrl);
+    case 'photo-delete':       return jpDeletePhoto(d.photoId);
+    case 'dispute-view':       return openDisputeView(d.dispute);
+    case 'dispute-statement':  return jpSendStatement(d.dispute, el);
+    case 'report':             return openReportProblem(d.job, d.kind);
+    case 'admin-rule':         return openAdminRuling(d.dispute, d.ruling);
+    case 'admin-retry-refund': return adminRetryRefund(d.dispute, el);
+  }
+});
 
 function loadCleanerReviews() {
   if (!currentUser?.isReal) return;
@@ -3981,7 +4854,7 @@ function openCashout() {
   const isReal  = !!currentUser?.isReal;
   const pending = isReal ? cleanerEarningsState.pending : 419.00;
   if (isReal && pending < 1) { showToast('No earnings available to cash out yet.', 'warn'); return; }
-  const instantFee = 10.00;
+  const instantFee = isReal ? cleanerEarningsState.instantFee : 10.00;
   const instantNet = Math.max(0, pending - instantFee);
   const acct = isReal ? '' : ' · Chase ···4832';
 
@@ -3995,12 +4868,12 @@ function openCashout() {
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:1.25rem">
         <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1.5px solid var(--bdr2);border-radius:var(--rad);cursor:pointer;transition:all .15s" onclick="selectCashoutType(this,'standard')">
           <input type="radio" name="cashout" value="standard" style="accent-color:var(--g);margin-top:2px" checked>
-          <div><div style="font-size:13px;font-weight:500">Standard payout — Free</div><div style="font-size:12px;color:var(--tx2)">Arrives by next Monday${acct}</div></div>
+          <div><div style="font-size:13px;font-weight:500">Standard payout — Free</div><div style="font-size:12px;color:var(--tx2)">${isReal ? 'Arrives in 1–3 business days' : 'Arrives by next Monday'}${acct}</div></div>
           <div style="margin-left:auto;font-size:14px;font-weight:500;color:var(--gd)">$${pending.toFixed(2)}</div>
         </label>
         <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1.5px solid var(--bdr2);border-radius:var(--rad);cursor:pointer;transition:all .15s" onclick="selectCashoutType(this,'instant')">
           <input type="radio" name="cashout" value="instant" style="accent-color:var(--g);margin-top:2px">
-          <div><div style="font-size:13px;font-weight:500">⚡ Instant payout — $10 fee</div><div style="font-size:12px;color:var(--tx2)">Within minutes${acct}</div></div>
+          <div><div style="font-size:13px;font-weight:500">⚡ Instant payout — $${instantFee % 1 ? instantFee.toFixed(2) : instantFee} fee</div><div style="font-size:12px;color:var(--tx2)">Within minutes${acct}</div></div>
           <div style="margin-left:auto;font-size:14px;font-weight:500;color:var(--gd)">$${instantNet.toFixed(2)}</div>
         </label>
       </div>
@@ -4038,11 +4911,17 @@ function confirmCashout(btn) {
 
   SparkleAPI.cashout(selected).then(result => {
     document.getElementById('cashout-modal')?.remove();
-    showToast(`💰 ${result.message}`, 'success');
+    // 'processing' means the bank transfer's outcome isn't confirmed yet; the
+    // server settles it and notifies the cleaner, so don't promise a result here.
+    showToast(result.status === 'processing'
+      ? `⏳ ${result.message}`
+      : `💰 ${result.message} — ${jpMoney(result.net_amount)}, ${String(result.eta || '').toLowerCase()}`, 'success');
     loadCleanerEarnings();
   }).catch(err => {
     document.getElementById('cashout-modal')?.remove();
+    if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
     showToast('Cashout failed: ' + err.message, 'error');
+    loadCleanerEarnings();
   });
 }
 
@@ -4401,10 +5280,34 @@ function loadMyBookings() {
           </div>`;
         return;
       }
+      const statusColors = { open:'green', accepted:'blue', in_progress:'amber', completed:'green', cancelled:'red' };
+      const statusLabels = { open:'Waiting for quotes', accepted:'Booked', in_progress:'Cleaning now', completed:'Completed', cancelled:'Cancelled' };
       page.innerHTML = jobs.map(job => {
-        const statusColors = { open:'green', accepted:'blue', in_progress:'amber', completed:'green', cancelled:'red' };
-        const color = statusColors[job.status] || 'grey';
+        const color = statusColors[job.status] || '';
         const date  = job.scheduled_at ? new Date(job.scheduled_at).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : 'TBD';
+        const id = escapeHtml(job.id);
+        const photoCount = (job.before_photo_count || 0) + (job.after_photo_count || 0) + (job.lockout_photo_count || 0);
+        const deadline = job.report_deadline
+          ? new Date(job.report_deadline).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+          : '';
+
+        let disputeHtml = '';
+        if (job.dispute_id) {
+          const open = job.dispute_status !== 'resolved';
+          const refund = { succeeded: ' A refund has been issued to your card.', pending: ' Your refund is processing.', failed: ' Your refund is processing.' }[job.dispute_refund_status] || '';
+          const text = open ? '⚖️ You reported a problem — Sparkle is reviewing it.'
+            : job.dispute_ruling === 'client' ? `✓ Sparkle resolved your report in your favor.${refund}`
+            : "Sparkle reviewed your report and resolved it in the cleaner's favor.";
+          disputeHtml = `<div class="alert ${open ? 'warn' : job.dispute_ruling === 'client' ? 'success' : 'info'}" style="margin:.75rem 0 0">${text}${open ? ` <span data-evidence-status="${escapeHtml(job.dispute_id)}">${jpEvidenceStatusHtml(job.dispute_id)}</span>` : ''}</div>`;
+        }
+
+        const actions = [
+          photoCount ? `<button class="btn sm" data-act="gallery" data-job="${id}">📷 ${job.status === 'cancelled' ? 'Photos' : 'Before &amp; after photos'} (${photoCount})</button>` : '',
+          job.dispute_id ? `<button class="btn sm" data-act="dispute-view" data-dispute="${escapeHtml(job.dispute_id)}">${job.dispute_status !== 'resolved' ? 'View report &amp; add photos' : 'View report'}</button>` : '',
+          job.can_report ? `<button class="btn warn sm" data-act="report" data-job="${id}" data-kind="job">Report a problem</button>` : '',
+          job.can_dispute_lockout ? `<button class="btn warn sm" data-act="report" data-job="${id}" data-kind="lockout">Dispute lockout fee</button>` : '',
+        ].filter(Boolean).join('');
+
         return `
           <div class="card" style="margin-bottom:1rem">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.75rem">
@@ -4412,17 +5315,22 @@ function loadMyBookings() {
                 <div style="font-weight:500;font-size:15px">${escapeHtml(job.service_type || 'Cleaning')}</div>
                 <div class="meta">${escapeHtml(job.address || '')}</div>
               </div>
-              <span class="tag ${color}">${escapeHtml(job.status || 'open')}</span>
+              <span class="tag ${color}">${escapeHtml(statusLabels[job.status] || job.status || 'Open')}</span>
             </div>
             <div class="meta" style="margin-bottom:.875rem">📅 ${date}</div>
             ${job.status === 'open' ? `
               <div style="font-size:12px;color:var(--tx2)">
                 Waiting for bids · job ID: ${escapeHtml(job.id.slice(0,8))}…
               </div>` : ''}
+            ${job.status === 'in_progress' ? `<div style="font-size:13px;color:var(--tx2)">🧹 Your cleaner is at your home now.</div>` : ''}
             ${job.total_charged ? `
               <div style="font-size:13px;font-weight:500;color:var(--gd);margin-top:.5rem">
                 Total: $${parseFloat(job.total_charged).toFixed(2)}
               </div>` : ''}
+            ${job.status === 'cancelled' && job.lockout_fee_amount ? `<div class="jp-hint" style="margin-top:.5rem">A ${jpMoney(job.lockout_fee_amount)} lockout fee was charged because your cleaner couldn't get in.</div>` : ''}
+            ${job.can_report && deadline ? `<div class="jp-hint" style="margin-top:.5rem">Something not right? You can report a problem until ${escapeHtml(deadline)}.</div>` : ''}
+            ${disputeHtml}
+            ${actions ? `<div class="actions" style="flex-wrap:wrap">${actions}</div>` : ''}
           </div>`;
       }).join('');
     })
@@ -4889,22 +5797,22 @@ async function loadAdminDashboard() {
 }
 
 // Sidebar counts shipped as hardcoded strings ('12', '34'); drive them from real data.
+function setNavBadge(navId, count, cls) {
+  const nav = document.getElementById('nav-' + navId);
+  if (!nav) return;
+  let badge = nav.querySelector('.nav-badge');
+  if (!count) { if (badge) badge.remove(); return; }
+  if (!badge) {
+    badge = document.createElement('span');
+    nav.appendChild(badge);
+  }
+  badge.className = 'nav-badge ' + cls;
+  badge.textContent = count > 99 ? '99+' : String(count);
+}
 function refreshAdminBadges(stats) {
-  const set = (navId, count, cls) => {
-    const nav = document.getElementById('nav-' + navId);
-    if (!nav) return;
-    let badge = nav.querySelector('.nav-badge');
-    if (!count) { if (badge) badge.remove(); return; }
-    if (!badge) {
-      badge = document.createElement('span');
-      nav.appendChild(badge);
-    }
-    badge.className = 'nav-badge ' + cls;
-    badge.textContent = count > 99 ? '99+' : String(count);
-  };
-  set('a-disputes',    stats?.disputes?.open || 0,   'nb-r');
-  set('a-bgchecks',    stats?.bgchecks?.pending || 0,'nb-a');
-  set('a-credentials', stats?.credentials_pending || 0, 'nb-a');
+  setNavBadge('a-disputes',    stats?.disputes?.open || 0,   'nb-r');
+  setNavBadge('a-bgchecks',    stats?.bgchecks?.pending || 0,'nb-a');
+  setNavBadge('a-credentials', stats?.credentials_pending || 0, 'nb-a');
 }
 
 // ── User management ──────────────────────────────────────────────────────────
@@ -5040,6 +5948,14 @@ async function adminFlagUser(id) {
 }
 
 // ── Disputes ─────────────────────────────────────────────────────────────────
+let adminDisputesState = { disputes: [] };
+const REFUND_STATUS_TAGS = {
+  succeeded:      ['green', 'Refunded'],
+  pending:        ['amber', 'Refund pending'],
+  failed:         ['red',   'Refund failed'],
+  not_applicable: ['',      'No card payment to refund'],
+};
+
 async function loadAdminDisputes() {
   if (!currentUser?.isReal) return;
   const page = document.getElementById('page-a-disputes');
@@ -5048,28 +5964,53 @@ async function loadAdminDisputes() {
   page.innerHTML = `<div class="pg-title">Disputes</div><div class="pg-sub">Loading…</div>`;
   try {
     const { disputes } = await SparkleAPI.getDisputes();
-    const open = (disputes || []).filter(d => d.status !== 'resolved');
+    adminDisputesState.disputes = disputes || [];
+    const all  = adminDisputesState.disputes;
+    const open = all.filter(d => d.status !== 'resolved');
+    setNavBadge('a-disputes', open.length, 'nb-r');   // the sidebar count would otherwise lag until the dashboard reloads
 
     page.innerHTML = `
       <div class="pg-title">Disputes</div>
-      <div class="pg-sub">${open.length ? `${open.length} awaiting a decision` : 'Lockout fees, damage claims, and no-shows'}</div>
-      ${!disputes?.length ? adminEmpty('No disputes have been filed yet.') : disputes.map(d => {
+      <div class="pg-sub">${open.length ? `${open.length} awaiting a decision` : "Problems reported by clients, with each job's before and after photos"}</div>
+      ${!all.length ? adminEmpty('No disputes have been filed yet.') : all.map(d => {
         const resolved = d.status === 'resolved';
-        return `<div class="card">
+        const id = escapeHtml(d.id);
+        const facts = [
+          `<span class="tag">📷 ${Number(d.proof_photo_count) || 0} job photo${d.proof_photo_count == 1 ? '' : 's'}</span>`,
+          d.evidence_photo_count ? `<span class="tag blue">🧾 ${Number(d.evidence_photo_count)} dispute photo${d.evidence_photo_count == 1 ? '' : 's'}</span>` : '',
+          `<span class="tag">Cleaner earnings ${jpMoney(d.cleaner_earnings)}</span>`,
+          d.has_card_payment ? `<span class="tag">Card charge ${jpMoney(d.total_charged)}</span>` : '<span class="tag">No card payment</span>',
+          d.capture_status === 'failed' ? '<span class="tag red">Payment capture failed</span>' : '',
+        ].filter(Boolean).join(' ');
+
+        let outcome = '';
+        if (resolved) {
+          const [rc, rt] = REFUND_STATUS_TAGS[d.refund_status] || [];
+          outcome = `<div style="font-size:13px;color:var(--gd);margin-top:.5rem">✓ Ruled for the ${d.ruling === 'client' ? 'client' : 'cleaner'}${d.resolution ? ': ' + escapeHtml(d.resolution) : ''}</div>`
+            + (d.ruling === 'client' && rt ? `<div class="tags" style="margin-top:6px"><span class="tag ${rc}">${rt}</span></div>` : '');
+        }
+
+        return `<div class="dispute-card${resolved ? ' resolved' : ''}">
           <div class="row c" style="margin-bottom:.5rem">
             <div>
-              <div style="font-size:13px;font-weight:500">${escapeHtml(d.type || 'Dispute')} · ${escapeHtml(d.service_type || 'job')}</div>
-              <div class="meta">${escapeHtml(d.filed_by_name || '')} (${escapeHtml(d.filed_by_role || '')}) vs ${escapeHtml(d.against_name || '')} (${escapeHtml(d.against_role || '')})</div>
+              <div style="font-size:13px;font-weight:500">${escapeHtml(DISPUTE_TYPE_LABELS[d.type] || d.type || 'Dispute')} · ${escapeHtml(d.service_type || 'job')}</div>
+              <div class="meta">${escapeHtml(d.filed_by_name || '')} (${escapeHtml(d.filed_by_role || '')}) vs ${escapeHtml(d.against_name || '')} (${escapeHtml(d.against_role || '')}) · filed ${escapeHtml(jpShortDate(d.created_at))}</div>
             </div>
             <span class="tag ${resolved ? 'green' : 'red'}">${resolved ? 'Resolved' : 'Open'}</span>
           </div>
-          ${d.description ? `<div style="font-size:13px;color:var(--tx2);margin-bottom:.5rem">${escapeHtml(d.description)}</div>` : ''}
-          ${resolved
-            ? `<div style="font-size:13px;color:var(--gd)">✓ ${escapeHtml(d.resolution || 'Resolved')}</div>`
-            : `<div class="actions">
-                 <button class="btn sm" onclick="adminResolveDispute('${d.id}','cleaner')">Rule for cleaner</button>
-                 <button class="btn sm" onclick="adminResolveDispute('${d.id}','client')">Rule for client (refund)</button>
-               </div>`}
+          ${d.description ? `<div class="jp-hint">Client says:</div><div class="jp-quote">${escapeHtml(d.description)}</div>` : ''}
+          ${d.respondent_statement
+            ? `<div class="jp-hint">Cleaner's response:</div><div class="jp-quote">${escapeHtml(d.respondent_statement)}</div>`
+            : (resolved ? '' : `<div class="jp-hint">The cleaner hasn't responded yet.</div>`)}
+          <div class="tags" style="margin-top:6px">${facts}</div>
+          ${outcome}
+          <div class="actions" style="flex-wrap:wrap">
+            <button class="btn sm" data-act="dispute-view" data-dispute="${id}">View photos &amp; details</button>
+            ${resolved
+              ? (d.refund_status === 'failed' ? `<button class="btn sm warn" data-act="admin-retry-refund" data-dispute="${id}">Retry refund</button>` : '')
+              : `<button class="btn sm" data-act="admin-rule" data-dispute="${id}" data-ruling="cleaner">Rule for cleaner</button>
+                 <button class="btn sm warn" data-act="admin-rule" data-dispute="${id}" data-ruling="client">Rule for client</button>`}
+          </div>
         </div>`;
       }).join('')}`;
   } catch (err) {
@@ -5078,27 +6019,85 @@ async function loadAdminDisputes() {
   }
 }
 
-async function adminResolveDispute(id, ruling) {
+// The ruling needs a written explanation — both people receive it — and spells
+// out exactly what will happen to the money before the admin commits.
+function openAdminRuling(id, ruling) {
+  const d = adminDisputesState.disputes.find(x => x.id === id);
+  if (!d) return;
+  document.getElementById('jp-ruling')?.remove();
   const forClient = ruling === 'client';
-  showConfirm({
-    title: forClient ? 'Rule for the client?' : 'Rule for the cleaner?',
-    body: forClient
-      ? 'The fee will be refunded to the client and both parties notified. This cannot be undone.'
-      : 'The fee stands and is paid to the cleaner. Both parties will be notified. This cannot be undone.',
-    confirmLabel: 'Confirm ruling',
-    onConfirm: async () => {
-      try {
-        await SparkleAPI.resolveDispute(id,
-          forClient ? 'Fee refunded to the client.' : 'Fee upheld and paid to the cleaner.',
-          ruling);
-        showToast('Dispute resolved — both parties notified.', 'success');
-        loadAdminDisputes();
-      } catch (err) {
-        if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
-        showToast(err.message, 'error');
-      }
-    },
+  const lockout = d.type === 'lockout_fee';
+
+  const effects = forClient ? [
+    lockout
+      ? 'The lockout fee is refunded to the client (if it was charged to a card).'
+      : d.has_card_payment
+        ? `The client's card is refunded ${jpMoney(d.total_charged)} (or the hold released, if it was never captured).`
+        : 'There is no card payment on this job, so no refund is issued.',
+    `The cleaner's ${lockout ? 'lockout fee' : 'earnings for this job'} (${jpMoney(d.cleaner_earnings)}) won't be paid — or, if already cashed out, will come out of their next cashout.`,
+  ] : [
+    'The cleaner keeps their earnings, and any hold on them is released right away.',
+    'No refund is issued to the client.',
+  ];
+
+  const overlay = document.createElement('div');
+  overlay.id = 'jp-ruling';
+  overlay.className = 'modal-overlay show';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.innerHTML = `<div class="modal" style="width:480px">
+    <div class="modal-title">Rule for the ${forClient ? 'client' : 'cleaner'}?</div>
+    <ul class="modal-sub" style="padding-left:1.1rem;margin-bottom:.75rem"></ul>
+    <div class="frow"><label class="flbl" for="jp-ruling-text">Explanation — both the client and the cleaner will see this</label>
+      <textarea class="inp" id="jp-ruling-text" rows="4" maxlength="2000"></textarea></div>
+    <div class="jp-hint">This can't be undone.</div>
+    <div class="modal-actions"><button class="btn" id="jp-ruling-cancel">Cancel</button><button class="btn ${forClient ? 'warn' : 'primary'}" id="jp-ruling-confirm">Confirm ruling</button></div>
+  </div>`;
+  const list = overlay.querySelector('ul');
+  effects.forEach(text => { const li = document.createElement('li'); li.textContent = text; list.appendChild(li); });
+  const textarea = overlay.querySelector('#jp-ruling-text');
+  textarea.placeholder = forClient
+    ? "For example: The after photos don't show the bathroom, and the client's photos show it wasn't cleaned."
+    : 'For example: The after photos show every room the client listed was cleaned.';
+
+  overlay.querySelector('#jp-ruling-cancel').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('keydown', e => { if (e.key === 'Escape') overlay.remove(); });
+  const confirmBtn = overlay.querySelector('#jp-ruling-confirm');
+  confirmBtn.addEventListener('click', async () => {
+    const resolution = textarea.value.trim();
+    if (resolution.length < 10) { showToast('Explain the decision in at least 10 characters.', 'warn'); textarea.focus(); return; }
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Saving…';
+    try {
+      const r = await SparkleAPI.resolveDispute(id, resolution, ruling);
+      overlay.remove();
+      showToast(r.refund_status === 'failed'
+        ? 'Dispute resolved, but the refund failed — use Retry refund.'
+        : 'Dispute resolved — both people have been notified.', r.refund_status === 'failed' ? 'warn' : 'success');
+      loadAdminDisputes();
+    } catch (err) {
+      if (err.message === 'SESSION_EXPIRED') { overlay.remove(); showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Confirm ruling';
+      showToast(err.message, 'error');
+      if (/already been resolved/i.test(err.message)) { overlay.remove(); loadAdminDisputes(); }
+    }
   });
+  document.body.appendChild(overlay);
+  textarea.focus();
+}
+
+async function adminRetryRefund(id, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Retrying…';
+  try {
+    const r = await SparkleAPI.retryDisputeRefund(id);
+    showToast(r.refund_status === 'succeeded' ? 'Refund issued.' : 'There was nothing to refund.', 'success');
+  } catch (err) {
+    if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+    showToast(`Refund still failing: ${err.message}`, 'error');
+  }
+  loadAdminDisputes();
 }
 
 // ── Background checks ────────────────────────────────────────────────────────

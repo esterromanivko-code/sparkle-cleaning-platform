@@ -10,6 +10,7 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const { getStripe } = require('../lib/stripe');
 const { queueNotification } = require('../lib/queue');
 const { audit } = require('../lib/logger');
+const { transaction } = require('../lib/payouts');
 
 const router = express.Router();
 
@@ -154,13 +155,14 @@ router.post('/:bid_id/choose', requireAuth, requireRole('client'), async (req, r
   const { payment_method_id } = req.body;
 
   const bid = db.prepare(`
-    SELECT b.*, j.client_id, j.service_type, j.scheduled_at, j.address
+    SELECT b.*, j.client_id, j.service_type, j.scheduled_at, j.address, j.status AS job_status
     FROM bids b JOIN jobs j ON j.id = b.job_id
     WHERE b.id = ? AND b.status = 'pending' AND b.expires_at > datetime('now')
   `).get(req.params.bid_id);
 
   if (!bid) return res.status(404).json({ error: 'Bid not found or has expired' });
   if (bid.client_id !== req.user.id) return res.status(403).json({ error: 'Not your job' });
+  if (bid.job_status !== 'open') return res.status(409).json({ error: 'This job has already been booked or closed.' });
 
   const stripe = getStripe();
 
@@ -198,29 +200,40 @@ router.post('/:bid_id/choose', requireAuth, requireRole('client'), async (req, r
       paymentIntentId = pi.id;
     }
 
-    // Mark bid as chosen, all others as declined
+    // Book it only if the job is still open and this bid still pending. The Stripe
+    // call above awaited, so another choose request may have booked the job since.
     const now = new Date().toISOString();
-    db.prepare("UPDATE bids SET status = 'chosen', chosen_at = ? WHERE id = ?").run(now, bid.id);
-    db.prepare("UPDATE bids SET status = 'declined' WHERE job_id = ? AND id != ?").run(bid.job_id, bid.id);
+    const booked = transaction(() => {
+      const stillPending = db.prepare("SELECT 1 FROM bids WHERE id = ? AND status = 'pending'").get(bid.id);
+      if (!stillPending) return false;
+      const jobRes = db.prepare(`
+        UPDATE jobs SET
+          cleaner_id   = ?,
+          status       = 'accepted',
+          base_amount  = ?,
+          platform_fee = ?,
+          total_charged= ?,
+          stripe_payment_intent_id = ?,
+          updated_at   = datetime('now')
+        WHERE id = ? AND status = 'open'
+      `).run(bid.cleaner_id, bid.amount, bookingFee, totalCharge, paymentIntentId, bid.job_id);
+      if (jobRes.changes !== 1) return false;
+      db.prepare("UPDATE bids SET status = 'chosen', chosen_at = ? WHERE id = ?").run(now, bid.id);
+      db.prepare("UPDATE bids SET status = 'declined' WHERE job_id = ? AND id != ? AND status = 'pending'").run(bid.job_id, bid.id);
+      return true;
+    });
 
-    // Assign cleaner to job and lock in pricing
-    db.prepare(`
-      UPDATE jobs SET
-        cleaner_id   = ?,
-        status       = 'accepted',
-        base_amount  = ?,
-        platform_fee = ?,
-        total_charged= ?,
-        stripe_payment_intent_id = ?,
-        updated_at   = datetime('now')
-      WHERE id = ?
-    `).run(bid.cleaner_id, bid.amount, bookingFee, totalCharge, paymentIntentId, bid.job_id);
+    if (!booked) {
+      if (paymentIntentId) {
+        stripe.paymentIntents.cancel(paymentIntentId)
+          .catch(err => console.error('Could not release authorization for a lost booking race:', paymentIntentId, err.message));
+      }
+      return res.status(409).json({ error: 'This job has already been booked.' });
+    }
 
-    // Create pending payout for cleaner (they get quote minus 10% success fee)
-    db.prepare(`
-      INSERT INTO payouts (id, cleaner_id, job_id, amount, type, status)
-      VALUES (?, ?, ?, ?, 'job', 'pending')
-    `).run(uuid(), bid.cleaner_id, bid.job_id, bid.amount - bid.success_fee);
+    // No payout is created here. The cleaner's earnings are created when the job is
+    // completed with its before and after photos (routes/jobs.js) — a booking-time
+    // payout could be cashed out for work that never happened.
 
     // Notify cleaner
     await queueNotification(
@@ -264,8 +277,17 @@ router.post('/job/:job_id/close', requireAuth, requireRole('client'), (req, res)
   const job = db.prepare('SELECT * FROM jobs WHERE id = ? AND client_id = ?').get(req.params.job_id, req.user.id);
   if (!job) return res.status(404).json({ error: 'Job not found' });
 
-  db.prepare("UPDATE bids SET status = 'declined' WHERE job_id = ?").run(job.id);
-  db.prepare("UPDATE jobs SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?").run(job.id);
+  // Closing is for a job still collecting quotes. A booked job goes through
+  // /api/jobs/:id/cancel, and a finished one can't be closed at all.
+  const closed = transaction(() => {
+    const res1 = db.prepare("UPDATE jobs SET status = 'cancelled', updated_at = datetime('now') WHERE id = ? AND status = 'open'").run(job.id);
+    if (res1.changes !== 1) return false;
+    db.prepare("UPDATE bids SET status = 'declined' WHERE job_id = ? AND status = 'pending'").run(job.id);
+    return true;
+  });
+  if (!closed) {
+    return res.status(409).json({ error: 'This job is no longer open. To cancel a booked clean, use Cancel booking instead.' });
+  }
 
   res.json({ message: 'Job closed. All cleaners who bid have been notified.' });
 });

@@ -28,10 +28,16 @@ function createMockStripe() {
       retrieve: async (customerId) => ({ id: customerId, invoice_settings: { default_payment_method: null } }),
       listPaymentMethods: async () => ({ data: [] }),
     },
-    paymentIntents:{ create: mock('paymentIntents.create'), capture: mock('paymentIntents.capture'), cancel: mock('paymentIntents.cancel') },
+    paymentIntents:{
+      create: mock('paymentIntents.create'),
+      capture: mock('paymentIntents.capture'),
+      cancel: mock('paymentIntents.cancel'),
+      retrieve: async (id) => ({ id, status: 'requires_capture' }),
+    },
     charges:       { create: mock('charges.create') },
     refunds:       { create: mock('refunds.create') },
-    transfers:     { create: mock('transfers.create') },
+    transfers:     { create: mock('transfers.create'), list: async () => ({ data: [] }) },
+    payouts:       { create: mock('payouts.create') },
     subscriptions: { create: mock('subscriptions.create'), cancel: mock('subscriptions.cancel') },
     identity:      { verificationSessions: { create: mock('identity.verificationSessions.create') } },
     webhooks: {

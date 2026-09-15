@@ -72,7 +72,14 @@ function cleanupUser(id) {
   try {
     db.prepare('DELETE FROM reviews WHERE reviewer_id = ? OR reviewee_id = ?').run(id, id);
     db.prepare('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?').run(id, id);
-    db.prepare('DELETE FROM payouts WHERE cleaner_id = ?').run(id);
+    // Children before parents: payouts point at cashouts, disputes and lockout fees.
+    db.prepare('DELETE FROM payouts WHERE cleaner_id = ? OR job_id IN (SELECT id FROM jobs WHERE client_id = ? OR cleaner_id = ?)').run(id, id, id);
+    db.prepare('DELETE FROM cashouts WHERE cleaner_id = ?').run(id);
+    db.prepare('DELETE FROM job_photos WHERE uploaded_by = ? OR job_id IN (SELECT id FROM jobs WHERE client_id = ? OR cleaner_id = ?)').run(id, id, id);
+    db.prepare('DELETE FROM disputes WHERE filed_by = ? OR against = ?').run(id, id);
+    db.prepare('DELETE FROM lockout_fees WHERE cleaner_id = ? OR client_id = ?').run(id, id);
+    db.prepare('DELETE FROM bids WHERE cleaner_id = ? OR job_id IN (SELECT id FROM jobs WHERE client_id = ?)').run(id, id);
+    db.prepare('DELETE FROM notifications WHERE user_id = ?').run(id);
     db.prepare('DELETE FROM jobs WHERE client_id = ? OR cleaner_id = ?').run(id, id);
     db.prepare('DELETE FROM cleaner_services WHERE cleaner_id = ?').run(id);
     db.prepare('DELETE FROM cleaner_profiles WHERE user_id = ?').run(id);

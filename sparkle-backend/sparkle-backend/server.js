@@ -253,16 +253,18 @@ app.get('/api/config', (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════
-//  STATIC UPLOADS — profile photos and job photos only
+//  STATIC UPLOADS — profile and review photos only
 // ═══════════════════════════════════════════════════
 // SECURITY: mounted per-subdirectory ON PURPOSE. Never mount UPLOAD_DIR itself —
-// it also contains uploads/documents, the licence and insurance scans, which carry
-// licence numbers and home addresses and must only ever be reachable through the
-// authenticated owner-or-admin route in routes/credentials.js.
+// it also contains private files that must only ever be reachable through
+// authenticated routes:
+//   uploads/documents   licence and insurance scans   → routes/credentials.js
+//   uploads/job-photos  photos inside clients' homes  → routes/jobPhotos.js
+//   uploads/jobs        legacy job photos             → no longer served at all
 {
   const path = require('path');
   const { UPLOAD_DIR } = require('./lib/uploads');
-  const publicDirs = ['profiles', 'jobs', 'reviews'];   // NOT 'documents'
+  const publicDirs = ['profiles', 'reviews'];   // NOT 'documents', 'job-photos' or 'jobs'
   const opts = {
     index:  false,
     dotfiles: 'deny',
@@ -332,6 +334,8 @@ app.use('/api/mileage',                 mileageRoutes);
 app.use('/api/verify-email',            emailVerifyRoutes);
 app.use('/api/support',                 supportRoutes);
 app.use('/api/credentials',             credentialRoutes);
+app.use('/api/job-photos',              require('./routes/jobPhotos'));
+app.use('/api/disputes',                require('./routes/disputes'));
 // NOTE: keep new mounts ABOVE this line — it is a catch-all on /api.
 app.use('/api',                         profileRoutes);
 
@@ -357,6 +361,7 @@ app.listen(PORT, () => {
   `);
   startScheduledBackups();        // Daily automated database backups
   startCredentialExpirySweep();   // Daily licence/insurance expiry warnings + downgrades
+  require('./lib/payouts').startCashoutReconciler();   // Settles cashouts whose Stripe result was lost
 });
 
 module.exports = app;
