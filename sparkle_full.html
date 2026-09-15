@@ -298,6 +298,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
 .jp-full-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;max-width:100%}
 .jp-full{max-width:min(1100px,94vw);max-height:84vh;object-fit:contain;border-radius:var(--rad);background:#111}
 
+/* LOCATION SHARING & TRACKING */
+.trk-line{font-size:12px;color:var(--tx2);margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;line-height:1.5}
+.trk-line.on{color:var(--gd);font-weight:500}
+.trk-map{height:280px;border-radius:var(--rad);border:1px solid var(--bdr);margin:.5rem 0 .75rem;background:var(--s100)}
+
+/* LEGAL LINKS */
+.auth-legal{font-size:11px;color:var(--tx2);margin:.25rem 0 .5rem;line-height:1.5}
+.auth-legal a{color:var(--g);text-decoration:none}
+
 /* NOTIFICATIONS PANEL */
 .notif-panel{position:fixed;top:52px;right:0;width:330px;height:calc(100vh - 52px);background:var(--surf);border-left:1px solid var(--bdr);z-index:700;transform:translateX(100%);transition:transform .25s ease;overflow-y:auto;box-shadow:var(--shl)}
 .notif-panel.open{transform:none}
@@ -622,6 +631,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
            data-expired-callback="onTurnstileExpired">
       </div> -->
       <button class="ob-btn" onclick="startOnboard()">Create account →</button>
+      <div class="auth-legal" style="text-align:center;margin-top:.875rem"><a href="terms.html" target="_blank" rel="noopener">Terms</a> · <a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="accessibility.html" target="_blank" rel="noopener">Accessibility</a></div>
     </div>
 
     <!-- Onboarding Steps -->
@@ -652,6 +662,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
              data-error-callback="onTurnstileError"
              data-expired-callback="onTurnstileExpired">
         </div> -->
+        <div class="auth-legal">By creating an account, you agree to Sparkle's <a href="terms.html" target="_blank" rel="noopener">Terms of Service</a> and <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</div>
         <button class="ob-btn" id="ob-continue-btn" onclick="obStepWithCaptcha(1)">Continue →</button>
         <button class="ob-btn-ghost" onclick="cancelOnboard()">← Back to sign in</button>
       </div>
@@ -901,7 +912,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
   <div class="card">
     <div class="frow"><label class="flbl">Type of cleaning</label><select class="inp" id="job-type"><option>Standard clean</option><option>Deep clean</option><option>Move-out clean</option><option>Move-in clean</option><option>Office / commercial</option></select></div>
     <div class="f2"><div class="frow"><label class="flbl">Bedrooms</label><select class="inp"><option>Studio</option><option>1</option><option selected>2</option><option>3</option><option>4+</option></select></div><div class="frow"><label class="flbl">Bathrooms</label><select class="inp"><option>1</option><option selected>2</option><option>3+</option></select></div></div>
-    <div class="frow"><label class="flbl">Address</label><input class="inp" id="job-address" placeholder="Street address, city" autocomplete="street-address"></div>
+    <div class="frow"><label class="flbl">Address</label><input class="inp" id="job-address" placeholder="Street address, city, state ZIP" autocomplete="street-address"></div>
     <div class="f2"><div class="frow"><label class="flbl">Preferred date</label><input class="inp" type="date" id="job-date"></div><div class="frow"><label class="flbl">Preferred time</label><select class="inp"><option>Morning 8–12pm</option><option>Afternoon 12–5pm</option><option>Evening 5–8pm</option></select></div></div>
     <div class="f2"><div class="frow"><label class="flbl">Supplies</label><select class="inp"><option>I'll provide</option><option>Cleaner brings</option></select></div><div class="frow"><label class="flbl">Pets</label><select class="inp"><option>No pets</option><option>Dog(s)</option><option>Cat(s)</option></select></div></div>
     <div class="frow"><label class="flbl">Make it recurring?</label><select class="inp" onchange="this.nextElementSibling.style.display=this.value?'block':'none'"><option value="">One-time booking</option><option value="weekly">Weekly (save 10%)</option><option value="biweekly">Bi-weekly (save 10%)</option><option value="monthly">Monthly (save 5%)</option></select><div class="alert info" style="display:none;margin-top:.5rem;font-size:12px">Recurring bookings lock in your preferred cleaner and include an automatic discount.</div></div>
@@ -1387,6 +1398,10 @@ function logout() {
   document.getElementById('jp-report')?.remove();
   document.getElementById('jp-ruling')?.remove();
   cleanerScheduleState.jobs = [];
+  trkStop();
+  trkCloseTracker();
+  clearTimeout(clientBookingState.refreshTimer);
+  document.getElementById('delete-account-modal')?.remove();
   closeMobileSidebar();
 }
 
@@ -1727,7 +1742,10 @@ async function confirmLockout(){
   btn.disabled = true;
   btn.textContent = 'Charging…';
   try {
-    const r = await SparkleAPI.chargeLockoutFee(job.id, [true, true, true, true, true]);
+    // Where the cleaner is standing is part of the evidence for the fee.
+    const coords = await trkGetPosition({ timeout: 10000, maximumAge: 30000 });
+    const r = await SparkleAPI.chargeLockoutFee(job.id, [true, true, true, true, true], coords);
+    if (trk.jobId === job.id) trkStop();
     closeModal();
     cleanerScheduleState.jobs = cleanerScheduleState.jobs.filter(j => j.id !== job.id);
     renderCleanerSchedule();
@@ -1771,7 +1789,7 @@ function jpNotifTarget(type = '') {
   }
   if (/^payout/.test(type)) return role === 'cleaner' ? 'c-earnings' : null;
   if (/^dispute/.test(type)) return role === 'cleaner' ? 'c-earnings' : 'cl-bookings';
-  if (['review_prompt', 'lockout_fee_charged', 'cleaner_arrived', 'job_accepted'].includes(type)) return 'cl-bookings';
+  if (['review_prompt', 'lockout_fee_charged', 'cleaner_arrived', 'cleaner_en_route', 'cleaner_nearby', 'job_accepted'].includes(type)) return 'cl-bookings';
   if (type === 'job_cancelled') return role === 'cleaner' ? 'c-schedule' : 'cl-bookings';
   if (type === 'bid_chosen') return 'c-schedule';
   return null;
@@ -2399,7 +2417,9 @@ function loadCleanerSchedule() {
 
   SparkleAPI.getMySchedule().then(data => {
     cleanerScheduleState.jobs = data?.jobs || [];
+    if (trk.jobId && !cleanerScheduleState.jobs.some(j => j.id === trk.jobId)) trkStop();
     renderCleanerSchedule();
+    trkResume();
   }).catch(err => {
     if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
     page.innerHTML = `<div class="pg-title">My schedule</div><div class="alert warn">Could not load schedule: ${escapeHtml(err.message)}</div>`;
@@ -2462,8 +2482,9 @@ function scheduleCardHtml(j) {
     actions = `<button class="btn primary sm" data-act="complete" data-job="${id}"${ready ? '' : ' disabled style="opacity:.5;cursor:not-allowed"'}>✓ Complete job</button>`
       + (ready ? '' : `<span class="jp-hint">${up.pending ? 'Waiting for photos to finish uploading' : `Add ${missing} to complete this job`}</span>`);
   } else {
-    actions = `<button class="btn sm" onclick="startMileageTracking('${id}')">📍 On my way</button>`
-      + `<button class="btn primary sm" data-act="arrive" data-job="${id}">I've arrived</button>`
+    const onTheWay = !!j.en_route_at;
+    actions = (onTheWay ? '' : `<button class="btn primary sm" data-act="en-route" data-job="${id}">🚗 On my way</button>`)
+      + `<button class="btn${onTheWay ? ' primary' : ''} sm" data-act="arrive" data-job="${id}">I've arrived</button>`
       + (j.lockout_fee_enabled ? `<button class="btn warn sm" data-act="lockout" data-job="${id}">🔒 Locked out</button>` : '');
   }
   if (before + after + (j.lockout_photo_count || 0)) {
@@ -2478,6 +2499,7 @@ function scheduleCardHtml(j) {
     ${stage('before', before, started ? 'Photos of each room before you started cleaning.' : 'Take these when you arrive, before you start cleaning.')}
     ${started ? stage('after', after, 'Photos of the same rooms once you have finished.') : ''}
     ${uploadLine}
+    ${trkCardStatusHtml(j)}
     <div class="actions" style="align-items:center;flex-wrap:wrap">${actions}</div>
   </div>`;
 }
@@ -2911,7 +2933,7 @@ async function openDisputeView(disputeId) {
   const { body, token } = jpOpenOverlay('Reported problem');
   jpGallery.disputeId = disputeId;
   try {
-    const { dispute: d, photos = [] } = await SparkleAPI.getDispute(disputeId);
+    const { dispute: d, photos = [], tracking = null } = await SparkleAPI.getDispute(disputeId);
     if (token !== jpGallery.token) return;
     const isAdmin = currentUser?.role === 'admin';
     const when = d.scheduled_at ? new Date(d.scheduled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
@@ -2953,6 +2975,7 @@ async function openDisputeView(disputeId) {
       </div>`;
     }
 
+    html += trkDisputeSummaryHtml(tracking, isAdmin);
     html += jpPhotoSectionsHtml(photos);
     body.innerHTML = html;
     jpLoadThumbs(body, token);
@@ -2966,13 +2989,19 @@ async function openDisputeView(disputeId) {
 // ── Cleaner actions ──────────────────────────────────────────────────────────
 async function jpArrive(jobId, btn) {
   btn.disabled = true;
-  btn.textContent = 'Saving…';
+  btn.textContent = 'Checking in…';
+  const coords = await trkGetPosition({ timeout: 10000, maximumAge: 30000 });
   try {
-    await SparkleAPI.arriveAtJob(jobId);
+    const r = await SparkleAPI.arriveAtJob(jobId, coords);
     const job = cleanerScheduleState.jobs.find(j => j.id === jobId);
-    if (job) job.status = 'in_progress';
-    rerenderScheduleCard(jobId);
-    showToast("The client knows you've arrived. Take your before photos before you start cleaning.", 'success');
+    if (job) { job.status = 'in_progress'; job.arrived_at = new Date().toISOString(); }
+    // While on site, a location check-in every couple of minutes (while Sparkle is open).
+    if (coords) { trkStartWatch(jobId, 'on_site'); trk.lastSent = coords; }
+    else { if (trk.jobId === jobId) trkStop(); rerenderScheduleCard(jobId); }
+    showToast(r.far_from_address
+      ? `Checked in — but your location looks about ${trkDistanceText(r.arrival_distance_m)} from the job's address. If that's wrong, message the client. Take your before photos before you start.`
+      : "The client knows you've arrived. Take your before photos before you start cleaning.",
+      r.far_from_address ? 'warn' : 'success');
   } catch (err) {
     if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
     showToast(err.message, 'error');
@@ -2987,7 +3016,9 @@ function jpComplete(jobId) {
     confirmLabel: 'Complete job',
     onConfirm: async () => {
       try {
-        const r = await SparkleAPI.completeJob(jobId);
+        const coords = await trkGetPosition({ timeout: 8000, maximumAge: 60000 });
+        const r = await SparkleAPI.completeJob(jobId, coords);
+        if (trk.jobId === jobId) trkStop();
         cleanerScheduleState.jobs = cleanerScheduleState.jobs.filter(j => j.id !== jobId);
         renderCleanerSchedule();
         showToast(r.cashable
@@ -3130,6 +3161,311 @@ function openReportProblem(jobId, kind) {
   desc.focus();
 }
 
+// ══════════════════════════════════════
+// LOCATION SHARING (cleaners) & TRACKING (clients)
+// ══════════════════════════════════════
+// A web page can only use location while it's open, so cleaners are asked to keep
+// Sparkle open while driving (a screen wake lock helps on phones). The phone apps
+// will add background location. Every check-in still works with location off —
+// it just isn't recorded.
+
+const TRK_SEND_EVERY_MS  = { en_route: 20000, on_site: 120000 };
+const TRK_MOVE_TRIGGER_M = 75;
+const trk = { jobId: null, phase: null, watchId: null, lastSentAt: 0, lastSent: null, denied: false, wakeLock: null, sending: false };
+
+function trkDuration(mins) {
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h ? `${h}h ${m}m` : `${m} min`;
+}
+// US-friendly: feet up close, miles beyond ~0.2 mi.
+function trkDistanceText(meters) {
+  if (meters == null) return '';
+  return meters < 322 ? `${Math.max(10, Math.round((meters * 3.281) / 10) * 10)} ft` : `${(meters / 1609.34).toFixed(1)} mi`;
+}
+function trkMeters(a, b) {
+  const rad = d => (d * Math.PI) / 180;
+  const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lng - a.lng) / 2) ** 2;
+  return 12742000 * Math.asin(Math.sqrt(h));
+}
+function trkCoords(pos) {
+  return { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy || 0) };
+}
+const trkTime = value => { const d = jpServerDate(value); return d ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''; };
+
+// One reading, or null when location is blocked or unavailable. Never rejects.
+function trkGetPosition({ timeout = 12000, maximumAge = 30000 } = {}) {
+  return new Promise(resolve => {
+    if (!navigator.geolocation) { resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => { trk.denied = false; resolve(trkCoords(pos)); },
+      err => { if (err.code === 1) trk.denied = true; resolve(null); },
+      { enableHighAccuracy: true, timeout, maximumAge });
+  });
+}
+
+async function trkSend(coords) {
+  if (!trk.jobId || trk.sending) return;
+  trk.sending = true;
+  try {
+    await SparkleAPI.sendJobLocation(trk.jobId, coords);
+    trk.lastSentAt = Date.now();
+    trk.lastSent = coords;
+  } catch (err) {
+    if (err.message === 'SESSION_EXPIRED' || err.code === 'TRACKING_ENDED' || err.status === 404) {
+      const jobId = trkStop();
+      if (jobId) rerenderScheduleCard(jobId);
+    }
+    // Anything else (a dropped connection, a busy server): the next reading retries.
+  } finally {
+    trk.sending = false;
+  }
+}
+
+function trkStartWatch(jobId, phase) {
+  if (!navigator.geolocation) return;
+  if (trk.watchId !== null && trk.jobId === jobId && trk.phase === phase) { rerenderScheduleCard(jobId); return; }
+  trkStop();
+  Object.assign(trk, { jobId, phase, lastSentAt: Date.now(), lastSent: null });
+  trk.watchId = navigator.geolocation.watchPosition(pos => {
+    trk.denied = false;
+    const c = trkCoords(pos);
+    const sinceLast = Date.now() - trk.lastSentAt;
+    const moved = trk.phase === 'en_route' && trk.lastSent && sinceLast >= 10000 && trkMeters(trk.lastSent, c) >= TRK_MOVE_TRIGGER_M;
+    if (sinceLast >= TRK_SEND_EVERY_MS[trk.phase] || moved) trkSend(c);
+  }, err => {
+    if (err.code === 1) { trk.denied = true; trkStop(); rerenderScheduleCard(jobId); }
+  }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 60000 });
+  trkKeepAwake(phase === 'en_route');
+  rerenderScheduleCard(jobId);
+}
+
+// Returns the job id that was being shared, if any.
+function trkStop() {
+  if (trk.watchId !== null && navigator.geolocation) navigator.geolocation.clearWatch(trk.watchId);
+  const jobId = trk.jobId;
+  Object.assign(trk, { watchId: null, jobId: null, phase: null, lastSent: null });
+  trkKeepAwake(false);
+  return jobId;
+}
+
+// Keeps a phone's screen on while driving, so the page — and sharing — keeps running.
+async function trkKeepAwake(on) {
+  try {
+    if (on && !trk.wakeLock && 'wakeLock' in navigator) {
+      trk.wakeLock = await navigator.wakeLock.request('screen');
+      trk.wakeLock.addEventListener?.('release', () => { trk.wakeLock = null; });
+    } else if (!on && trk.wakeLock) {
+      const lock = trk.wakeLock;
+      trk.wakeLock = null;
+      await lock.release();
+    }
+  } catch { trk.wakeLock = null; }
+}
+// The browser drops the wake lock when the tab is hidden; take it back on return.
+document.addEventListener('visibilitychange', () => { if (!document.hidden && trk.phase === 'en_route') trkKeepAwake(true); });
+
+async function trkEnRoute(jobId, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+  const coords = await trkGetPosition({ timeout: 15000, maximumAge: 0 });
+  try {
+    await SparkleAPI.startEnRoute(jobId, coords);
+    const job = cleanerScheduleState.jobs.find(j => j.id === jobId);
+    if (job) job.en_route_at = new Date().toISOString();
+    if (coords) {
+      trkStartWatch(jobId, 'en_route');
+      trk.lastSent = coords;   // already recorded by startEnRoute; movement is measured from here
+      showToast("The client knows you're on the way and can follow your location. Keep Sparkle open while you drive.", 'success');
+    } else {
+      rerenderScheduleCard(jobId);
+      showToast(trk.denied
+        ? "The client knows you're on the way. Location is blocked for Sparkle, so they can't follow you — allow location in your browser settings to share it."
+        : "The client knows you're on the way. We couldn't get your location, so they can't follow you on a map.", 'warn');
+    }
+  } catch (err) {
+    if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+    showToast(err.message, 'error');
+    loadCleanerSchedule();
+  }
+}
+
+async function trkShareNow(jobId, btn) {
+  btn.disabled = true;
+  const coords = await trkGetPosition({ timeout: 15000, maximumAge: 0 });
+  const job = cleanerScheduleState.jobs.find(j => j.id === jobId);
+  if (!coords || !job) {
+    btn.disabled = false;
+    showToast(trk.denied ? 'Location is blocked for Sparkle. Allow it in your browser settings, then try again.' : "Couldn't get your location. Try again in a moment.", 'warn');
+    return;
+  }
+  trkStartWatch(jobId, job.status === 'in_progress' ? 'on_site' : 'en_route');
+  trk.lastSentAt = 0;
+  trkSend(coords);
+}
+
+// After a reload, resume sharing without a permission prompt when location is already allowed.
+async function trkResume() {
+  if (trk.watchId !== null || !navigator.permissions?.query) return;
+  const job = cleanerScheduleState.jobs.find(j => j.status === 'in_progress' || (j.status === 'accepted' && j.en_route_at));
+  if (!job) return;
+  try {
+    const permission = await navigator.permissions.query({ name: 'geolocation' });
+    if (permission.state === 'granted') trkStartWatch(job.id, job.status === 'in_progress' ? 'on_site' : 'en_route');
+  } catch {}
+}
+
+function trkCardStatusHtml(j) {
+  const id = escapeHtml(j.id);
+  const sharingHere = trk.watchId !== null && trk.jobId === j.id;
+  if (j.status === 'accepted' && j.en_route_at) {
+    if (sharingHere) return `<div class="trk-line on">🟢 Sharing your location with the client. Keep Sparkle open while you drive.</div>`;
+    return `<div class="trk-line">🚗 The client knows you're on the way.${navigator.geolocation ? ` <button class="btn sm" data-act="share-location" data-job="${id}">Share my location</button>` : ''}</div>`;
+  }
+  if (j.status === 'in_progress' && j.arrived_at) {
+    const since = jpServerDate(j.arrived_at);
+    const mins = since ? Math.max(0, Math.round((Date.now() - since.getTime()) / 60000)) : null;
+    return `<div class="trk-line">🧹 On site since ${escapeHtml(trkTime(j.arrived_at))}${mins != null ? ` · ${trkDuration(mins)}` : ''}</div>`;
+  }
+  return '';
+}
+
+// ── Client: follow the cleaner ───────────────────────────────────────────────
+const trkView = { timer: null, mapsTimer: null, jobId: null, map: null, markers: {}, last: null };
+
+function trkCloseTracker() {
+  clearInterval(trkView.timer);
+  clearInterval(trkView.mapsTimer);
+  document.getElementById('trk-modal')?.remove();
+  Object.assign(trkView, { timer: null, mapsTimer: null, jobId: null, map: null, markers: {}, last: null });
+}
+
+function openTracker(jobId) {
+  trkCloseTracker();
+  trkView.jobId = jobId;
+  const overlay = document.createElement('div');
+  overlay.id = 'trk-modal';
+  overlay.className = 'modal-overlay show';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.innerHTML = `<div class="modal jp-wide" style="width:560px">
+    <div class="row c" style="margin-bottom:.5rem"><div class="modal-title" style="margin:0">Your cleaner</div><button class="btn sm" data-act="tracker-close" aria-label="Close">✕</button></div>
+    <div id="trk-status" class="modal-sub" role="status" aria-live="polite" style="margin-bottom:.25rem">Loading…</div>
+    <div id="trk-map" class="trk-map" hidden></div>
+    <div class="jp-hint">Your cleaner's location is shared only while they're on the way, and updates about every 20 seconds while they have Sparkle open.</div>
+  </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) trkCloseTracker(); });
+  overlay.addEventListener('keydown', e => { if (e.key === 'Escape') trkCloseTracker(); });
+  document.body.appendChild(overlay);
+  overlay.querySelector('[data-act="tracker-close"]').focus();
+
+  // The map is a bonus; the text above always says the same thing.
+  loadGoogleMapsAPI();
+  let waited = 0;
+  trkView.mapsTimer = setInterval(() => {
+    waited += 500;
+    if (window.google?.maps && trkView.last) { trkDrawMap(trkView.last); clearInterval(trkView.mapsTimer); }
+    else if (waited >= 10000) clearInterval(trkView.mapsTimer);
+  }, 500);
+
+  trkRefreshTracker();
+  trkView.timer = setInterval(trkRefreshTracker, 15000);
+}
+
+async function trkRefreshTracker() {
+  const jobId = trkView.jobId;
+  if (!jobId) return;
+  let t;
+  try {
+    t = (await SparkleAPI.getJobTracking(jobId)).tracking;
+  } catch (err) {
+    if (err.message === 'SESSION_EXPIRED') { trkCloseTracker(); showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+    const s = document.getElementById('trk-status');
+    if (s) s.textContent = "Couldn't load your cleaner's location. Trying again…";
+    return;
+  }
+  if (jobId !== trkView.jobId) return;
+  const statusEl = document.getElementById('trk-status');
+  if (!statusEl) return;
+  trkView.last = t;
+
+  let text;
+  if (t.arrived_at) {
+    text = `✅ Your cleaner arrived at ${trkTime(t.arrived_at)}.`;
+    clearInterval(trkView.timer);
+    trkView.timer = null;
+    if (_activePage?.id === 'page-cl-bookings') loadMyBookings();
+  } else if (t.live) {
+    const where = t.live.distance_m != null
+      ? `About ${trkDistanceText(t.live.distance_m)} away${t.live.eta_minutes ? `, roughly ${t.live.eta_minutes} min` : ''}.`
+      : 'On the way.';
+    const age = t.live.seconds_ago < 60 ? 'Updated just now' : `Updated ${Math.round(t.live.seconds_ago / 60)} min ago`;
+    text = `🚗 ${where} ${age}${t.live.stale ? ' — they may have closed Sparkle or lost signal' : ''}.`;
+  } else if (t.en_route_at) {
+    text = `🚗 Your cleaner has been on the way since ${trkTime(t.en_route_at)}. They aren't sharing a live location.`;
+  } else {
+    text = "Your cleaner hasn't set off yet. You'll get a notification when they're on the way.";
+  }
+  statusEl.textContent = text;
+  trkDrawMap(t);
+}
+
+function trkDrawMap(t) {
+  const el = document.getElementById('trk-map');
+  if (!el) return;
+  if (!window.google?.maps || !t.live) { el.hidden = !(trkView.map && t.live); return; }
+  el.hidden = false;
+  const cleanerPos = { lat: t.live.lat, lng: t.live.lng };
+  if (!trkView.map) {
+    trkView.map = new google.maps.Map(el, { center: cleanerPos, zoom: 14, disableDefaultUI: true, zoomControl: true, clickableIcons: false });
+  }
+  const pin = (key, pos, title, color) => {
+    if (!trkView.markers[key]) {
+      trkView.markers[key] = new google.maps.Marker({
+        map: trkView.map, title,
+        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: color, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 },
+      });
+    }
+    trkView.markers[key].setPosition(pos);
+  };
+  pin('cleaner', cleanerPos, 'Your cleaner', '#1D9E75');
+  if (t.destination) {
+    pin('home', t.destination, 'Your home', '#378ADD');
+    const bounds = new google.maps.LatLngBounds();
+    bounds.extend(cleanerPos);
+    bounds.extend(t.destination);
+    trkView.map.fitBounds(bounds, 60);
+  } else {
+    trkView.map.setCenter(cleanerPos);
+  }
+}
+
+// ── Disputes: what the location record shows ─────────────────────────────────
+function trkDisputeSummaryHtml(t, isAdmin) {
+  if (!t) return '';
+  const when = value => { const d = jpServerDate(value); return d ? d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''; };
+  const checkIn = (label, c, at) => {
+    if (!at) return '';
+    const where = !c?.location_shared ? 'no location shared'
+      : c.distance_m == null ? 'location shared (the address could not be placed on a map)'
+      : `${trkDistanceText(c.distance_m)} from the address${c.far_from_address ? ' — farther than expected' : ''}`;
+    const mapLink = isAdmin && c?.lat != null
+      ? ` · <a href="https://www.google.com/maps/search/?api=1&query=${Number(c.lat)},${Number(c.lng)}" target="_blank" rel="noopener" style="color:var(--gd)">view on map</a>` : '';
+    return `<li>${label} ${escapeHtml(when(at))} — <span style="${c?.far_from_address ? 'color:var(--rd)' : ''}">${escapeHtml(where)}</span>${mapLink}</li>`;
+  };
+  const lines = [
+    t.en_route_at ? `<li>Set off ${escapeHtml(when(t.en_route_at))}</li>` : '',
+    checkIn('Arrived', t.arrival, t.arrived_at),
+    t.arrived_at ? checkIn('Finished', t.completion, t.completed_at) : '',
+    t.minutes_on_site != null ? `<li>Time on site: <strong>${trkDuration(t.minutes_on_site)}</strong></li>` : '',
+    t.on_site_checks?.count
+      ? `<li>${t.on_site_checks.count} location check${t.on_site_checks.count === 1 ? '' : 's'} during the job${t.on_site_checks.max_distance_m != null ? `, farthest ${trkDistanceText(t.on_site_checks.max_distance_m)} from the address` : ''}</li>` : '',
+    isAdmin && t.trail?.length ? `<li>${t.trail.length} location point${t.trail.length === 1 ? '' : 's'} recorded in total</li>` : '',
+  ].filter(Boolean);
+  return `<div class="jp-stage"><div class="jp-stage-hd"><strong>Arrival &amp; time on site</strong></div>${lines.length
+    ? `<ul class="jp-hint" style="margin:.25rem 0 0;padding-left:1.1rem">${lines.join('')}</ul>`
+    : '<div class="jp-hint">No arrival was recorded for this job.</div>'}</div>`;
+}
+
 // ── Delegated listeners ──────────────────────────────────────────────────────
 document.addEventListener('change', e => {
   const input = e.target;
@@ -3144,6 +3480,10 @@ document.addEventListener('click', e => {
   if (!el || el.disabled) return;
   const d = el.dataset;
   switch (d.act) {
+    case 'en-route':           return trkEnRoute(d.job, el);
+    case 'share-location':     return trkShareNow(d.job, el);
+    case 'track':              return openTracker(d.job);
+    case 'tracker-close':      return trkCloseTracker();
     case 'arrive':             return jpArrive(d.job, el);
     case 'complete':           return jpComplete(d.job);
     case 'lockout':            return showLockoutModal(d.job);
@@ -3534,7 +3874,8 @@ function loadCleanerSettings() {
       </div>
     </div>
     ${supportCardHtml('c')}
-    <div class="card" style="margin-top:10px;border-color:#F7C1C1"><div class="sect-title red" style="margin-bottom:.5rem">Danger zone</div><div style="font-size:13px;color:var(--tx2);margin-bottom:.875rem">Permanently delete your account and all associated data.</div><button class="btn danger sm" onclick="confirmDelete()">Delete account</button></div>`;
+    ${legalLinksCardHtml()}
+    ${dangerZoneCardHtml()}`;
   loadSupportTickets('c');
 }
 
@@ -4208,6 +4549,13 @@ function loadMyBookings() {
       const jobs = data?.jobs || [];
       clientBookingState.jobs = jobs;
       clientBookingState.loaded = true;
+      // While a clean is booked or underway, refresh so "on the way" and "arrived" appear.
+      clearTimeout(clientBookingState.refreshTimer);
+      if (jobs.some(j => j.status === 'accepted' || j.status === 'in_progress')) {
+        clientBookingState.refreshTimer = setTimeout(() => {
+          if (_activePage?.id === 'page-cl-bookings' && currentUser?.role === 'client' && !document.getElementById('jp-report')) loadMyBookings();
+        }, 60000);
+      }
       if (!jobs.length) {
         page.innerHTML = `
           <div style="text-align:center;padding:3rem 1rem;color:var(--tx2)">
@@ -4241,6 +4589,17 @@ function loadMyBookings() {
           disputeHtml = `<div class="alert ${open ? 'warn' : job.dispute_ruling === 'client' ? 'success' : 'info'}" style="margin:.75rem 0 0">${text}${open ? ` <span data-evidence-status="${escapeHtml(job.dispute_id)}">${jpEvidenceStatusHtml(job.dispute_id)}</span>` : ''}</div>`;
         }
 
+        let trackHtml = '';
+        if (job.status === 'accepted' && job.en_route_at) {
+          trackHtml = `<div class="alert info" style="margin:.75rem 0 0">🚗 Your cleaner is on the way. <button class="btn sm" data-act="track" data-job="${id}">Track your cleaner</button></div>`;
+        } else if (job.status === 'in_progress') {
+          const since = jpServerDate(job.arrived_at);
+          trackHtml = `<div style="font-size:13px;color:var(--tx2)">🧹 Your cleaner is at your home${since ? ` — arrived ${escapeHtml(trkTime(job.arrived_at))}, on site ${trkDuration(Math.max(0, Math.round((Date.now() - since.getTime()) / 60000)))}` : ' now'}.</div>`;
+        } else if (job.status === 'completed' && job.arrived_at && job.completed_at) {
+          const mins = Math.max(0, Math.round((jpServerDate(job.completed_at) - jpServerDate(job.arrived_at)) / 60000));
+          trackHtml = `<div class="jp-hint" style="margin-top:.5rem">⏱️ On site ${trkDuration(mins)} (${escapeHtml(trkTime(job.arrived_at))} – ${escapeHtml(trkTime(job.completed_at))})</div>`;
+        }
+
         const actions = [
           photoCount ? `<button class="btn sm" data-act="gallery" data-job="${id}">📷 ${job.status === 'cancelled' ? 'Photos' : 'Before &amp; after photos'} (${photoCount})</button>` : '',
           job.dispute_id ? `<button class="btn sm" data-act="dispute-view" data-dispute="${escapeHtml(job.dispute_id)}">${job.dispute_status !== 'resolved' ? 'View report &amp; add photos' : 'View report'}</button>` : '',
@@ -4262,7 +4621,7 @@ function loadMyBookings() {
               <div style="font-size:12px;color:var(--tx2)">
                 Waiting for bids · job ID: ${escapeHtml(job.id.slice(0,8))}…
               </div>` : ''}
-            ${job.status === 'in_progress' ? `<div style="font-size:13px;color:var(--tx2)">🧹 Your cleaner is at your home now.</div>` : ''}
+            ${trackHtml}
             ${job.total_charged ? `
               <div style="font-size:13px;font-weight:500;color:var(--gd);margin-top:.5rem">
                 Total: $${parseFloat(job.total_charged).toFixed(2)}
@@ -4429,7 +4788,9 @@ function loadClientSettings() {
         <div class="toggle-row"><label class="sw"><input type="checkbox" id="pref-promo" ${prefs.promo ? 'checked' : ''}><span class="sl"></span></label><div><div class="tl-main">Promotional emails</div></div></div>
       </div>
     </div>
-    ${supportCardHtml('cl')}`;
+    ${supportCardHtml('cl')}
+    ${legalLinksCardHtml()}
+    ${dangerZoneCardHtml()}`;
   loadSupportTickets('cl');
 }
 async function saveClientSettings(btn) {
@@ -4502,24 +4863,81 @@ async function submitReview() {
 
 
 
+function legalLinksCardHtml() {
+  const link = (href, text) => `<a href="${href}" target="_blank" rel="noopener" style="color:var(--gd);text-decoration:none">${text}</a>`;
+  return `<div class="card" style="margin-top:10px"><div class="sect-title" style="margin-bottom:.5rem">Legal</div>
+    <div style="font-size:13px;display:flex;gap:18px;flex-wrap:wrap">${link('privacy.html', 'Privacy Policy')}${link('terms.html', 'Terms of Service')}${link('accessibility.html', 'Accessibility')}</div></div>`;
+}
+
+function dangerZoneCardHtml() {
+  return `<div class="card" style="margin-top:10px;border-color:#F7C1C1"><div class="sect-title red" style="margin-bottom:.5rem">Danger zone</div>
+    <div style="font-size:13px;color:var(--tx2);margin-bottom:.875rem">Permanently delete your account and personal information.</div>
+    <button class="btn danger sm" onclick="confirmDelete()">Delete account</button></div>`;
+}
+
+// Real, self-service deletion (DELETE /api/auth/me). The server refuses while
+// anything is unfinished and says what, and those reasons are listed here.
 function confirmDelete() {
-  showConfirm({
-    title: 'Delete your account?',
-    // There is no self-service deletion yet, so don't pretend one happened: route
-    // the request to Sparkle support, where an admin can act on it.
-    body: 'Sparkle support deletes accounts on request, so nothing is removed by accident. Continue to send the request from Contact support.',
-    confirmLabel: 'Request deletion',
-    confirmClass: 'danger',
-    onConfirm: () => {
-      const prefix = currentUser?.role === 'client' ? 'cl' : 'c';
-      const subject = document.getElementById(`${prefix}-support-subject`);
-      const message = document.getElementById(`${prefix}-support-message`);
-      if (!subject || !message) { showToast('Open Settings → Contact support to request account deletion.', 'info'); return; }
-      subject.value = 'Please delete my account';
-      subject.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      message.focus();
+  document.getElementById('delete-account-modal')?.remove();
+  const isCleaner = currentUser?.role === 'cleaner';
+  const overlay = document.createElement('div');
+  overlay.id = 'delete-account-modal';
+  overlay.className = 'modal-overlay show';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', 'del-title');
+  overlay.innerHTML = `<div class="modal" style="width:460px">
+    <div class="modal-title" id="del-title">Delete your account?</div>
+    <div class="modal-sub">This can't be undone. We'll remove your name, email, phone number, profile photo, ${isCleaner ? 'bio, services, license and insurance documents, mileage log, ' : 'saved address, '}notifications and sign-in sessions.
+      Past jobs, payments, reviews and messages stay on record as “Deleted user”, and job photos and location history are deleted 180 days after each job.
+      <a href="privacy.html#choices" target="_blank" rel="noopener" style="color:var(--gd)">Learn more</a></div>
+    <div id="del-blockers" aria-live="polite"></div>
+    <div class="frow"><label class="flbl" for="del-password">Your password</label><input class="inp" type="password" id="del-password" autocomplete="current-password"></div>
+    <div class="frow"><label class="flbl" for="del-confirm">Type DELETE to confirm</label><input class="inp" id="del-confirm" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+    <div class="modal-actions"><button class="btn" id="del-cancel">Cancel</button><button class="btn danger" id="del-go">Delete my account</button></div>
+  </div>`;
+
+  const close = () => overlay.remove();
+  overlay.querySelector('#del-cancel').addEventListener('click', close);
+  overlay.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+
+  const go = overlay.querySelector('#del-go');
+  go.addEventListener('click', async () => {
+    const password = overlay.querySelector('#del-password').value;
+    const typed = overlay.querySelector('#del-confirm').value.trim().toUpperCase();
+    if (!password) { showToast('Enter your password.', 'warn'); overlay.querySelector('#del-password').focus(); return; }
+    if (typed !== 'DELETE') { showToast('Type DELETE to confirm.', 'warn'); overlay.querySelector('#del-confirm').focus(); return; }
+
+    go.disabled = true;
+    go.textContent = 'Deleting…';
+    try {
+      await SparkleAPI.deleteAccount(password);
+      close();
+      logout();
+      showToast('Your account has been deleted.', 'success');
+    } catch (err) {
+      go.disabled = false;
+      go.textContent = 'Delete my account';
+      if (err.message === 'SESSION_EXPIRED') { close(); showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+      if (err.code === 'DELETION_BLOCKED' && Array.isArray(err.data?.blockers)) {
+        const box = overlay.querySelector('#del-blockers');
+        const alert = document.createElement('div');
+        alert.className = 'alert warn';
+        const title = document.createElement('strong');
+        title.textContent = 'Before you can delete your account:';
+        const list = document.createElement('ul');
+        list.style.cssText = 'margin:.4rem 0 0;padding-left:1.1rem';
+        err.data.blockers.forEach(text => { const li = document.createElement('li'); li.textContent = text; list.appendChild(li); });
+        alert.append(title, list);
+        box.replaceChildren(alert);
+        return;
+      }
+      showToast(err.message, 'error');
     }
   });
+
+  document.body.appendChild(overlay);
+  overlay.querySelector('#del-password').focus();
 }
 
 
@@ -4786,6 +5204,14 @@ async function loadAdminDisputes() {
           `<span class="tag">Cleaner earnings ${jpMoney(d.cleaner_earnings)}</span>`,
           d.has_card_payment ? `<span class="tag">Card charge ${jpMoney(d.total_charged)}</span>` : '<span class="tag">No card payment</span>',
           d.capture_status === 'failed' ? '<span class="tag red">Payment capture failed</span>' : '',
+          d.minutes_on_site != null ? `<span class="tag">⏱️ ${trkDuration(d.minutes_on_site)} on site</span>` : '',
+          d.arrived_at
+            ? (d.arrival_location_shared
+                ? (d.arrival_distance_m != null
+                    ? `<span class="tag ${d.arrival_distance_m - (d.arrival_accuracy_m || 0) > 500 ? 'red' : ''}">📍 Arrived ${trkDistanceText(d.arrival_distance_m)} from the address</span>`
+                    : '<span class="tag">📍 Arrival location shared</span>')
+                : '<span class="tag amber">📍 No arrival location</span>')
+            : '',
         ].filter(Boolean).join(' ');
 
         let outcome = '';
@@ -4937,6 +5363,7 @@ async function loadAdminLockouts() {
           </div>
           <div class="tags">
             <span class="tag">📷 ${Number(f.door_photo_count) || 0} door photo${f.door_photo_count == 1 ? '' : 's'}</span>
+            <span class="tag ${f.location_shared && f.distance_m != null && f.distance_m - (f.accuracy_m || 0) > 500 ? 'red' : f.location_shared ? '' : 'amber'}">📍 ${f.location_shared ? (f.distance_m != null ? `Charged ${trkDistanceText(f.distance_m)} from the address` : 'Location shared') : 'No location shared'}</span>
             <span class="tag">${f.charged_to_card ? 'Charged to card' : 'No card on file'}</span>
             <span class="tag ${disputed && f.dispute_status !== 'resolved' ? 'red' : ''}">${escapeHtml(disputeText)}</span>
           </div>

@@ -11,6 +11,9 @@ const { createRefreshToken, revokeAllUserTokens } = require('../lib/tokens');
 const { sendVerificationEmail } = require('./emailVerification');
 const { sendWelcomeEmail } = require('../lib/email');
 const { requireCaptcha, requireCaptchaStrict } = require('../middleware/captcha');
+const { deletionBlockers, deleteAccountData } = require('../lib/accountDeletion');
+const { notifyAdmins } = require('../lib/notify');
+const { getStripe } = require('../lib/stripe');
 
 const router = express.Router();
 // SECURITY: Short-lived access tokens (15 min). If a token is stolen, the
@@ -223,6 +226,45 @@ router.post('/change-password', requireAuth, [body('current_password').notEmpty(
   db.prepare("UPDATE users SET password_hash=?,updated_at=datetime('now') WHERE id=?").run(hash,req.user.id);
   revokeAllUserTokens(db, req.user.id);
   res.json({message:'Password changed. Please log in again on all devices.'});
+});
+
+// DELETE /api/auth/me — permanently delete the signed-in account.
+// Body: { password, confirm: 'DELETE' }. Refused (409, with the reasons) while
+// anything is unfinished — see lib/accountDeletion.js for what is removed and kept.
+// Failed password attempts count toward authLimiter on the /api/auth mount.
+router.delete('/me', requireAuth, async (req, res) => {
+  if (String(req.body?.confirm || '').trim().toUpperCase() !== 'DELETE') {
+    return res.status(422).json({ error: 'Type DELETE to confirm.' });
+  }
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!user) return res.status(404).json({ error: 'Account not found' });
+  if (user.role === 'admin') {
+    return res.status(403).json({ error: "Admin accounts can't be deleted from the app." });
+  }
+  // 403, not 401: a 401 would make the app try to refresh the session first.
+  const password = String(req.body?.password || '');
+  if (!password || !(await bcrypt.compare(password, user.password_hash))) {
+    return res.status(403).json({ error: 'That password is incorrect.', code: 'WRONG_PASSWORD' });
+  }
+
+  const blockers = deletionBlockers(user);
+  if (blockers.length) {
+    return res.status(409).json({ error: "Your account can't be deleted just yet.", code: 'DELETION_BLOCKED', blockers });
+  }
+
+  try {
+    const { stripeCustomerId } = deleteAccountData(user);
+    if (stripeCustomerId) {
+      try { await getStripe().customers.del(stripeCustomerId); }
+      catch (err) { console.warn('[ACCOUNT] Stripe customer was not deleted:', err.message); }
+    }
+    console.log(`[AUDIT] Account deleted by its owner: ${user.id} (${user.role})`);
+    notifyAdmins('Account deleted', `A ${user.role} deleted their Sparkle account.`, 'account_deleted');
+    res.json({ message: 'Your account has been deleted.' });
+  } catch (err) {
+    console.error('Account deletion error:', err);
+    res.status(500).json({ error: 'Your account could not be deleted. Nothing was changed — please try again.' });
+  }
 });
 
 module.exports = router;

@@ -47,11 +47,11 @@ function requireAuth(req, res, next) {
   // It also makes the database, not the token, the authority on role.
   // Required lazily so loading this middleware never opens the database early.
   const user = require('../db')
-    .prepare('SELECT role, is_active FROM users WHERE id = ?')
+    .prepare('SELECT role, is_active, deleted_at FROM users WHERE id = ?')
     .get(payload.id);
 
-  if (!user) {
-    return res.status(401).json({ error: 'Account no longer exists' });
+  if (!user || user.deleted_at) {
+    return res.status(401).json({ error: 'Account no longer exists', code: 'ACCOUNT_DELETED' });
   }
   if (!user.is_active) {
     return res.status(403).json({ error: 'Account suspended. Contact support.', code: 'ACCOUNT_SUSPENDED' });

@@ -127,6 +127,16 @@ const jobPhotoUploadLimiter = rateLimit({
   message:      { error: 'Too many photo uploads. Please wait a few minutes and try again.' }
 });
 
+// Live location pings from a cleaner on the way or on site — the app sends about
+// one every 20 seconds, so 40 a minute per user leaves plenty of room for retries.
+const locationPingLimiter = rateLimit({
+  windowMs:     60 * 1000,
+  max:          40,
+  store:        redisStore || undefined,
+  keyGenerator: (req) => (req.user?.id ? `user:${req.user.id}` : rateLimit.ipKeyGenerator(req.ip)),
+  message:      { error: 'Location updates are coming in too fast.' }
+});
+
 // ══════════════════════════════════════════════════════
 //  2. INPUT SANITIZATION — strip dangerous characters
 //     Prevents XSS (cross-site scripting) attacks
@@ -306,6 +316,7 @@ module.exports = {
   supportLimiter,
   credentialUploadLimiter,
   jobPhotoUploadLimiter,
+  locationPingLimiter,
   sanitizeInput,
   securityHeaders,
   detectSuspiciousActivity,

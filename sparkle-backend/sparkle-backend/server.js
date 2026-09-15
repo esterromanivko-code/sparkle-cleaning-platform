@@ -362,6 +362,7 @@ app.listen(PORT, () => {
   startScheduledBackups();        // Daily automated database backups
   startCredentialExpirySweep();   // Daily licence/insurance expiry warnings + downgrades
   require('./lib/payouts').startCashoutReconciler();   // Settles cashouts whose Stripe result was lost
+  require('./lib/retention').startRetentionSweep();    // Deletes job photos and location history after 180 days
 });
 
 module.exports = app;

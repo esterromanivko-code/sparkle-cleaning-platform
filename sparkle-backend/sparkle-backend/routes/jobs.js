@@ -12,14 +12,37 @@ const { body, query, validationResult } = require('express-validator');
 const db     = require('../db');
  const { requireAuth, requireRole } = require('../middleware/auth');
 const { getStripe } = require('../lib/stripe');
-const { stageCounts } = require('../lib/jobPhotos');
+const { stageCounts, jobAccess } = require('../lib/jobPhotos');
 const { ensureJobPayout, reverseJobEarnings, transaction } = require('../lib/payouts');
 const { notify, notifyAdmins } = require('../lib/notify');
+const { readCoords, ensureJobCoordinates } = require('../lib/geo');
+const { recordLocation, trackingSummary, isFar, ARRIVAL_RADIUS_M, MIN_PING_GAP_SECONDS } = require('../lib/tracking');
+const { locationPingLimiter } = require('../middleware/security');
 const stripe = getStripe();
 
 const router = express.Router();
 
 const REPORT_WINDOW_HOURS = 72;
+
+// A cleaner's precise positions reach the client only through /tracking, and only
+// while the cleaner is on the way. List endpoints never include them.
+const CLEANER_LOCATION_FIELDS = [
+  'last_lat', 'last_lng', 'last_accuracy_m', 'last_distance_m', 'last_location_at',
+  'arrival_lat', 'arrival_lng', 'arrival_accuracy_m', 'arrival_distance_m',
+  'completion_lat', 'completion_lng', 'completion_accuracy_m', 'completion_distance_m',
+];
+function withoutCleanerLocation(job) {
+  const out = { ...job };
+  for (const field of CLEANER_LOCATION_FIELDS) delete out[field];
+  return out;
+}
+
+// The optional { lat, lng, accuracy } the app sends with check-ins. Returns null
+// when none was sent; sends 422 and returns undefined when it's invalid.
+function bodyLocation(req, res) {
+  try { return readCoords(req.body); }
+  catch { res.status(422).json({ error: 'Invalid location' }); return undefined; }
+}
 
 // Live before/after photo counts for the job's current cleaner, as SQL columns.
 const PHOTO_COUNT_COLUMNS = `
@@ -141,7 +164,7 @@ router.get('/my-bookings', requireAuth, requireRole('client'), (req, res) => {
   `).all(req.user.id);
 
   res.json({
-    jobs: jobs.map(j => ({ ...j, can_report: !!j.can_report, can_dispute_lockout: !!j.can_dispute_lockout })),
+    jobs: jobs.map(j => ({ ...withoutCleanerLocation(j), can_report: !!j.can_report, can_dispute_lockout: !!j.can_dispute_lockout })),
   });
 });
 
@@ -213,6 +236,9 @@ router.post('/', requireAuth, requireRole('client'), [
       paymentIntentId
     );
 
+    // Look up the address's map coordinates in the background, for arrival checks.
+    ensureJobCoordinates(id).catch(() => {});
+
     // TODO: Push notification to nearby cleaners (via FCM/APNs)
 
     res.status(201).json({
@@ -263,23 +289,125 @@ router.post('/:id/decline', requireAuth, requireRole('cleaner'), (req, res) => {
 });
 
 // ─────────────────────────────────────────────────
-// POST /api/jobs/:id/arrive  (cleaner only)
-// Cleaner marks themselves as arrived on-site
+// POST /api/jobs/:id/en-route  (cleaner only)
+// "On my way": tells the client, and starts live location sharing when the
+// cleaner's device sends a location. Body: { location: { lat, lng, accuracy } } (optional)
 // ─────────────────────────────────────────────────
-router.post('/:id/arrive', requireAuth, requireRole('cleaner'), (req, res) => {
-  const result = db.prepare(`
-    UPDATE jobs SET status = 'in_progress', updated_at = datetime('now')
-    WHERE id = ? AND cleaner_id = ? AND status = 'accepted'
-  `).run(req.params.id, req.user.id);
-  if (result.changes !== 1) return res.status(404).json({ error: 'Job not found' });
+router.post('/:id/en-route', requireAuth, requireRole('cleaner'), async (req, res) => {
+  const coords = bodyLocation(req, res);
+  if (coords === undefined) return;
+  const owned = db.prepare('SELECT id FROM jobs WHERE id = ? AND cleaner_id = ?').get(req.params.id, req.user.id);
+  if (!owned) return res.status(404).json({ error: 'Job not found' });
+  await ensureJobCoordinates(owned.id);
 
-  const job = db.prepare('SELECT client_id FROM jobs WHERE id = ?').get(req.params.id);
-  notify(job.client_id,
-    '🧹 Your cleaner has arrived!',
-    'Your cleaner is now at your home and has started the job.',
-    'cleaner_arrived');
+  const outcome = transaction(() => {
+    const job = db.prepare('SELECT * FROM jobs WHERE id = ? AND cleaner_id = ?').get(owned.id, req.user.id);
+    if (job.status !== 'accepted') {
+      return { status: 409, error: job.status === 'in_progress' ? "You've already arrived at this job." : `This job is ${job.status}.` };
+    }
+    const first = db.prepare(`
+      UPDATE jobs SET en_route_at = datetime('now'), updated_at = datetime('now') WHERE id = ? AND en_route_at IS NULL
+    `).run(job.id).changes === 1;
+    recordLocation(job, req.user.id, 'en_route', coords);
+    if (first) {
+      notify(job.client_id, '🚗 Your cleaner is on the way',
+        coords ? 'Follow their location from My bookings until they arrive.' : "They'll let you know when they arrive.",
+        'cleaner_en_route');
+    }
+    return { jobId: job.id };
+  });
+  if (outcome.error) return res.status(outcome.status).json({ error: outcome.error });
 
-  res.json({ message: 'Arrival confirmed, job in progress' });
+  res.json({
+    message: 'The client knows you are on the way',
+    location_shared: !!coords,
+    tracking: trackingSummary(outcome.jobId, 'cleaner'),
+  });
+});
+
+// ─────────────────────────────────────────────────
+// POST /api/jobs/:id/location  (cleaner only)
+// A live position: on the way (shown to the client) or on site (kept as
+// evidence). Body: { lat, lng, accuracy }
+// ─────────────────────────────────────────────────
+router.post('/:id/location', requireAuth, requireRole('cleaner'), locationPingLimiter, (req, res) => {
+  const coords = bodyLocation(req, res);
+  if (coords === undefined) return;
+  if (!coords) return res.status(422).json({ error: 'lat and lng are required' });
+
+  const result = transaction(() => {
+    const job = db.prepare(`
+      SELECT *, (julianday('now') - julianday(last_location_at)) * 86400 AS seconds_since_last
+      FROM jobs WHERE id = ? AND cleaner_id = ?
+    `).get(req.params.id, req.user.id);
+    if (!job) return { status: 404, error: 'Job not found' };
+    const phase = job.status === 'accepted' && job.en_route_at ? 'en_route'
+      : job.status === 'in_progress' ? 'on_site' : null;
+    if (!phase) return { status: 409, code: 'TRACKING_ENDED', error: 'Location sharing has ended for this job.' };
+    if (job.seconds_since_last != null && job.seconds_since_last < MIN_PING_GAP_SECONDS) return { skipped: true };
+
+    const distance = recordLocation(job, req.user.id, phase, coords);
+    if (phase === 'en_route' && distance != null && distance <= ARRIVAL_RADIUS_M) {
+      const firstTime = db.prepare(`
+        UPDATE jobs SET nearby_notified_at = datetime('now') WHERE id = ? AND nearby_notified_at IS NULL
+      `).run(job.id).changes === 1;
+      if (firstTime) notify(job.client_id, '📍 Your cleaner is almost there', 'Your cleaner is just around the corner.', 'cleaner_nearby');
+    }
+    return { phase, distance };
+  });
+  if (result.error) return res.status(result.status).json({ error: result.error, code: result.code });
+  res.json(result.skipped ? { skipped: true } : { recorded: true, phase: result.phase, distance_m: result.distance });
+});
+
+// ─────────────────────────────────────────────────
+// GET /api/jobs/:id/tracking — the job's cleaner, its client, or an admin
+// What each may see is decided in lib/tracking.js.
+// ─────────────────────────────────────────────────
+router.get('/:id/tracking', requireAuth, (req, res) => {
+  const job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(req.params.id);
+  const access = jobAccess(job, req.user);
+  if (!access) return res.status(404).json({ error: 'Job not found' });
+  res.json({ tracking: trackingSummary(job, access) });
+});
+
+// ─────────────────────────────────────────────────
+// POST /api/jobs/:id/arrive  (cleaner only)
+// Cleaner marks themselves as arrived on-site. The optional location is kept,
+// with its distance from the address, as evidence if the visit is disputed.
+// Body: { location: { lat, lng, accuracy } }
+// ─────────────────────────────────────────────────
+router.post('/:id/arrive', requireAuth, requireRole('cleaner'), async (req, res) => {
+  const coords = bodyLocation(req, res);
+  if (coords === undefined) return;
+  const owned = db.prepare('SELECT id FROM jobs WHERE id = ? AND cleaner_id = ? AND status = ?')
+    .get(req.params.id, req.user.id, 'accepted');
+  if (!owned) return res.status(404).json({ error: 'Job not found' });
+  if (coords) await ensureJobCoordinates(owned.id);
+
+  const outcome = transaction(() => {
+    const job = db.prepare('SELECT * FROM jobs WHERE id = ? AND cleaner_id = ? AND status = ?')
+      .get(owned.id, req.user.id, 'accepted');
+    if (!job) return null;
+    const distance = recordLocation(job, req.user.id, 'arrived', coords);
+    db.prepare(`
+      UPDATE jobs SET status = 'in_progress', arrived_at = datetime('now'), updated_at = datetime('now'),
+             arrival_lat = ?, arrival_lng = ?, arrival_accuracy_m = ?, arrival_distance_m = ?
+      WHERE id = ?
+    `).run(coords?.lat ?? null, coords?.lng ?? null, coords?.accuracy ?? null, distance, job.id);
+    notify(job.client_id,
+      '🧹 Your cleaner has arrived!',
+      'Your cleaner is now at your home and has started the job.',
+      'cleaner_arrived');
+    return { distance };
+  });
+  if (!outcome) return res.status(404).json({ error: 'Job not found' });
+
+  res.json({
+    message: 'Arrival confirmed, job in progress',
+    location_shared: !!coords,
+    arrival_distance_m: outcome.distance,
+    far_from_address: isFar(outcome.distance, coords?.accuracy),
+  });
 });
 
 // Capture the client's authorized payment. Never throws: a failure is recorded on
@@ -319,6 +447,8 @@ async function capturePayment(job) {
 // Safe to retry: a repeat call on a completed job finishes whatever didn't happen.
 // ─────────────────────────────────────────────────
 router.post('/:id/complete', requireAuth, requireRole('cleaner'), async (req, res) => {
+  const coords = bodyLocation(req, res);
+  if (coords === undefined) return;
   // The photo check and the status change happen in one synchronous step, so a
   // photo can't be deleted in between.
   const step = transaction(() => {
@@ -342,6 +472,11 @@ router.post('/:id/complete', requireAuth, requireRole('cleaner'), async (req, re
              photos_verified_at = CASE WHEN ? THEN datetime('now') ELSE photos_verified_at END
       WHERE id = ? AND status = 'in_progress'
     `).run(hasPhotos ? 1 : 0, j.id);
+    if (coords) {
+      const distance = recordLocation(j, req.user.id, 'completed', coords);
+      db.prepare('UPDATE jobs SET completion_lat = ?, completion_lng = ?, completion_accuracy_m = ?, completion_distance_m = ? WHERE id = ?')
+        .run(coords.lat, coords.lng, coords.accuracy, distance, j.id);
+    }
     return { job: db.prepare('SELECT * FROM jobs WHERE id = ?').get(j.id), alreadyCompleted: false };
   });
   if (step.error) {
@@ -448,6 +583,12 @@ router.post('/:id/lockout-fee', requireAuth, requireRole('cleaner'), async (req,
     });
   }
 
+  const coords = bodyLocation(req, res);
+  if (coords === undefined) return;
+  if (coords && db.prepare('SELECT 1 FROM jobs WHERE id = ? AND cleaner_id = ?').get(req.params.id, req.user.id)) {
+    await ensureJobCoordinates(req.params.id);
+  }
+
   // Verify lockout fee is enabled for this cleaner
   const profile = db.prepare(
     'SELECT lockout_fee_enabled, lockout_fee_amount FROM cleaner_profiles WHERE user_id = ?'
@@ -478,6 +619,12 @@ router.post('/:id/lockout-fee', requireAuth, requireRole('cleaner'), async (req,
         (id, job_id, cleaner_id, client_id, fee_amount, status, arrived_at, checklist_json)
       VALUES (?, ?, ?, ?, ?, 'pending', datetime('now'), ?)
     `).run(lockoutId, j.id, req.user.id, j.client_id, feeAmount, JSON.stringify(checklist));
+    if (coords) {
+      // Where the cleaner was when they said they couldn't get in.
+      const distance = recordLocation(j, req.user.id, 'lockout', coords);
+      db.prepare('UPDATE lockout_fees SET lat = ?, lng = ?, accuracy_m = ?, distance_m = ? WHERE id = ?')
+        .run(coords.lat, coords.lng, coords.accuracy, distance, lockoutId);
+    }
     return { job: j };
   });
   if (reserved.error) {

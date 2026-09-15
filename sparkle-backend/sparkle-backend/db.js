@@ -488,6 +488,22 @@ db.exec(`
     completed_at       TEXT
   );
 
+  -- JOB LOCATIONS — the cleaner's position at points during a job: live while on
+  -- the way, at arrival, while on site, at completion, and when charging a
+  -- lockout fee. Evidence for disputes; see lib/tracking.js for who sees what and
+  -- lib/retention.js for when it's deleted.
+  CREATE TABLE IF NOT EXISTS job_locations (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id       TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    cleaner_id   TEXT NOT NULL REFERENCES users(id),
+    phase        TEXT NOT NULL CHECK(phase IN ('en_route','arrived','on_site','completed','lockout')),
+    lat          REAL NOT NULL,
+    lng          REAL NOT NULL,
+    accuracy_m   REAL,
+    distance_m   REAL,               -- from the job's address, when its coordinates are known
+    recorded_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   -- ALL INDEXES (must come after all table definitions)
   CREATE INDEX IF NOT EXISTS idx_jobs_client ON jobs(client_id);
   CREATE INDEX IF NOT EXISTS idx_jobs_cleaner ON jobs(cleaner_id);
@@ -530,6 +546,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_payouts_job       ON payouts(job_id, type, status);
   CREATE INDEX IF NOT EXISTS idx_cashouts_cleaner  ON cashouts(cleaner_id, created_at);
   CREATE INDEX IF NOT EXISTS idx_cashouts_status   ON cashouts(status, created_at);
+  CREATE INDEX IF NOT EXISTS idx_job_locations_job ON job_locations(job_id, id);
 `);
 
 // ── Column migrations ─────────────────────────────────────────────────────────
@@ -564,6 +581,19 @@ if (addColumn('jobs', 'photos_required INTEGER NOT NULL DEFAULT 1')) {
 addColumn('jobs', 'photos_verified_at TEXT');   // set by /complete once the photos were checked
 addColumn('jobs', 'completed_at TEXT');         // the 72-hour problem-report window starts here
 addColumn('jobs', 'capture_status TEXT');       // captured | failed | not_required
+
+// Location tracking: "On my way", arrival and completion check-ins, and the latest
+// live position (lib/tracking.js). geocode_status records the one address lookup.
+for (const column of [
+  'en_route_at TEXT', 'nearby_notified_at TEXT', 'arrived_at TEXT',
+  'arrival_lat REAL', 'arrival_lng REAL', 'arrival_accuracy_m REAL', 'arrival_distance_m REAL',
+  'completion_lat REAL', 'completion_lng REAL', 'completion_accuracy_m REAL', 'completion_distance_m REAL',
+  'last_lat REAL', 'last_lng REAL', 'last_accuracy_m REAL', 'last_distance_m REAL', 'last_location_at TEXT',
+  'geocode_status TEXT',
+]) addColumn('jobs', column);
+for (const column of ['lat REAL', 'lng REAL', 'accuracy_m REAL', 'distance_m REAL']) addColumn('lockout_fees', column);
+
+addColumn('users', 'deleted_at TEXT');          // set by self-service account deletion (lib/accountDeletion.js)
 
 // Older completed jobs never recorded a completion time; their last update is the
 // closest record there is. Only ever touches rows still missing one.

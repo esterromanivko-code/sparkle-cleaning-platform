@@ -18,6 +18,7 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const { transaction } = require('../lib/payouts');
 const { notify, notifyAdmins } = require('../lib/notify');
 const { serializePhoto } = require('../lib/jobPhotos');
+const { trackingSummary } = require('../lib/tracking');
 const { MAX_PHOTOS_PER_STAGE } = require('../lib/jobPhotoUploads');
 
 const router = express.Router();
@@ -198,8 +199,10 @@ router.get('/:id', requireAuth, (req, res) => {
   `).all(d.job_id, d.id);
 
   res.json({
-    dispute: serializeDispute(d, req.user),
-    photos:  photos.map(p => serializePhoto(p, req.user)),
+    dispute:  serializeDispute(d, req.user),
+    photos:   photos.map(p => serializePhoto(p, req.user)),
+    // Arrival, time on site and check-in distances; admins also get the trail.
+    tracking: trackingSummary(d.job_id, isAdmin ? 'admin' : 'party'),
   });
 });
 

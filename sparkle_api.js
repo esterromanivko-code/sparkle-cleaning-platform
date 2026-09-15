@@ -889,13 +889,31 @@ window.SparkleAPI = (function () {
   const post = (path, body, fallback) =>
     jsonCall(path, { method: 'POST', body: JSON.stringify(body || {}) }, fallback);
 
-  const arriveAtJob      = (jobId) => post(`/api/jobs/${encodeURIComponent(jobId)}/arrive`, {}, 'Could not record your arrival');
+  // `location` is { lat, lng, accuracy } from the device, or null when the cleaner
+  // hasn't allowed location — every one of these still works without it.
+  const jobPath = (jobId, action) => `/api/jobs/${encodeURIComponent(jobId)}/${action}`;
+  const startEnRoute     = (jobId, location = null) => post(jobPath(jobId, 'en-route'), { location }, "Couldn't let the client know you're on the way");
+  const sendJobLocation  = (jobId, location) => post(jobPath(jobId, 'location'), location, 'Location update failed');
+  const getJobTracking   = (jobId) => jsonCall(jobPath(jobId, 'tracking'), {}, 'Failed to load location');
+  const arriveAtJob      = (jobId, location = null) => post(jobPath(jobId, 'arrive'), { location }, 'Could not record your arrival');
   /** Fails with code PHOTOS_REQUIRED (and err.data.counts) until ≥1 before and ≥1 after photo exist. */
-  const completeJob      = (jobId) => post(`/api/jobs/${encodeURIComponent(jobId)}/complete`, {}, 'Could not complete the job');
-  const cancelJob        = (jobId) => post(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, {}, 'Could not cancel the job');
+  const completeJob      = (jobId, location = null) => post(jobPath(jobId, 'complete'), { location }, 'Could not complete the job');
+  const cancelJob        = (jobId) => post(jobPath(jobId, 'cancel'), {}, 'Could not cancel the job');
   /** Needs all 5 checklist items and at least one 'lockout' photo at the door. */
-  const chargeLockoutFee = (jobId, checklist) =>
-    post(`/api/jobs/${encodeURIComponent(jobId)}/lockout-fee`, { checklist }, 'Could not charge the lockout fee');
+  const chargeLockoutFee = (jobId, checklist, location = null) =>
+    post(jobPath(jobId, 'lockout-fee'), { checklist, location }, 'Could not charge the lockout fee');
+
+  /**
+   * Permanently delete the signed-in account. On a 409, err.data.blockers lists
+   * what has to be finished first (upcoming jobs, earnings to cash out, …).
+   */
+  async function deleteAccount(password) {
+    const json = await jsonCall('/api/auth/me',
+      { method: 'DELETE', body: JSON.stringify({ password, confirm: 'DELETE' }) },
+      'Could not delete your account');
+    clearTokens();
+    return json;
+  }
   const getMyJobHistory  = () => jsonCall('/api/jobs/my-history', {}, 'Failed to load your recent jobs');
 
   const getJobPhotos = (jobId) => jsonCall(`/api/job-photos/${encodeURIComponent(jobId)}`, {}, 'Failed to load photos');
@@ -1002,6 +1020,10 @@ window.SparkleAPI = (function () {
     getPendingCredentials,
     approveCredential,
     rejectCredential,
+    startEnRoute,
+    sendJobLocation,
+    getJobTracking,
+    deleteAccount,
     arriveAtJob,
     completeJob,
     cancelJob,

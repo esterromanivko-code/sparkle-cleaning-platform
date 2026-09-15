@@ -27,7 +27,7 @@ router.get('/dashboard', requireAuth, requireRole('admin'), (req, res) => {
         SUM(CASE WHEN role='client' THEN 1 ELSE 0 END) as clients,
         SUM(CASE WHEN is_flagged=1 THEN 1 ELSE 0 END) as flagged,
         SUM(CASE WHEN is_active=0 THEN 1 ELSE 0 END) as banned
-      FROM users WHERE role != 'admin'
+      FROM users WHERE role != 'admin' AND deleted_at IS NULL
     `).get(),
 
     jobs: db.prepare(`
@@ -83,7 +83,7 @@ router.get('/users', requireAuth, requireRole('admin'), (req, res) => {
     FROM users u
     LEFT JOIN cleaner_profiles cp ON cp.user_id = u.id AND u.role = 'cleaner'
     LEFT JOIN client_profiles clp ON clp.user_id = u.id AND u.role = 'client'
-    WHERE u.role != 'admin'
+    WHERE u.role != 'admin' AND u.deleted_at IS NULL
   `;
   const params = [];
 
@@ -96,7 +96,7 @@ router.get('/users', requireAuth, requireRole('admin'), (req, res) => {
   params.push(parseInt(limit), offset);
 
   const users = db.prepare(sql).all(...params);
-  const total = db.prepare(`SELECT COUNT(*) as cnt FROM users WHERE role != 'admin'`).get();
+  const total = db.prepare(`SELECT COUNT(*) as cnt FROM users WHERE role != 'admin' AND deleted_at IS NULL`).get();
 
   res.json({ users, total: total.cnt, page: parseInt(page), limit: parseInt(limit) });
 });
@@ -139,6 +139,9 @@ router.get('/disputes', requireAuth, requireRole('admin'), (req, res) => {
            filer.first_name || ' ' || filer.last_name AS filed_by_name, filer.role AS filed_by_role,
            against.first_name || ' ' || against.last_name AS against_name, against.role AS against_role,
            j.service_type, j.scheduled_at, j.completed_at, j.total_charged, j.capture_status,
+           j.arrived_at, j.arrival_distance_m, j.arrival_accuracy_m, (j.arrival_lat IS NOT NULL) AS arrival_location_shared,
+           CASE WHEN j.arrived_at IS NOT NULL AND j.completed_at IS NOT NULL
+                THEN CAST(ROUND((julianday(j.completed_at) - julianday(j.arrived_at)) * 1440) AS INTEGER) END AS minutes_on_site,
            (j.stripe_payment_intent_id IS NOT NULL) AS has_card_payment,
            (SELECT COUNT(*) FROM job_photos ph WHERE ph.job_id = d.job_id AND ph.deleted_at IS NULL
               AND ph.stage IN ('before','after','lockout')) AS proof_photo_count,
@@ -315,6 +318,7 @@ router.get('/lockout-fees', requireAuth, requireRole('admin'), (req, res) => {
   const fees = db.prepare(`
     SELECT lf.id, lf.job_id, lf.fee_amount, lf.status, lf.created_at,
            (lf.stripe_charge_id IS NOT NULL) AS charged_to_card,
+           (lf.lat IS NOT NULL) AS location_shared, lf.distance_m, lf.accuracy_m,
            j.service_type, j.scheduled_at,
            cl.first_name || ' ' || cl.last_name AS cleaner_name,
            cu.first_name || ' ' || cu.last_name AS client_name,

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Accessibility — Sparkle</title>
+<meta name="description" content="Sparkle's commitment to accessibility.">
+<meta name="robots" content="index, follow">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✦</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --g:#1D9E75; --gd:#0F6E56; --tx:#1C1F1D; --tx2:#5B625E; --bdr:#E4E7E2; --bg:#FAFAF8; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Inter,system-ui,-apple-system,sans-serif; color:var(--tx); background:var(--bg); line-height:1.7; font-size:16px; }
+  header { background:#fff; border-bottom:1px solid var(--bdr); }
+  .bar { max-width:820px; margin:0 auto; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .logo { font-family:'Playfair Display',Georgia,serif; font-weight:600; font-size:22px; color:var(--tx); text-decoration:none; }
+  .logo span { color:var(--g); }
+  nav a { color:var(--tx2); text-decoration:none; font-size:14px; margin-left:16px; }
+  nav a[aria-current="page"] { color:var(--gd); font-weight:600; }
+  main { max-width:820px; margin:0 auto; padding:36px 20px 64px; }
+  h1 { font-family:'Playfair Display',Georgia,serif; font-weight:600; font-size:36px; line-height:1.2; margin:0 0 6px; }
+  .updated { color:var(--tx2); font-size:14px; margin:0 0 28px; }
+  h2 { font-size:20px; margin:32px 0 8px; }
+  p, li { color:#2C302D; }
+  ul { padding-left:22px; }
+  a { color:var(--gd); }
+  footer { border-top:1px solid var(--bdr); background:#fff; }
+  footer .bar { font-size:13px; color:var(--tx2); }
+  footer a { color:var(--tx2); margin-left:14px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="logo" href="sparkle_landing.html">✦ Spark<span>le</span></a>
+    <nav aria-label="Legal">
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+      <a href="accessibility.html" aria-current="page">Accessibility</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <h1>Accessibility</h1>
+  <p class="updated">Updated September 15, 2026</p>
+
+  <p>Everyone should be able to book a clean or run a cleaning business on Sparkle. We aim to meet the Web Content Accessibility Guidelines (WCAG) 2.1 at level AA across our website and app.</p>
+
+  <h2>What we do</h2>
+  <ul>
+    <li>Label buttons, form fields and dialogs so screen readers can announce them.</li>
+    <li>Support keyboard navigation, including closing dialogs with the Escape key.</li>
+    <li>Keep text readable with sufficient color contrast, and never rely on color alone to show status.</li>
+    <li>Design pages to work on phones, tablets and computers, and with browser zoom.</li>
+  </ul>
+
+  <h2>Known limitations</h2>
+  <ul>
+    <li>Maps showing a cleaner's approach may be hard to use with a screen reader. The same information — whether your cleaner is on the way, roughly how far away they are, and when they arrived — is always shown as text too.</li>
+    <li>Photos uploaded by cleaners and clients don't have written descriptions.</li>
+  </ul>
+
+  <h2>Tell us about a barrier</h2>
+  <p>If something on Sparkle is hard to use, we want to fix it. In the app, go to <strong>Settings → Contact support</strong>, or use the contact form on the <a href="sparkle_landing.html#contact">Sparkle website</a>. Tell us the page and what happened, and we'll get back to you.</p>
+</main>
+
+<footer>
+  <div class="bar">
+    <span>© 2026 Sparkle · Seattle, WA</span>
+    <span><a href="privacy.html">Privacy Policy</a><a href="terms.html">Terms of Service</a><a href="accessibility.html">Accessibility</a></span>
+  </div>
+</footer>
+</body>
+</html>
