@@ -528,6 +528,9 @@ router.post('/:id/lockout-fee', requireAuth, requireRole('cleaner'), async (req,
       `A $${feeAmount} lockout fee was charged because your cleaner arrived but could not access your home and the appointment was not cancelled. ` +
       `If this is wrong, you can dispute it from your bookings within ${REPORT_WINDOW_HOURS} hours.`,
       'lockout_fee_charged');
+    notifyAdmins('🔒 Lockout fee charged',
+      `A $${feeAmount} lockout fee was charged on a ${job.service_type} job. The cleaner's door photo is in Lockout fees.`,
+      'lockout_fee_charged');
   });
 
   res.json({

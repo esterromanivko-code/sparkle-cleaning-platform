@@ -942,6 +942,7 @@ window.SparkleAPI = (function () {
   const retryDisputeRefund = (id) => adminPost(`/api/admin/disputes/${encodeURIComponent(id)}/retry-refund`, {}, 'retry refund');
   const releaseJobEarnings = (jobId, reason) =>
     adminPost(`/api/admin/jobs/${encodeURIComponent(jobId)}/release-earnings`, { reason }, 'release earnings');
+  const getAdminLockoutFees = () => adminGet('/api/admin/lockout-fees', 'lockout fees');
 
   // ─── Public API ─────────────────────────────────────────────────────────────
   return {
@@ -1018,5 +1019,6 @@ window.SparkleAPI = (function () {
     markNotificationRead,
     retryDisputeRefund,
     releaseJobEarnings,
+    getAdminLockoutFees,
   };
 })();

@@ -87,16 +87,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
 .auth-link{text-align:center;font-size:12px;color:var(--tx2);margin-top:1rem}
 .auth-link a{color:var(--g);cursor:pointer;text-decoration:none}
 
-/* Demo user selector */
-.demo-users{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1.25rem}
-.demo-user{border:1.5px solid var(--bdr2);border-radius:var(--radl);padding:.875rem .75rem;cursor:pointer;transition:all .15s;text-align:center}
-.demo-user:hover{border-color:var(--g);background:var(--gl)}
-.du-av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;margin:0 auto 6px}
-.du-name{font-size:12px;font-weight:500;margin-bottom:1px}
-.du-role{font-size:10px;color:var(--tx2)}
-.du-cleaner{background:var(--gl);color:var(--gd)}
-.du-client{background:var(--bl);color:var(--bd)}
-.du-admin{background:var(--pul);color:var(--pud)}
 
 /* ══════ APP SHELL ══════ */
 #app{display:none;flex-direction:column;height:auto;min-height:100vh}
@@ -110,9 +100,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
 .rp-client{background:var(--bl);color:var(--bd)}
 .rp-admin{background:var(--pul);color:var(--pud)}
 /* Admin only: view-as switcher */
-.admin-view-switcher{display:flex;background:var(--s100);border-radius:16px;padding:2px;gap:2px}
-.avs-btn{padding:3px 12px;border-radius:14px;font-size:11px;border:none;background:transparent;color:var(--tx2);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
-.avs-btn.active{background:#fff;color:var(--tx);box-shadow:var(--sh);font-weight:500}
 .topbar-right{display:flex;align-items:center;gap:10px}
 .notif-btn{position:relative;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .12s;border:none;background:transparent}
 .notif-btn:hover{background:var(--s100)}
@@ -468,7 +455,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
   .auth-card{width:calc(100% - 2rem);max-width:420px;padding:1.5rem;border-radius:16px;margin:1rem}
   #auth-screen{align-items:flex-start;padding-top:1.5rem;overflow-y:auto}
   .role-cards{grid-template-columns:1fr 1fr}
-  .demo-users{grid-template-columns:1fr 1fr}
 
   /* App shell — hide sidebar, show hamburger */
   .hamburger{display:flex;align-items:center;justify-content:center}
@@ -549,7 +535,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
   /* Improve spacing on mobile */
   .stats-grid{grid-template-columns:1fr 1fr;gap:6px}
   .supply-grid{grid-template-columns:1fr}
-  .demo-users{grid-template-columns:1fr 1fr}
   .role-cards{grid-template-columns:1fr}
   .svc-grid{grid-template-columns:repeat(2,1fr)}
   .auth-card{padding:1.25rem}
@@ -601,10 +586,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
     <div class="auth-logo">Spark<span>le</span></div>
     <div class="auth-tagline">Fair pay. Honest work. No scammy fees.</div>
 
-    <!-- Sign-in / demo screen -->
+    <!-- Sign-in screen (the id "auth-demo" is historical; other code refers to it) -->
     <div class="auth-step active" id="auth-demo">
       <div class="ob-title">Sign in to Sparkle</div>
-      <div class="ob-sub" style="margin-bottom:1.25rem">Enter your credentials, or explore in demo mode below.</div>
+      <div class="ob-sub" style="margin-bottom:1.25rem">Sign in to your cleaner, client or admin account.</div>
 
       <!-- ── Real sign-in form ─────────────────────────────────── -->
       <div class="ob-field">
@@ -617,28 +602,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
       </div>
       <div id="signin-error" role="alert" style="display:none;font-size:12px;color:var(--r);background:var(--rl);border-radius:var(--rad);padding:8px 12px;margin-bottom:.75rem;line-height:1.5"></div>
       <button class="ob-btn" id="signin-btn" onclick="doSignIn()">Sign in</button>
-
-      <!-- ── Divider ───────────────────────────────────────────── -->
-      <div style="display:flex;align-items:center;gap:10px;margin:1.25rem 0">
-        <div style="flex:1;height:1px;background:var(--bdr2)"></div>
-        <span style="font-size:11px;color:var(--tx3);white-space:nowrap">or explore in demo mode</span>
-        <div style="flex:1;height:1px;background:var(--bdr2)"></div>
-      </div>
-
-      <!-- ── Demo accounts ─────────────────────────────────────── -->
-      <div class="demo-users">
-        <div class="demo-user" onclick="loginAs('cleaner')">
-          <div class="du-av du-cleaner">JM</div>
-          <div class="du-name">Jordan M.</div>
-          <div class="du-role">Cleaner demo</div>
-        </div>
-        <div class="demo-user" onclick="loginAs('client')">
-          <div class="du-av du-client">SK</div>
-          <div class="du-name">Sarah K.</div>
-          <div class="du-role">Client demo</div>
-        </div>
-        <!-- Admin access: visit sparkle_full.html?mode=admin (not shown publicly) -->
-      </div>
 
       <!-- ── Create account ────────────────────────────────────── -->
       <div class="divider" style="margin:.875rem 0"></div>
@@ -716,16 +679,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
         <div id="obs-2-cleaner">
           <div class="ob-title">Set your lockout fee</div>
           <div class="ob-sub">Charged <strong>only</strong> if you arrive and can't get in because the client was a no-show and did <em>not</em> cancel. Not a cancellation fee.</div>
-          <div class="toggle-row"><label class="sw"><input type="checkbox" checked><span class="sl"></span></label><div><div class="tl-main">Enable lockout fee</div><div class="tl-sub">Clients see your policy before booking</div></div></div>
-          <div class="f2"><div class="ob-field"><label class="ob-lbl">Fee amount</label><input class="ob-inp" type="number" value="35"></div><div class="ob-field"><label class="ob-lbl">Grace period</label><select class="ob-inp"><option>10 min</option><option selected>15 min</option><option>20 min</option><option>30 min</option></select></div></div>
-          <div class="alert info" style="font-size:12px;margin-bottom:0">After signup, complete a $30 background check to earn your Verified badge. Verified cleaners get 3× more bookings.</div>
+          <div class="alert info" style="font-size:12px;margin-bottom:0">After you sign up, set your lockout fee amount and grace period in <strong>My profile</strong> — clients see your policy before they book. You can also upload your license and insurance there to earn a verification badge.</div>
         </div>
         <div id="obs-2-client" style="display:none">
-          <div class="ob-title">Add a payment method</div>
+          <div class="ob-title">How paying works</div>
           <div class="ob-sub">You're only charged after a cleaning is complete. No surprise fees, ever.</div>
-          <div class="pay-method sel"><div class="pm-icon">VISA</div><div><div style="font-size:13px;font-weight:500">Visa ending in 4242</div><div style="font-size:11px;color:var(--tx2)">Expires 08/27</div></div></div>
-          <div class="pay-method"><div class="pm-icon" style="font-size:8px">APPLE</div><div><div style="font-size:13px;font-weight:500">Apple Pay</div></div></div>
-          <div class="alert info" style="font-size:12px;margin-bottom:0">Transparent 8% booking fee charged only after your job is complete. No subscriptions. No hidden charges. Ever.</div>
+          <div class="alert info" style="font-size:12px;margin-bottom:0">There's nothing to pay today. When you book your first clean you'll add a card, and a transparent 8% booking fee is charged only after the job is complete. No subscriptions.</div>
         </div>
         <button class="ob-btn" onclick="finishOnboard()" style="margin-top:1rem">Get started →</button>
         <button class="ob-btn-ghost" onclick="obStep(1)">← Back</button>
@@ -754,86 +713,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
   </div>
 </div>
 
-<!-- CLIENT: SIMPLE FREQUENCY MODAL -->
-<div class="modal-overlay" id="frequency-modal" role="dialog" aria-modal="true" aria-labelledby="freq-modal-title">
-  <div class="modal">
-    <div class="modal-title" id="freq-modal-title">Change cleaning frequency</div>
-    <div class="modal-sub" id="freq-modal-sub" style="margin-bottom:1.25rem">How often would you like cleanings?</div>
-    <div class="frow">
-      <label class="flbl">New frequency</label>
-      <select class="inp" id="freq-select">
-        <option>Weekly</option>
-        <option>Bi-weekly</option>
-        <option>Monthly</option>
-      </select>
-    </div>
-    <div class="modal-actions">
-      <button class="btn" onclick="closeFrequencyModal()">Cancel</button>
-      <button class="btn primary" onclick="saveFrequencyChange()">Update frequency</button>
-    </div>
-  </div>
-</div>
 
-<!-- RECURRING EDIT MODAL (for cleaners) -->
-<div class="modal-overlay" id="recurring-edit-modal" role="dialog" aria-modal="true" aria-labelledby="rec-edit-title">
-  <div class="modal">
-    <div class="modal-title" id="rec-edit-title">Edit recurring booking</div>
-    <div class="modal-sub" id="rec-edit-sub" style="margin-bottom:1.25rem"></div>
-    <div class="frow">
-      <label class="flbl">Frequency</label>
-      <select class="inp" id="rec-edit-freq">
-        <option>Weekly</option>
-        <option>Bi-weekly</option>
-        <option>Monthly</option>
-      </select>
-    </div>
-    <div class="frow">
-      <label class="flbl">Day of week</label>
-      <select class="inp" id="rec-edit-day">
-        <option>Monday</option>
-        <option>Tuesday</option>
-        <option>Wednesday</option>
-        <option>Thursday</option>
-        <option>Friday</option>
-        <option>Saturday</option>
-        <option>Sunday</option>
-      </select>
-    </div>
-    <div class="frow">
-      <label class="flbl">Start time</label>
-      <select class="inp" id="rec-edit-time">
-        <option value="08:00">8:00 am</option>
-        <option value="09:00">9:00 am</option>
-        <option value="10:00">10:00 am</option>
-        <option value="11:00">11:00 am</option>
-        <option value="12:00">12:00 pm</option>
-        <option value="13:00">1:00 pm</option>
-        <option value="14:00">2:00 pm</option>
-        <option value="15:00">3:00 pm</option>
-        <option value="16:00">4:00 pm</option>
-      </select>
-    </div>
-    <div class="frow">
-      <label class="flbl">Duration</label>
-      <select class="inp" id="rec-edit-duration">
-        <option value="1.5">1.5 hours</option>
-        <option value="2">2 hours</option>
-        <option value="2.5">2.5 hours</option>
-        <option value="3">3 hours</option>
-        <option value="4">4 hours</option>
-        <option value="5">5 hours</option>
-      </select>
-    </div>
-    <div class="frow">
-      <label class="flbl">Note to client <span style="color:var(--tx3);font-weight:400">(optional)</span></label>
-      <textarea class="inp" id="rec-edit-note" rows="2" placeholder="e.g. I'll need access by the side gate"></textarea>
-    </div>
-    <div class="modal-actions">
-      <button class="btn" onclick="closeRecurringEdit()">Cancel</button>
-      <button class="btn primary" onclick="saveRecurringEdit()">Save changes</button>
-    </div>
-  </div>
-</div>
 
 <!-- MILEAGE TRACKING MODAL -->
 <div class="modal-overlay" id="mileage-modal" role="dialog" aria-modal="true" aria-labelledby="mileage-modal-title">
@@ -884,11 +764,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
       <!-- Client pill -->
       <div class="role-pill rp-client" id="pill-client" style="display:none">🏠 Client portal</div>
       <!-- Admin: view-as switcher -->
-      <div class="admin-view-switcher" id="admin-switcher" style="display:none">
-        <button class="avs-btn active" id="avs-admin" onclick="adminViewAs('admin',this)">Admin</button>
-        <button class="avs-btn" id="avs-cleaner" onclick="adminViewAs('cleaner',this)">View: Cleaner</button>
-        <button class="avs-btn" id="avs-client" onclick="adminViewAs('client',this)">View: Client</button>
-      </div>
     </div>
     <div class="topbar-right">
       <button class="notif-btn" id="notif-btn" onclick="toggleNotif()" aria-label="Notifications" aria-expanded="false" aria-controls="notif-panel">
@@ -896,8 +771,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
         <div class="notif-dot" id="notif-dot" aria-hidden="true"></div>
       </button>
       <div class="user-chip">
-        <div class="av" id="topbar-av">JM</div>
-        <span class="user-name" id="topbar-name">Jordan M.</span>
+        <div class="av" id="topbar-av"></div>
+        <span class="user-name" id="topbar-name"></span>
       </div>
     </div>
   </div>
@@ -921,131 +796,23 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
 ══════════════════════════════════════ -->
 
 <div class="page" id="page-c-dashboard">
-  <div class="pg-title">Good morning, Jordan 👋</div>
-  <div class="pg-sub">Here's your Sparkle overview for today</div>
-  <div class="stats-grid">
-    <div class="stat"><div class="stat-lbl">This week</div><div class="stat-val green">$312</div></div>
-    <div class="stat"><div class="stat-lbl">This month</div><div class="stat-val green">$1,840</div></div>
-    <div class="stat"><div class="stat-lbl">Jobs done</div><div class="stat-val">27</div></div>
-    <div class="stat"><div class="stat-lbl">Your rating</div><div class="stat-val">4.9 ★</div></div>
-  </div>
-  <div class="f2">
-    <div>
-      <div class="sect-hd"><div class="sect-title">Today's jobs</div></div>
-      <div class="card"><div style="font-size:13px;font-weight:500">Deep clean · 2 bed / 2 bath</div><div class="meta">304 Oak Lane, Bellevue · Mon Apr 28, 11am</div><div class="tags" style="margin-top:8px"><span class="tag green">Confirmed</span><span class="tag">$102</span></div><div class="actions"><button class="btn primary sm" onclick="arrivedConfirm(this)">I've arrived</button><button class="btn warn sm" onclick="showLockoutModal()">Lockout fee</button></div></div>
-    </div>
-    <div>
-      <div class="sect-hd"><div class="sect-title">New jobs near you</div><button class="btn sm primary" onclick="showPage('c-jobs')">View all</button></div>
-      <div class="card-sm"><div class="row c"><div><div style="font-size:13px;font-weight:500">① Deep clean · $126</div><div class="meta">1842 Maple St · 2.1 mi</div></div><button class="btn primary sm" onclick="showPage('c-jobs')">View</button></div></div>
-      <div class="card-sm"><div class="row c"><div><div style="font-size:13px;font-weight:500">② Standard · $68</div><div class="meta">520 Pine Ave · 3.8 mi</div></div><button class="btn primary sm" onclick="showPage('c-jobs')">View</button></div></div>
-      <div class="card-sm"><div class="row c"><div><div style="font-size:13px;font-weight:500">③ Move-out · $140</div><div class="meta">7701 Rainier Ave · 4.2 mi</div></div><button class="btn primary sm" onclick="showPage('c-jobs')">View</button></div></div>
-    </div>
-  </div>
-  <div class="alert warn" style="margin-top:.5rem">🛡️ Complete your <strong>background check</strong> to earn your Verified badge and get 3× more bookings. <a href="#" onclick="showPage('c-bgcheck');return false" style="color:var(--ad)">Start now — $30 →</a></div>
+  <div class="pg-title">Dashboard</div>
+  <div class="pg-sub">Loading…</div>
 </div>
 
 <div class="page" id="page-c-jobs">
   <div class="pg-title">Open jobs near you</div>
-  <div class="pg-sub">Seattle / Renton, WA · Bidding is free — you only pay a success fee when you win</div>
-  <div class="alert warn" style="font-size:13px"><strong>How bidding works:</strong> Send a custom quote and message for any job. The client reviews all bids and picks the best fit. If chosen, a 10% success fee is deducted from your quote. If not chosen, it costs you nothing.</div>
-
-  <div class="map-wrap">
-    <svg width="100%" height="100%" viewBox="0 0 680 220"><rect width="680" height="220" fill="#EEF0EC"/>
-    <line x1="0" y1="55" x2="680" y2="55" stroke="#E0E2DC" stroke-width="1"/><line x1="0" y1="110" x2="680" y2="110" stroke="#E0E2DC" stroke-width="1"/><line x1="0" y1="165" x2="680" y2="165" stroke="#E0E2DC" stroke-width="1"/>
-    <line x1="170" y1="0" x2="170" y2="220" stroke="#E0E2DC" stroke-width="1"/><line x1="340" y1="0" x2="340" y2="220" stroke="#E0E2DC" stroke-width="1"/><line x1="510" y1="0" x2="510" y2="220" stroke="#E0E2DC" stroke-width="1"/>
-    <path d="M0,110 Q170,90 340,110 Q510,130 680,110" class="map-road"/><path d="M170,0 L170,220" class="map-road"/><path d="M340,0 L340,220" class="map-road-sm"/>
-    <circle cx="340" cy="110" r="12" fill="#1D9E75" opacity=".2"/><circle cx="340" cy="110" r="6" fill="#1D9E75"/><circle cx="340" cy="110" r="2.5" fill="#fff"/>
-    <text x="350" y="108" class="map-you-lbl">You</text>
-    <g class="map-pin" onclick="hlBidJob(0)"><circle cx="195" cy="75" r="10" fill="#E24B4A"/><text x="195" y="79" text-anchor="middle" fill="#fff" font-size="10" font-family="DM Sans,sans-serif" font-weight="600">1</text></g><text x="210" y="75" class="map-lbl">2bd · 2.1mi</text>
-    <g class="map-pin" onclick="hlBidJob(1)"><circle cx="455" cy="135" r="10" fill="#E24B4A"/><text x="455" y="139" text-anchor="middle" fill="#fff" font-size="10" font-family="DM Sans,sans-serif" font-weight="600">2</text></g><text x="470" y="135" class="map-lbl">1bd · 3.8mi</text>
-    <g class="map-pin" onclick="hlBidJob(2)"><circle cx="290" cy="175" r="10" fill="#378ADD"/><text x="290" y="179" text-anchor="middle" fill="#fff" font-size="10" font-family="DM Sans,sans-serif" font-weight="600">3</text></g><text x="305" y="175" class="map-lbl">Move-out</text>
-    <g class="map-pin" onclick="hlBidJob(3)"><circle cx="550" cy="60" r="10" fill="#E24B4A"/><text x="550" y="64" text-anchor="middle" fill="#fff" font-size="10" font-family="DM Sans,sans-serif" font-weight="600">4</text></g><text x="565" y="60" class="map-lbl">Office</text>
-    </svg>
-  </div>
-
-  <div id="bid-job-cards">
-    <div class="card" id="bjc-0">
-      <div class="row"><div><div style="font-size:13px;font-weight:500">&#9312; Standard clean &middot; 2 bed / 2 bath</div><div class="meta">1842 Maple St, Seattle &middot; 2.1 mi</div></div><span class="jobs-feed job-open-badge">Open &middot; 3 bids so far</span></div>
-      <div class="tags" style="margin-top:8px"><span class="tag blue">Sat May 3, 10am</span><span class="tag">~2.5 hrs</span><span class="tag green">Pets ok</span><span class="tag">Supplies provided</span></div>
-      <div class="meta" style="margin-top:6px">Client: <strong>Sarah K.</strong> &middot; &#9733; 4.9 &middot; 8 bookings &middot; <span class="timer-badge">&#8987; 41 hrs to bid</span></div>
-      <div class="actions" style="flex-direction:column;align-items:stretch">
-        <div style="display:flex;gap:6px">
-          <button class="btn primary sm" onclick="toggleBidForm(0)">Send a quote</button>
-          <button class="btn sm" onclick="openChat('Sarah K.','SK','av-b','Job inquiry')">Message</button>
-          <button class="btn sm" onclick="skipJob(0)">Skip</button>
-        </div>
-        <div class="bid-form" id="bid-form-0" style="display:none;margin-top:.75rem">
-          <div style="font-size:13px;font-weight:500;margin-bottom:.75rem;color:var(--gd)">Your quote for this job</div>
-          <div class="price-input"><div class="price-input-wrap"><span class="price-symbol">$</span><input class="inp" type="number" id="bid-price-0" placeholder="e.g. 95" style="padding-left:24px" oninput="updateBidBreakdown(0)"></div><span style="font-size:12px;color:var(--tx2)">What you want to earn</span></div>
-          <div id="bid-breakdown-0" style="display:none" class="breakdown-box"><div class="row-line"><span>Your quote to client</span><span id="bd-quote-0">&#8212;</span></div><div class="row-line"><span>Sparkle success fee (10%)</span><span id="bd-fee-0" style="color:var(--rd)">&#8212;</span></div><div class="row-line total-line"><span>You receive</span><span id="bd-net-0" style="color:var(--gd)">&#8212;</span></div></div>
-          <div class="frow"><label class="flbl">Your message to the client</label><textarea id="bid-msg-0" placeholder="Introduce yourself, confirm availability, mention anything specific about this job..."></textarea></div>
-          <div style="display:flex;gap:8px;margin-top:.5rem"><button class="btn primary sm" onclick="submitBid(0,'Sarah K.')">Send quote</button><button class="btn sm" onclick="toggleBidForm(0)">Cancel</button></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card" id="bjc-1">
-      <div class="row"><div><div style="font-size:13px;font-weight:500">&#9313; Deep clean &middot; 1 bed / 1 bath</div><div class="meta">520 Pine Ave, Renton &middot; 3.8 mi</div></div><span class="jobs-feed job-open-badge">Open &middot; 1 bid so far</span></div>
-      <div class="tags" style="margin-top:8px"><span class="tag blue">Fri May 2, 2pm</span><span class="tag">~2 hrs</span><span class="tag amber">No pets</span></div>
-      <div class="meta" style="margin-top:6px">Client: <strong>Marcus T.</strong> &middot; &#9733; 4.7 &middot; <span class="timer-badge">&#8987; 38 hrs to bid</span></div>
-      <div class="actions" style="flex-direction:column;align-items:stretch">
-        <div style="display:flex;gap:6px"><button class="btn primary sm" onclick="toggleBidForm(1)">Send a quote</button><button class="btn sm" onclick="openChat('Marcus T.','MT','av-a','Job inquiry')">Message</button><button class="btn sm" onclick="skipJob(1)">Skip</button></div>
-        <div class="bid-form" id="bid-form-1" style="display:none;margin-top:.75rem">
-          <div class="price-input"><div class="price-input-wrap"><span class="price-symbol">$</span><input class="inp" type="number" id="bid-price-1" placeholder="e.g. 75" style="padding-left:24px" oninput="updateBidBreakdown(1)"></div><span style="font-size:12px;color:var(--tx2)">Your quote</span></div>
-          <div id="bid-breakdown-1" style="display:none" class="breakdown-box"><div class="row-line"><span>Your quote</span><span id="bd-quote-1">&#8212;</span></div><div class="row-line"><span>Sparkle fee (10%)</span><span id="bd-fee-1" style="color:var(--rd)">&#8212;</span></div><div class="row-line total-line"><span>You receive</span><span id="bd-net-1" style="color:var(--gd)">&#8212;</span></div></div>
-          <div class="frow"><label class="flbl">Message</label><textarea id="bid-msg-1" placeholder="Introduce yourself..."></textarea></div>
-          <div style="display:flex;gap:8px"><button class="btn primary sm" onclick="submitBid(1,'Marcus T.')">Send quote</button><button class="btn sm" onclick="toggleBidForm(1)">Cancel</button></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card" id="bjc-2" style="opacity:.7">
-      <div class="row"><div><div style="font-size:13px;font-weight:500">&#9314; Move-out clean &middot; 2 bed / 1 bath</div><div class="meta">7701 Rainier Ave S &middot; 4.2 mi</div></div><span class="tag green">Quote sent &#10003;</span></div>
-      <div class="tags" style="margin-top:8px"><span class="tag blue">Sun May 4, 9am</span><span class="tag">~4 hrs</span></div>
-      <div class="meta" style="margin-top:6px">Client: <strong>Priya N.</strong> &middot; Your quote: <strong>$140</strong> &middot; Waiting for client decision</div>
-      <div class="actions"><button class="btn sm" onclick="openChat('Priya N.','PN','av-g','Move-out quote')">Message client</button></div>
-    </div>
-
-    <div class="card" id="bjc-3">
-      <div class="row"><div><div style="font-size:13px;font-weight:500">&#9315; Office clean &middot; commercial</div><div class="meta">200 2nd Ave S, Seattle &middot; 5.0 mi</div></div><span class="jobs-feed job-open-badge" style="background:var(--gl);color:var(--gd);border-color:var(--gm)">0 bids yet &#8212; be first!</span></div>
-      <div class="tags" style="margin-top:8px"><span class="tag blue">Thu May 1, 6pm</span><span class="tag">~2.5 hrs</span></div>
-      <div class="meta" style="margin-top:6px">Client: <strong>Lena B.</strong> &middot; &#9733; 4.6 &middot; <span class="timer-badge">&#8987; 44 hrs to bid</span></div>
-      <div class="actions" style="flex-direction:column;align-items:stretch">
-        <div style="display:flex;gap:6px"><button class="btn primary sm" onclick="toggleBidForm(3)">Send a quote</button><button class="btn sm" onclick="skipJob(3)">Skip</button></div>
-        <div class="bid-form" id="bid-form-3" style="display:none;margin-top:.75rem">
-          <div class="price-input"><div class="price-input-wrap"><span class="price-symbol">$</span><input class="inp" type="number" id="bid-price-3" placeholder="e.g. 85" style="padding-left:24px" oninput="updateBidBreakdown(3)"></div><span style="font-size:12px;color:var(--tx2)">Your quote</span></div>
-          <div id="bid-breakdown-3" style="display:none" class="breakdown-box"><div class="row-line"><span>Your quote</span><span id="bd-quote-3">&#8212;</span></div><div class="row-line"><span>Sparkle fee (10%)</span><span id="bd-fee-3" style="color:var(--rd)">&#8212;</span></div><div class="row-line total-line"><span>You receive</span><span id="bd-net-3" style="color:var(--gd)">&#8212;</span></div></div>
-          <div class="frow"><label class="flbl">Message</label><textarea id="bid-msg-3" placeholder="Introduce yourself..."></textarea></div>
-          <div style="display:flex;gap:8px"><button class="btn primary sm" onclick="submitBid(3,'Lena B.')">Send quote</button><button class="btn sm" onclick="toggleBidForm(3)">Cancel</button></div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <div class="pg-sub">Loading…</div>
 </div>
 
 <div class="page" id="page-c-schedule">
   <div class="pg-title">My schedule</div>
-  <div class="pg-sub">Upcoming confirmed appointments</div>
-  <div class="alert info">2 jobs this week. Tap "I've arrived" when on-site to notify the client automatically.</div>
-  <div class="card"><div class="row c"><div><div style="font-size:13px;font-weight:500">Deep clean · 2 bed / 2 bath</div><div class="meta">304 Oak Lane, Bellevue</div></div><span class="tag green">Confirmed</span></div><div class="tags" style="margin-top:8px"><span class="tag blue">Mon Apr 28, 11am</span><span class="tag">~3 hrs · $102</span><span class="tag green">Recurring ✓</span></div><div class="meta" style="margin-top:6px">Client: <strong>Diana W.</strong> · ★ 4.8</div><div class="actions"><button class="btn sm" onclick="startMileageTracking('job-diana-28')">📍 On my way</button><button class="btn primary sm" onclick="arrivedConfirm(this)">I've arrived</button><button class="btn warn sm" onclick="showLockoutModal()">Charge lockout fee</button><button class="btn sm" onclick="openChat('Diana W.','DW','av-g','Recurring · Apr 28')">Message</button></div></div>
-  <div class="card"><div class="row c"><div><div style="font-size:13px;font-weight:500">Standard clean · 1 bed</div><div class="meta">88 Cherry St, Kirkland</div></div><span class="tag green">Confirmed</span></div><div class="tags" style="margin-top:8px"><span class="tag blue">Wed Apr 30, 2pm</span><span class="tag">~2 hrs · $68</span></div><div class="meta" style="margin-top:6px">Client: <strong>Ray J.</strong> · ★ 4.5</div><div class="actions"><button class="btn sm" onclick="startMileageTracking('job-ray-30')">📍 On my way</button><button class="btn primary sm" onclick="arrivedConfirm(this)">I've arrived</button><button class="btn warn sm" onclick="showLockoutModal()">Charge lockout fee</button><button class="btn sm" onclick="openChat('Ray J.','RJ','av-b','Standard · Apr 30')">Message</button></div></div>
+  <div class="pg-sub">Loading…</div>
 </div>
 
 <div class="page" id="page-c-recurring">
   <div class="pg-title">Recurring bookings</div>
-  <div class="pg-sub">Your steady, scheduled income from repeat clients</div>
-  <div class="alert success">Recurring clients are locked in. They get a discount, you get a reliable schedule.</div>
-  <div class="card"><div class="row c"><div><div style="font-size:13px;font-weight:500">Diana W. · Deep clean · Bi-weekly</div><div class="meta">304 Oak Lane, Bellevue · Mondays 11am</div></div><span class="tag green">Active</span></div><div class="tags" style="margin-top:8px"><span class="tag">~3 hrs · $102/visit</span><span class="tag green">10% recurring discount applied</span></div><div class="meta" style="margin-top:6px">Next: <strong>Mon Apr 28</strong> · 8 cleanings completed</div><div class="actions"><button class="btn sm" onclick="openRecurringEdit(this,{name:'Diana W.',freq:'Bi-weekly',day:'Monday',time:'11:00',duration:'3'})">Edit</button><button class="btn sm" onclick="openChat('Diana W.','DW','av-g','Recurring')">Message</button><button class="btn danger sm" onclick="endSeries(this)">End series</button></div></div>
-  <div class="card"><div class="row c"><div><div style="font-size:13px;font-weight:500">Priya N. · Standard clean · Monthly</div><div class="meta">121 Lakeside Blvd, Kirkland · 1st Tuesday 10am</div></div><span class="tag green">Active</span></div><div class="tags" style="margin-top:8px"><span class="tag">~2 hrs · $68/visit</span><span class="tag green">5% recurring discount</span></div><div class="meta" style="margin-top:6px">Next: <strong>Tue May 6</strong> · 4 cleanings completed</div><div class="actions"><button class="btn sm" onclick="openRecurringEdit(this,{name:'Priya N.',freq:'Monthly',day:'Tuesday',time:'10:00',duration:'2'})">Edit</button><button class="btn sm" onclick="openChat('Priya N.','PN','av-g','Recurring')">Message</button><button class="btn danger sm" onclick="endSeries(this)">End series</button></div></div>
-  <div class="divider"></div>
-  <div class="sect-title" style="margin-bottom:.875rem">April / May calendar</div>
-  <div class="cal-grid">
-    <div class="cal-day hdr">S</div><div class="cal-day hdr">M</div><div class="cal-day hdr">T</div><div class="cal-day hdr">W</div><div class="cal-day hdr">T</div><div class="cal-day hdr">F</div><div class="cal-day hdr">S</div>
-    <div class="cal-day other">30</div><div class="cal-day other">31</div><div class="cal-day">1</div><div class="cal-day">2</div><div class="cal-day">3</div><div class="cal-day">4</div><div class="cal-day">5</div>
-    <div class="cal-day">6</div><div class="cal-day booked">7</div><div class="cal-day">8</div><div class="cal-day">9</div><div class="cal-day">10</div><div class="cal-day">11</div><div class="cal-day">12</div>
-    <div class="cal-day">13</div><div class="cal-day booked">14</div><div class="cal-day">15</div><div class="cal-day">16</div><div class="cal-day">17</div><div class="cal-day">18</div><div class="cal-day">19</div>
-    <div class="cal-day">20</div><div class="cal-day booked">21</div><div class="cal-day today">26</div><div class="cal-day">27</div><div class="cal-day booked">28</div><div class="cal-day">29</div><div class="cal-day booked">30</div>
-  </div>
+  <div class="pg-sub">Loading…</div>
 </div>
 
 <div class="page" id="page-c-mileage">
@@ -1067,117 +834,52 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
   <div class="pg-sub">Direct communication with your clients</div>
   <div class="msg-layout">
     <div class="msg-list" id="c-msg-list"></div>
-    <div class="msg-thread"><div class="msg-hdr"><div class="av av-b" id="msg-av">SK</div><div><div class="msg-hdr-name" id="msg-name">Sarah K.</div><div class="msg-hdr-sub" id="msg-sub">Deep clean · May 3</div></div></div><div class="msg-body" id="msg-body"></div><div class="msg-foot"><input class="msg-inp" id="msg-inp" placeholder="Type a message…" onkeydown="if(event.key==='Enter')sendMsg()"><button class="msg-send" onclick="sendMsg()">Send</button></div></div>
+    <div class="msg-thread"><div class="msg-hdr"><div class="av" id="msg-av"></div><div><div class="msg-hdr-name" id="msg-name"></div><div class="msg-hdr-sub" id="msg-sub"></div></div></div><div class="msg-body" id="msg-body"></div><div class="msg-foot"><input class="msg-inp" id="msg-inp" placeholder="Type a message…" onkeydown="if(event.key==='Enter')sendMsg()"><button class="msg-send" onclick="sendMsg()">Send</button></div></div>
   </div>
 </div>
 
 <div class="page" id="page-c-earnings">
   <div class="pg-title">Earnings &amp; payouts</div>
-  <div class="pg-sub">You keep 100% of your hourly wage — Sparkle never cuts into your pay.</div>
-  <div class="payout-card"><div class="payout-lbl">Available to cash out</div><div class="payout-amt">$419.00</div><div class="payout-row"><div><div class="payout-item-lbl">This week</div><div class="payout-item-val">$312</div></div><div><div class="payout-item-lbl">This month</div><div class="payout-item-val">$1,840</div></div><div><div class="payout-item-lbl">Lockout fees</div><div class="payout-item-val">$70</div></div><div><div class="payout-item-lbl">Jobs done</div><div class="payout-item-val">27</div></div></div></div>
-  <div class="f2" style="margin-bottom:1.25rem"><button class="btn primary" onclick="openCashout()">Cash out now</button><div><label class="flbl">Payout to</label><select class="inp"><option>Chase ···4832</option><option>Zelle · (206) 555-0134</option><option onclick="openAddPayout()">+ Add account</option></select></div></div>
-  <div class="sect-title" style="margin-bottom:.75rem">Recent transactions</div>
-  <div class="card-sm"><div class="row c"><div><div style="font-size:13px;font-weight:500">Deep clean · Diana W.</div><div style="font-size:11px;color:var(--tx2)">Apr 22 · 3 hrs @ $34/hr · Recurring</div></div><div style="color:var(--gd);font-weight:500">+$102</div></div></div>
-  <div class="card-sm"><div class="row c"><div><div style="font-size:13px;font-weight:500">Lockout fee · Alex P.</div><div style="font-size:11px;color:var(--tx2)">Apr 19 · No-show, not cancelled</div></div><div style="color:var(--gd);font-weight:500">+$35</div></div></div>
-  <div class="card-sm"><div class="row c"><div><div style="font-size:13px;font-weight:500">Move-out clean · Sam R.</div><div style="font-size:11px;color:var(--tx2)">Apr 15 · 4 hrs @ $34/hr + tip</div></div><div style="color:var(--gd);font-weight:500">+$140</div></div></div>
+  <div class="pg-sub">Loading…</div>
 </div>
 
 <div class="page" id="page-c-reviews">
   <div class="pg-title">My reviews</div>
-  <div class="pg-sub">4.9 average · 27 reviews</div>
-  <div class="stats-grid" style="grid-template-columns:repeat(5,1fr)"><div class="stat"><div class="stat-lbl">5 ★</div><div style="font-size:16px;font-weight:500;color:var(--gd)">23</div></div><div class="stat"><div class="stat-lbl">4 ★</div><div style="font-size:16px;font-weight:500">3</div></div><div class="stat"><div class="stat-lbl">3 ★</div><div style="font-size:16px;font-weight:500">1</div></div><div class="stat"><div class="stat-lbl">2 ★</div><div style="font-size:16px;font-weight:500">0</div></div><div class="stat"><div class="stat-lbl">1 ★</div><div style="font-size:16px;font-weight:500">0</div></div></div>
-  <div class="card"><div class="stars">★★★★★</div><div class="meta">Sarah K. · Apr 22</div><div style="font-size:13px;margin-top:6px;line-height:1.6">Jordan was punctual and did a phenomenal job. The bathroom was spotless. Will definitely rebook!</div></div>
-  <div class="card"><div class="stars">★★★★★</div><div class="meta">Priya N. · Apr 14</div><div style="font-size:13px;margin-top:6px;line-height:1.6">Best cleaner I've had through any app. Very thorough and communicative. Highly recommend.</div></div>
-  <div class="card"><div class="stars">★★★★<span style="color:var(--s200)">★</span></div><div class="meta">Marcus T. · Apr 5</div><div style="font-size:13px;margin-top:6px;line-height:1.6">Great work overall, missed the baseboards but everything else was great. Would use again.</div></div>
+  <div class="pg-sub">Loading…</div>
 </div>
 
 <div class="page" id="page-c-profile">
   <div class="pg-title">My profile</div>
-  <div class="pg-sub">Your public profile and rate settings</div>
-  <div class="card">
-    <div class="profile-top">
-      <div class="av-lg av-g" style="width:52px;height:52px;font-size:18px">JM</div>
-      <div><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><div style="font-size:15px;font-weight:500">Jordan Martinez</div><span class="badge-verified">🛡️ Verified</span><span class="badge-pro">⭐ Pro</span></div><div class="stars">★★★★★ <span style="font-size:12px;color:var(--tx2);font-weight:400">4.9 · 27 jobs</span></div><div style="font-size:12px;color:var(--tx2);margin-top:2px">Seattle, WA · Member since Jan 2024</div></div>
-    </div>
-    <div class="divider"></div>
-    <label class="flbl">My hourly rate</label>
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem"><div style="font-size:28px;font-weight:500;color:var(--gd)" id="profile-wage">$34/hr</div><input type="range" style="flex:1;accent-color:var(--g)" min="20" max="75" value="34" oninput="document.getElementById('profile-wage').textContent='$'+this.value+'/hr'"><span style="font-size:12px;color:var(--tx2)">$20–$75</span></div>
-    <div class="divider"></div>
-    <label class="flbl" style="margin-bottom:8px">Lockout fee policy</label>
-    <div class="alert warn" style="font-size:12px;margin-bottom:10px"><strong>Note:</strong> Only charge this fee when you arrive and can't access the property because the client was a no-show and did not cancel. This is not a cancellation fee.</div>
-    <div class="f2" style="margin-bottom:.875rem"><div class="frow"><label class="flbl">Policy</label><select class="inp"><option>Enabled</option><option>Disabled</option></select></div><div class="frow"><label class="flbl">Fee amount</label><input class="inp" type="number" value="35"></div></div>
-    <div class="frow"><label class="flbl">Grace period</label><select class="inp"><option>10 min</option><option selected>15 min</option><option>20 min</option><option>30 min</option></select></div>
-    <div class="divider"></div>
-    <label class="flbl" style="margin-bottom:8px">Services I offer</label>
-    <div class="svc-grid"><div class="svc-chip on" onclick="this.classList.toggle('on')">Standard</div><div class="svc-chip on" onclick="this.classList.toggle('on')">Deep clean</div><div class="svc-chip on" onclick="this.classList.toggle('on')">Move-out</div><div class="svc-chip" onclick="this.classList.toggle('on')">Move-in</div><div class="svc-chip" onclick="this.classList.toggle('on')">Office</div><div class="svc-chip on" onclick="this.classList.toggle('on')">Laundry</div><div class="svc-chip" onclick="this.classList.toggle('on')">Windows</div><div class="svc-chip" onclick="this.classList.toggle('on')">Appliances</div><div class="svc-chip" onclick="this.classList.toggle('on')">Post-construction</div></div>
-    <button class="btn primary lg" onclick="saveSuccess(this,'Profile saved!')">Save changes</button>
-  </div>
+  <div class="pg-sub">Loading…</div>
 </div>
 
 <div class="page" id="page-c-settings">
   <div class="pg-title">Settings</div>
-  <div class="pg-sub">Account, notifications, and privacy</div>
-  <div class="card"><div class="sect-title" style="margin-bottom:.875rem">Account</div><div class="frow"><label class="flbl">Email</label><input class="inp" value="jordan@example.com"></div><div class="frow"><label class="flbl">Phone</label><input class="inp" value="(206) 555-0134"></div><div class="frow"><label class="flbl">Password</label><input class="inp" type="password" value="••••••••"></div><button class="btn primary sm" onclick="saveSuccess(this,'Account saved!')">Save account</button></div>
-  <div class="card" style="margin-top:10px"><div class="sect-title" style="margin-bottom:.875rem">Notifications</div>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <div class="toggle-row"><label class="sw"><input type="checkbox" checked><span class="sl"></span></label><div><div class="tl-main">New job alerts</div><div class="tl-sub">Push + email when new jobs appear near you</div></div></div>
-      <div class="toggle-row"><label class="sw"><input type="checkbox" checked><span class="sl"></span></label><div><div class="tl-main">Booking confirmations</div><div class="tl-sub">Alerts when a client confirms or cancels</div></div></div>
-      <div class="toggle-row"><label class="sw"><input type="checkbox"><span class="sl"></span></label><div><div class="tl-main">Promotional emails</div><div class="tl-sub">Tips, feature updates, and Pro offers</div></div></div>
-    </div>
-  </div>
-  <div class="card" style="margin-top:10px;border-color:#F7C1C1"><div class="sect-title red" style="margin-bottom:.5rem">Danger zone</div><div style="font-size:13px;color:var(--tx2);margin-bottom:.875rem">Permanently delete your account and all associated data.</div><button class="btn danger sm" onclick="confirmDelete()">Delete account</button></div>
+  <div class="pg-sub">Loading…</div>
 </div>
 
 <!-- EARN MORE SUBPAGES -->
 <div class="page" id="page-c-pro">
   <div class="pg-title">Sparkle Pro</div>
   <div class="pg-sub">Optional membership to earn more and grow faster — paid monthly or annually.</div>
-  <div class="alert gold">⭐ Pro members earn <strong>23% more on average</strong> — more visibility, priority jobs, better tools.</div>
+  <div class="alert gold">⭐ Sparkle Pro is launching soon. These are the plans we're planning to offer.</div>
   <div class="pricing-grid">
     <div class="pricing-card"><div style="font-size:24px;margin-bottom:.75rem">🌱</div><div class="pricing-name">Free</div><div class="pricing-price">$0<span>/mo</span></div><div class="pricing-desc">Everything you need to get started.</div><ul class="pricing-features"><li>Accept &amp; decline jobs</li><li>Set your own rate</li><li>Lockout fee protection</li><li>In-app messaging</li><li class="no">Priority job notifications</li><li class="no">Profile boost in search</li><li class="no">Earnings analytics</li></ul><button class="btn lg" disabled style="opacity:.5">Current plan</button></div>
-    <div class="pricing-card featured"><div class="pricing-popular">Most popular</div><div style="font-size:24px;margin-bottom:.75rem">⭐</div><div class="pricing-name" style="color:var(--gold)">Pro</div><div class="pricing-price" style="color:var(--gold)">$18<span>/mo</span></div><div class="pricing-desc">For cleaners serious about building a full-time income.</div><ul class="pricing-features"><li>Everything in Free</li><li><strong>Priority job notifications</strong></li><li><strong>Featured badge</strong> in search</li><li><strong>Earnings analytics</strong></li><li><strong>Dedicated support line</strong></li><li><strong>10% bonus</strong> on first 3 jobs/month</li></ul><button class="btn gold-btn lg" onclick="openProPayment('monthly','$18/mo')">Upgrade to Pro — $18/mo</button></div>
-    <div class="pricing-card"><div style="font-size:24px;margin-bottom:.75rem">🏆</div><div class="pricing-name" style="color:var(--pud)">Pro Annual</div><div class="pricing-price" style="color:var(--pud)">$15<span>/mo</span></div><div class="pricing-desc">Same as Pro, billed yearly. Save $36/year.</div><ul class="pricing-features"><li>Everything in Pro</li><li><strong>Save $36/year</strong></li><li><strong>Business profile</strong></li><li><strong>Priority dispute resolution</strong></li></ul><button class="btn purple-btn lg" onclick="openProPayment('annual','$180/yr')">Annual Pro — $180/yr</button></div>
+    <div class="pricing-card featured"><div class="pricing-popular">Most popular</div><div style="font-size:24px;margin-bottom:.75rem">⭐</div><div class="pricing-name" style="color:var(--gold)">Pro</div><div class="pricing-price" style="color:var(--gold)">$18<span>/mo</span></div><div class="pricing-desc">For cleaners serious about building a full-time income.</div><ul class="pricing-features"><li>Everything in Free</li><li><strong>Priority job notifications</strong></li><li><strong>Featured badge</strong> in search</li><li><strong>Earnings analytics</strong></li><li><strong>Dedicated support line</strong></li><li><strong>10% bonus</strong> on first 3 jobs/month</li></ul><button class="btn gold-btn lg" disabled style="opacity:.6;cursor:not-allowed">Coming soon</button></div>
+    <div class="pricing-card"><div style="font-size:24px;margin-bottom:.75rem">🏆</div><div class="pricing-name" style="color:var(--pud)">Pro Annual</div><div class="pricing-price" style="color:var(--pud)">$15<span>/mo</span></div><div class="pricing-desc">Same as Pro, billed yearly. Save $36/year.</div><ul class="pricing-features"><li>Everything in Pro</li><li><strong>Save $36/year</strong></li><li><strong>Business profile</strong></li><li><strong>Priority dispute resolution</strong></li></ul><button class="btn purple-btn lg" disabled style="opacity:.6;cursor:not-allowed">Coming soon</button></div>
   </div>
 </div>
 
 <div class="page" id="page-c-bgcheck">
   <div class="pg-title">Background check</div>
-  <div class="pg-sub">One-time $30 fee · Powered by Checkr · Results in 24–72 hours</div>
-  <div class="bgflow">
-    <div class="bgflow-step"><div class="bgflow-num done">✓</div><div class="bgflow-lbl">Account<br>created</div></div>
-    <div class="bgflow-step"><div class="bgflow-num cur" id="bg2">2</div><div class="bgflow-lbl">Pay &amp;<br>submit</div></div>
-    <div class="bgflow-step"><div class="bgflow-num pend" id="bg3">3</div><div class="bgflow-lbl">ID<br>verify</div></div>
-    <div class="bgflow-step"><div class="bgflow-num pend" id="bg4">4</div><div class="bgflow-lbl">Criminal<br>check</div></div>
-    <div class="bgflow-step"><div class="bgflow-num pend" id="bg5">🛡️</div><div class="bgflow-lbl">Badge<br>active</div></div>
-  </div>
-  <div class="card" style="border-color:var(--gold)" id="bg-pay-card">
-    <div class="row c" style="margin-bottom:1rem"><div><div style="font-size:15px;font-weight:500;margin-bottom:4px">Background check fee</div><div style="font-size:12px;color:var(--tx2)">One-time · ID verification + criminal history + sex offender registry</div></div><div style="font-size:28px;font-weight:500;color:var(--gd)">$30</div></div>
-    <div style="background:var(--gl);border-radius:var(--rad);padding:.75rem 1rem;margin-bottom:1rem;font-size:13px;color:var(--gd)">✓ One-time fee · Covers full identity verification + criminal history check + sex offender registry screening · Non-refundable</div>
-    <div class="alert info" style="margin-bottom:1rem;font-size:12px">💡 Verified cleaners get booked <strong>3× more often</strong> and earn an average of <strong>$8/hr more</strong>. This pays for itself fast.</div>
-    <button class="btn primary lg" onclick="startBgCheck()">Pay $30 &amp; start background check →</button>
-    <div style="font-size:11px;color:var(--tx3);text-align:center;margin-top:8px">Secured by Stripe · Non-refundable · Results within 72 hours</div>
-  </div>
-  <div class="card" id="bg-progress-card" style="display:none">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem"><div style="font-size:28px">🔍</div><div><div style="font-size:14px;font-weight:500">Background check in progress</div><div style="font-size:12px;color:var(--tx2)">Submitted Apr 26 · Est. completion Apr 27–28</div></div></div>
-    <div class="frow"><div class="flbl">ID verification</div><div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div><div style="font-size:11px;color:var(--gd)">✓ Complete</div></div>
-    <div class="frow"><div class="flbl">Criminal history</div><div class="progress-bar"><div class="progress-fill" style="width:60%"></div></div><div style="font-size:11px;color:var(--tx2)">Processing…</div></div>
-    <div class="frow"><div class="flbl">Sex offender registry</div><div class="progress-bar"><div class="progress-fill" style="width:40%"></div></div><div style="font-size:11px;color:var(--tx2)">Processing…</div></div>
-    <div class="alert info" style="margin-bottom:0;font-size:12px">You'll be notified by email and in-app when results are ready. Keep accepting jobs in the meantime!</div>
-  </div>
+  <div class="pg-sub">ID verification and criminal history check</div>
+  <div class="alert info">Background checks through Sparkle are coming soon. We'll send you a notification as soon as you can start yours.</div>
 </div>
 
 <div class="page" id="page-c-supplies">
   <div class="pg-title">Supply store</div>
-  <div class="pg-sub">Cleaning supplies from trusted brands. Sparkle earns an affiliate commission — no extra cost to you.</div>
-  <div class="alert info" style="font-size:12px">🛒 <strong>Pro members</strong> get an extra 5% off all orders. <a href="#" onclick="showPage('c-pro');return false" style="color:var(--bd)">Upgrade to Pro →</a></div>
-  <div class="supply-grid">
-    <div class="supply-card"><div class="supply-img">🧴</div><div class="supply-name">Multi-Surface Cleaner</div><div class="supply-brand">Grove Collaborative</div><div class="supply-price">$12.99</div><button class="supply-btn" onclick="this.textContent='Added ✓';setTimeout(()=>this.textContent='Add to cart',1500)">Add to cart</button></div>
-    <div class="supply-card"><div class="supply-img">🪣</div><div class="supply-name">Commercial Mop Bucket</div><div class="supply-brand">Rubbermaid Pro</div><div class="supply-price">$38.50</div><button class="supply-btn" onclick="this.textContent='Added ✓';setTimeout(()=>this.textContent='Add to cart',1500)">Add to cart</button></div>
-    <div class="supply-card"><div class="supply-img">🧹</div><div class="supply-name">Microfiber Cloth 24-Pack</div><div class="supply-brand">AmazonBasics</div><div class="supply-price">$19.99</div><button class="supply-btn" onclick="this.textContent='Added ✓';setTimeout(()=>this.textContent='Add to cart',1500)">Add to cart</button></div>
-    <div class="supply-card"><div class="supply-img">🫧</div><div class="supply-name">Bathroom Disinfectant</div><div class="supply-brand">Seventh Generation</div><div class="supply-price">$8.49</div><button class="supply-btn" onclick="this.textContent='Added ✓';setTimeout(()=>this.textContent='Add to cart',1500)">Add to cart</button></div>
-    <div class="supply-card"><div class="supply-img">🪟</div><div class="supply-name">Streak-Free Glass Cleaner</div><div class="supply-brand">Windex Pro</div><div class="supply-price">$6.99</div><button class="supply-btn" onclick="this.textContent='Added ✓';setTimeout(()=>this.textContent='Add to cart',1500)">Add to cart</button></div>
-    <div class="supply-card"><div class="supply-img">🧺</div><div class="supply-name">Supply Caddy Organizer</div><div class="supply-brand">Simplehuman</div><div class="supply-price">$24.95</div><button class="supply-btn" onclick="this.textContent='Added ✓';setTimeout(()=>this.textContent='Add to cart',1500)">Add to cart</button></div>
-  </div>
+  <div class="pg-sub">Cleaning supplies from trusted brands</div>
+  <div class="alert info">The Sparkle supply store is coming soon.</div>
 </div>
 
 <div class="page" id="page-c-insurance">
@@ -1199,7 +901,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
   <div class="card">
     <div class="frow"><label class="flbl">Type of cleaning</label><select class="inp" id="job-type"><option>Standard clean</option><option>Deep clean</option><option>Move-out clean</option><option>Move-in clean</option><option>Office / commercial</option></select></div>
     <div class="f2"><div class="frow"><label class="flbl">Bedrooms</label><select class="inp"><option>Studio</option><option>1</option><option selected>2</option><option>3</option><option>4+</option></select></div><div class="frow"><label class="flbl">Bathrooms</label><select class="inp"><option>1</option><option selected>2</option><option>3+</option></select></div></div>
-    <div class="frow"><label class="flbl">Address</label><input class="inp" value="1234 Elm Street, Renton, WA 98057"></div>
+    <div class="frow"><label class="flbl">Address</label><input class="inp" id="job-address" placeholder="Street address, city" autocomplete="street-address"></div>
     <div class="f2"><div class="frow"><label class="flbl">Preferred date</label><input class="inp" type="date" id="job-date"></div><div class="frow"><label class="flbl">Preferred time</label><select class="inp"><option>Morning 8–12pm</option><option>Afternoon 12–5pm</option><option>Evening 5–8pm</option></select></div></div>
     <div class="f2"><div class="frow"><label class="flbl">Supplies</label><select class="inp"><option>I'll provide</option><option>Cleaner brings</option></select></div><div class="frow"><label class="flbl">Pets</label><select class="inp"><option>No pets</option><option>Dog(s)</option><option>Cat(s)</option></select></div></div>
     <div class="frow"><label class="flbl">Make it recurring?</label><select class="inp" onchange="this.nextElementSibling.style.display=this.value?'block':'none'"><option value="">One-time booking</option><option value="weekly">Weekly (save 10%)</option><option value="biweekly">Bi-weekly (save 10%)</option><option value="monthly">Monthly (save 5%)</option></select><div class="alert info" style="display:none;margin-top:.5rem;font-size:12px">Recurring bookings lock in your preferred cleaner and include an automatic discount.</div></div>
@@ -1210,185 +912,18 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
 </div>
 
 <div class="page" id="page-cl-bookings">
-  <div class="pg-title">My jobs &amp; bids</div>
-  <div class="pg-sub">Review quotes from cleaners and confirm your booking</div>
-
-  <!-- Active job with bids coming in -->
-  <div class="card" style="border-color:var(--g)">
-    <div class="row c" style="margin-bottom:.75rem">
-      <div>
-        <div style="font-size:13px;font-weight:500">Standard clean · 2 bed / 2 bath</div>
-        <div class="meta">1234 Elm St, Renton · Posted today</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span class="timer-badge">⏰ 41 hrs left to choose</span>
-        <span class="tag blue">Open</span>
-      </div>
-    </div>
-
-    <!-- Sort bar -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:8px">
-      <div style="font-size:13px;font-weight:500">3 quotes received <span class="bid-count-badge">3</span></div>
-      <div class="sort-bar" style="margin-bottom:0">
-        <span style="font-size:12px;color:var(--tx2)">Sort by:</span>
-        <button class="sort-btn active" onclick="sortBids('price',this)">💰 Price</button>
-        <button class="sort-btn" onclick="sortBids('rating',this)">⭐ Rating</button>
-        <button class="sort-btn" onclick="sortBids('speed',this)">⚡ Response time</button>
-      </div>
-    </div>
-
-    <!-- Bid 1 -->
-    <div class="bid-card" id="bid-1">
-      <div class="row c" style="margin-bottom:6px">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div class="av av-g" style="width:36px;height:36px;font-size:12px">JM</div>
-          <div>
-            <div style="font-size:13px;font-weight:500">Jordan M. <span class="badge-verified" style="font-size:10px">🛡️ Verified</span> <span class="badge-pro" style="font-size:10px">⭐ Pro</span></div>
-            <div style="font-size:11px;color:var(--tx2)">★★★★★ 4.9 · 27 jobs · Replied 12 min ago</div>
-          </div>
-        </div>
-        <div class="bid-amount">$95</div>
-      </div>
-      <div class="bid-msg">"Hi Sarah! I would love to help with your standard clean. I will make sure the kitchen and bathrooms get extra attention. I bring eco-friendly supplies and have been cleaning professionally for 4 years. I am available your preferred Saturday at 10am."</div>
-      <div class="tags"><span class="tag">~2.5 hrs</span><span class="tag green">Brings supplies</span><span class="tag blue">Available Sat 10am</span></div>
-      <div class="actions">
-        <button class="btn primary sm" onclick="chooseCleaner('Jordan M.','$95',this)">Choose Jordan →</button>
-        <button class="btn sm" onclick="openChat('Jordan M.','JM','av-g','Quote inquiry')">Message</button>
-        <button class="btn sm" onclick="showPage('cl-find')">View profile</button>
-      </div>
-    </div>
-
-    <!-- Bid 2 -->
-    <div class="bid-card" id="bid-2">
-      <div class="row c" style="margin-bottom:6px">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div class="av av-b" style="width:36px;height:36px;font-size:12px">AL</div>
-          <div>
-            <div style="font-size:13px;font-weight:500">Aisha L. <span class="badge-verified" style="font-size:10px">🛡️ Verified</span></div>
-            <div style="font-size:11px;color:var(--tx2)">★★★★★ 4.8 · 14 jobs · Replied 38 min ago</div>
-          </div>
-        </div>
-        <div class="bid-amount">$80</div>
-      </div>
-      <div class="bid-msg">"Hello! I specialize in standard cleans and can do Saturday at 10am. I am detail-oriented and always do a walkthrough with clients after to make sure everything is perfect."</div>
-      <div class="tags"><span class="tag">~2.5 hrs</span><span class="tag amber">Client brings supplies</span><span class="tag blue">Available Sat 10am</span></div>
-      <div class="actions">
-        <button class="btn primary sm" onclick="chooseCleaner('Aisha L.','$80',this)">Choose Aisha →</button>
-        <button class="btn sm" onclick="openChat('Aisha L.','AL','av-b','Quote inquiry')">Message</button>
-        <button class="btn sm">View profile</button>
-      </div>
-    </div>
-
-    <!-- Bid 3 -->
-    <div class="bid-card" id="bid-3">
-      <div class="row c" style="margin-bottom:6px">
-        <div style="display:flex;align-items:center;gap:10px">
-          <div class="av av-a" style="width:36px;height:36px;font-size:12px">KR</div>
-          <div>
-            <div style="font-size:13px;font-weight:500">Kevin R.</div>
-            <div style="font-size:11px;color:var(--tx2)">★★★★★ 5.0 · 41 jobs · Replied 1 hr ago</div>
-          </div>
-        </div>
-        <div class="bid-amount">$110</div>
-      </div>
-      <div class="bid-msg">"I can do a thorough standard clean Saturday morning. 5-star rating across 41 jobs — I take pride in every home I clean and go above and beyond. Worth every dollar."</div>
-      <div class="tags"><span class="tag">~2.5 hrs</span><span class="tag green">Brings supplies</span><span class="tag blue">Available Sat 10am</span></div>
-      <div class="actions">
-        <button class="btn primary sm" onclick="chooseCleaner('Kevin R.','$110',this)">Choose Kevin →</button>
-        <button class="btn sm" onclick="openChat('Kevin R.','KR','av-a','Quote inquiry')">Message</button>
-        <button class="btn sm">View profile</button>
-      </div>
-    </div>
-
-    <div style="border-top:1px solid var(--bdr);padding-top:.875rem;margin-top:.25rem;display:flex;gap:8px">
-      <button class="btn sm danger" onclick="this.closest('.card').style.opacity='.5'">Close job — no longer needed</button>
-    </div>
-  </div>
-
-  <!-- Booking confirmation modal (hidden by default) -->
-  <div id="booking-confirm-card" style="display:none">
-    <div class="confirmed-banner">
-      <div style="font-size:28px;margin-bottom:.5rem">✅</div>
-      <div style="font-size:17px;font-weight:500;margin-bottom:4px" id="confirm-title">Booking confirmed!</div>
-      <div style="font-size:13px;opacity:.85" id="confirm-sub">Your cleaner is confirmed for Saturday May 3 at 10am</div>
-    </div>
-    <div class="card">
-      <div class="sect-title" style="margin-bottom:.875rem">Booking summary</div>
-      <div class="breakdown-box">
-        <div class="row-line"><span>Cleaner quote</span><span id="confirm-quote">$95</span></div>
-        <div class="row-line green-line"><span>Subscription fee</span><span>$0.00 ✓</span></div>
-        <div class="row-line"><span>Sparkle booking fee (8%)</span><span id="confirm-fee">$7.60</span></div>
-        <div class="row-line" id="guarantee-fee-line" style="display:none"><span>Sparkle Guarantee (protection plan)</span><span id="guarantee-fee-amt">$12.00</span></div>
-        <div class="row-line total-line"><span>Total charged after job</span><span id="confirm-total">$102.60</span></div>
-      </div>
-      <div class="alert info" style="font-size:12px">Your card is authorized now but only charged after the job is completed and confirmed. You have 48 hours after completion to report any issues.</div>
-      <div style="display:flex;gap:8px;margin-top:.5rem">
-        <button class="btn primary sm" onclick="showPage('cl-messages')">Message your cleaner</button>
-        <button class="btn sm" id="add-guarantee-btn" onclick="addSparkleGuarantee(this)">Add Sparkle Guarantee (+$12)</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Past booking -->
-  <div class="card">
-    <div class="row c"><div><div style="font-size:13px;font-weight:500">Deep clean · 2 bed / 2 bath <span class="tag green" style="font-size:10px">Recurring</span></div><div class="meta">1234 Elm St, Renton · Apr 12</div></div><span class="tag green">Completed</span></div>
-    <div class="tags" style="margin-top:8px"><span class="tag blue">Apr 12, 11am</span><span class="tag">3 hrs · $102</span></div>
-    <div class="meta" style="margin-top:6px">Jordan M. · ★ 4.9 · <span class="badge-verified" style="font-size:10px">🛡️ Verified</span></div>
-    <div class="actions">
-      <button class="btn primary sm" onclick="showPage('cl-review')">Leave a review</button>
-      <button class="btn sm" onclick="openChat('Jordan M.','JM','av-g','Deep clean · Apr 12')">Message</button>
-      <button class="btn sm" onclick="rebookWithCleaner({name:'Jordan M.',serviceType:'Deep clean',beds:'2',baths:'2',address:'1234 Elm St, Renton'})">Rebook with Jordan</button>
-    </div>
-  </div>
+  <div class="pg-title">My bookings</div>
+  <div class="pg-sub">Loading…</div>
 </div>
 
 <div class="page" id="page-cl-recurring">
   <div class="pg-title">Recurring plan</div>
-  <div class="pg-sub">Your scheduled cleaning series</div>
-  <div class="alert success">Bi-weekly plan active with Jordan M. — saving you 10% per visit.</div>
-  <div class="card"><div class="row c"><div><div style="font-size:13px;font-weight:500">Bi-weekly deep clean · Jordan M.</div><div class="meta">1234 Elm St, Renton · 2 bed / 2 bath</div></div><span class="tag green">Active</span></div><div class="tags" style="margin-top:8px"><span class="tag">Every other Monday, 11am</span><span class="tag green">$91.80/visit (10% off)</span></div><div class="meta" style="margin-top:6px">Next: <strong>Mon Apr 28</strong> · 8 cleanings done · Est. monthly: $183.60</div><div class="actions"><button class="btn sm" onclick="openRecurringEdit(this,{name:'Jordan M.',freq:'Bi-weekly',day:'Monday',time:'11:00',duration:'2',isClient:true})">Change frequency</button><button class="btn sm" onclick="openChat('Jordan M.','JM','av-g','Recurring')">Message Jordan</button><button class="btn danger sm" onclick="endSeries(this,'recurring plan')">Pause / cancel</button></div></div>
-  <div class="divider"></div>
-  <div class="sect-title" style="margin-bottom:.875rem">Upcoming in this series</div>
-  <div class="cal-grid">
-    <div class="cal-day hdr">S</div><div class="cal-day hdr">M</div><div class="cal-day hdr">T</div><div class="cal-day hdr">W</div><div class="cal-day hdr">T</div><div class="cal-day hdr">F</div><div class="cal-day hdr">S</div>
-    <div class="cal-day other">30</div><div class="cal-day other">31</div><div class="cal-day">1</div><div class="cal-day">2</div><div class="cal-day">3</div><div class="cal-day">4</div><div class="cal-day">5</div>
-    <div class="cal-day">6</div><div class="cal-day booked">7</div><div class="cal-day">8</div><div class="cal-day">9</div><div class="cal-day">10</div><div class="cal-day">11</div><div class="cal-day">12</div>
-    <div class="cal-day">13</div><div class="cal-day booked">14</div><div class="cal-day today">26</div><div class="cal-day">27</div><div class="cal-day booked">28</div>
-  </div>
+  <div class="pg-sub">Loading…</div>
 </div>
 
 <div class="page" id="page-cl-find">
   <div class="pg-title">Find cleaners near you</div>
-  <div class="pg-sub">Renton / Seattle, WA · Verified cleaners shown first</div>
-
-  <!-- Sort controls -->
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
-    <span style="font-size:13px;font-weight:500">3 cleaners available</span>
-    <div class="sort-bar" style="margin-bottom:0">
-      <span style="font-size:12px;color:var(--tx2)">Sort by:</span>
-      <button class="sort-btn active" onclick="sortCleaners('verified',this)">✓ Verified</button>
-      <button class="sort-btn" onclick="sortCleaners('rating',this)">⭐ Rating</button>
-      <button class="sort-btn" onclick="sortCleaners('price',this)">💰 Price</button>
-    </div>
-  </div>
-
-  <div class="map-wrap">
-    <svg width="100%" height="100%" viewBox="0 0 680 220"><rect width="680" height="220" fill="#EEF0EC"/>
-    <line x1="0" y1="55" x2="680" y2="55" stroke="#E0E2DC" stroke-width="1"/><line x1="0" y1="110" x2="680" y2="110" stroke="#E0E2DC" stroke-width="1"/><line x1="0" y1="165" x2="680" y2="165" stroke="#E0E2DC" stroke-width="1"/>
-    <line x1="170" y1="0" x2="170" y2="220" stroke="#E0E2DC" stroke-width="1"/><line x1="340" y1="0" x2="340" y2="220" stroke="#E0E2DC" stroke-width="1"/><line x1="510" y1="0" x2="510" y2="220" stroke="#E0E2DC" stroke-width="1"/>
-    <path d="M0,110 Q170,90 340,110 Q510,130 680,110" class="map-road"/><path d="M170,0 L170,220" class="map-road"/><path d="M340,0 L340,220" class="map-road-sm"/><path d="M510,0 L510,220" class="map-road-sm"/>
-    <circle cx="340" cy="130" r="12" fill="#1D9E75" opacity=".2"/><circle cx="340" cy="130" r="6" fill="#1D9E75"/><circle cx="340" cy="130" r="2.5" fill="#fff"/>
-    <text x="350" y="128" class="map-you-lbl">You</text>
-    <g style="cursor:pointer"><circle cx="225" cy="85" r="20" fill="#fff" stroke="#378ADD" stroke-width="2"/><text x="225" y="81" text-anchor="middle" fill="#185FA5" font-size="10" font-family="DM Sans,sans-serif" font-weight="600">JM</text><text x="225" y="94" text-anchor="middle" fill="#185FA5" font-size="9" font-family="DM Sans,sans-serif">$34/hr</text></g>
-    <g style="cursor:pointer"><circle cx="425" cy="95" r="20" fill="#fff" stroke="#378ADD" stroke-width="2"/><text x="425" y="91" text-anchor="middle" fill="#185FA5" font-size="10" font-family="DM Sans,sans-serif" font-weight="600">AL</text><text x="425" y="104" text-anchor="middle" fill="#185FA5" font-size="9" font-family="DM Sans,sans-serif">$28/hr</text></g>
-    <g style="cursor:pointer"><circle cx="515" cy="175" r="20" fill="#fff" stroke="#378ADD" stroke-width="2"/><text x="515" y="171" text-anchor="middle" fill="#185FA5" font-size="10" font-family="DM Sans,sans-serif" font-weight="600">KR</text><text x="515" y="184" text-anchor="middle" fill="#185FA5" font-size="9" font-family="DM Sans,sans-serif">$40/hr</text></g>
-    </svg>
-  </div>
-  <div id="cleaners-list">
-    <div class="card cleaner-card" data-verified="true" data-rating="4.9" data-price="34"><div class="profile-top"><div class="av-lg av-g" style="width:48px;height:48px">JM</div><div style="flex:1"><div class="row c"><div style="display:flex;align-items:center;gap:8px"><div style="font-size:14px;font-weight:500">Jordan Martinez</div><span class="badge-verified">🛡️ Verified</span><span class="badge-pro">⭐ Pro</span></div><div style="font-size:15px;font-weight:500;color:var(--gd)">$34/hr</div></div><div class="stars">★★★★★ <span style="font-size:12px;color:var(--tx2);font-weight:400">4.9 · 27 jobs</span></div><div class="tags" style="margin-top:5px"><span class="tag green">Standard</span><span class="tag green">Deep clean</span><span class="tag green">Move-out</span><span class="tag green">Laundry</span></div></div></div><div style="font-size:12px;color:var(--tx2);margin-bottom:.75rem">Lockout fee: $35 · disclosed before booking</div><div style="display:flex;gap:6px"><button class="btn primary sm" onclick="showPage('cl-post')">Request Jordan</button><button class="btn sm" onclick="openChat('Jordan M.','JM','av-g','Inquiry')">Message</button></div></div>
-    <div class="card cleaner-card" data-verified="true" data-rating="4.8" data-price="28"><div class="profile-top"><div class="av-lg av-b" style="width:48px;height:48px">AL</div><div style="flex:1"><div class="row c"><div style="display:flex;align-items:center;gap:8px"><div style="font-size:14px;font-weight:500">Aisha Lowe</div><span class="badge-verified">🛡️ Verified</span></div><div style="font-size:15px;font-weight:500;color:var(--gd)">$28/hr</div></div><div class="stars">★★★★★ <span style="font-size:12px;color:var(--tx2);font-weight:400">4.8 · 14 jobs</span></div><div class="tags" style="margin-top:5px"><span class="tag green">Standard</span><span class="tag green">Move-in</span><span class="tag green">Office</span></div></div></div><div style="font-size:12px;color:var(--tx2);margin-bottom:.75rem">No lockout fee</div><div style="display:flex;gap:6px"><button class="btn sm">Request Aisha</button><button class="btn sm" onclick="openChat('Aisha L.','AL','av-b','Inquiry')">Message</button></div></div>
-    <div class="card cleaner-card" data-verified="false" data-rating="5.0" data-price="40"><div class="profile-top"><div class="av-lg av-a" style="width:48px;height:48px">KR</div><div style="flex:1"><div class="row c"><div><div style="font-size:14px;font-weight:500">Kevin Rosales</div></div><div style="font-size:15px;font-weight:500;color:var(--gd)">$40/hr</div></div><div class="stars">★★★★★ <span style="font-size:12px;color:var(--tx2);font-weight:400">5.0 · 41 jobs</span></div><div class="tags" style="margin-top:5px"><span class="tag green">Deep clean</span><span class="tag green">Post-construction</span><span class="tag green">Windows</span></div></div></div><div style="font-size:12px;color:var(--ad)">⏳ Background check in progress</div><div style="display:flex;gap:6px"><button class="btn sm">Request Kevin</button><button class="btn sm" onclick="openChat('Kevin R.','KR','av-a','Inquiry')">Message</button></div></div>
-  </div>
+  <div class="pg-sub">Loading…</div>
 </div>
 
 <div class="page" id="page-cl-messages">
@@ -1396,41 +931,23 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
   <div class="pg-sub">Communication with your cleaners</div>
   <div class="msg-layout">
     <div class="msg-list" id="cl-msg-list"></div>
-    <div class="msg-thread"><div class="msg-hdr"><div class="av av-g" id="cl-msg-av">JM</div><div><div class="msg-hdr-name" id="cl-msg-name">Jordan M.</div><div class="msg-hdr-sub" id="cl-msg-sub">Deep clean · Apr 12</div></div></div><div class="msg-body" id="cl-msg-body"></div><div class="msg-foot"><input class="msg-inp" id="cl-msg-inp" placeholder="Type a message…" onkeydown="if(event.key==='Enter')sendClMsg()"><button class="msg-send" onclick="sendClMsg()">Send</button></div></div>
+    <div class="msg-thread"><div class="msg-hdr"><div class="av" id="cl-msg-av"></div><div><div class="msg-hdr-name" id="cl-msg-name"></div><div class="msg-hdr-sub" id="cl-msg-sub"></div></div></div><div class="msg-body" id="cl-msg-body"></div><div class="msg-foot"><input class="msg-inp" id="cl-msg-inp" placeholder="Type a message…" onkeydown="if(event.key==='Enter')sendClMsg()"><button class="msg-send" onclick="sendClMsg()">Send</button></div></div>
   </div>
 </div>
 
 <div class="page" id="page-cl-payments">
   <div class="pg-title">Payments</div>
-  <div class="pg-sub">Payment methods and history</div>
-  <div class="sect-hd" style="margin-bottom:.75rem"><div class="sect-title">Payment methods</div><button class="btn sm" onclick="openAddCard()">+ Add card</button></div>
-  <div class="pay-method sel"><div class="pm-icon">VISA</div><div style="flex:1"><div style="font-size:13px;font-weight:500">Visa ending in 4242</div><div style="font-size:11px;color:var(--tx2)">Expires 08/27 · Default</div></div><span class="tag green">Default</span></div>
-  <div class="pay-method"><div class="pm-icon" style="font-size:8px">APPLE</div><div><div style="font-size:13px;font-weight:500">Apple Pay</div></div></div>
-  <div class="divider"></div>
-  <div class="sect-title" style="margin-bottom:.75rem">Payment history</div>
-  <div class="card-sm"><div class="row c"><div><div style="font-size:13px;font-weight:500">Deep clean · Jordan M.</div><div style="font-size:11px;color:var(--tx2)">Apr 12 · Recurring discount applied</div></div><div style="font-weight:500">$95.70</div></div></div>
-  <div class="card-sm"><div class="row c"><div><div style="font-size:13px;font-weight:500">Standard clean · Jordan M.</div><div style="font-size:11px;color:var(--tx2)">Mar 5</div></div><div style="font-weight:500">$71.40</div></div></div>
-  <div class="alert info" style="margin-top:1rem;font-size:12px">Sparkle charges a transparent 8% booking fee, applied only after your job is complete. No subscriptions. No hidden charges. Ever.</div>
+  <div class="pg-sub">Loading…</div>
 </div>
 
 <div class="page" id="page-cl-review">
   <div class="pg-title">Leave a review</div>
-  <div class="pg-sub">Help Jordan build their reputation and guide other clients.</div>
-  <div class="card" id="review-card">
-    <div style="font-size:13px;color:var(--tx2);margin-bottom:1rem">Reviewing <strong>Jordan Martinez</strong> · Apr 12 deep clean</div>
-    <label class="flbl">Your rating</label>
-    <div id="star-pick" style="display:flex;gap:4px;font-size:28px;margin-bottom:1rem;cursor:pointer"><span onclick="setStar(1)" style="color:var(--a)">★</span><span onclick="setStar(2)" style="color:var(--a)">★</span><span onclick="setStar(3)" style="color:var(--a)">★</span><span onclick="setStar(4)" style="color:var(--a)">★</span><span onclick="setStar(5)" style="color:var(--s200)">★</span></div>
-    <div class="frow"><label class="flbl">Your review</label><textarea class="inp" rows="4" id="review-txt" placeholder="Punctuality, quality, communication…"></textarea></div>
-    <div class="frow"><label class="flbl">Quick tags</label><div class="tags" style="margin-top:0;gap:6px"><span class="tag" style="cursor:pointer" onclick="this.classList.toggle('green')">Punctual</span><span class="tag" style="cursor:pointer" onclick="this.classList.toggle('green')">Thorough</span><span class="tag" style="cursor:pointer" onclick="this.classList.toggle('green')">Great communicator</span><span class="tag" style="cursor:pointer" onclick="this.classList.toggle('green')">Would rebook</span></div></div>
-    <button class="btn primary lg" onclick="submitReview()">Submit review</button>
-  </div>
+  <div class="pg-sub">Loading…</div>
 </div>
 
 <div class="page" id="page-cl-settings">
   <div class="pg-title">Settings</div>
-  <div class="pg-sub">Account, notifications, and preferences</div>
-  <div class="card"><div class="sect-title" style="margin-bottom:.875rem">Account</div><div class="frow"><label class="flbl">Name</label><div class="f2"><input class="inp" value="Sarah"><input class="inp" value="K."></div></div><div class="frow"><label class="flbl">Email</label><input class="inp" type="email" value="sarah@example.com"></div><div class="frow"><label class="flbl">Phone</label><input class="inp" type="tel" value="(425) 555-0198"></div><button class="btn primary sm" onclick="saveSuccess(this,'Account saved!')">Save account</button></div>
-  <div class="card" style="margin-top:10px"><div class="sect-title" style="margin-bottom:.875rem">Notifications</div><div style="display:flex;flex-direction:column;gap:10px"><div class="toggle-row"><label class="sw"><input type="checkbox" checked><span class="sl"></span></label><div><div class="tl-main">Booking confirmations</div><div class="tl-sub">When a cleaner accepts or declines your job</div></div></div><div class="toggle-row"><label class="sw"><input type="checkbox" checked><span class="sl"></span></label><div><div class="tl-main">Cleaner on the way</div><div class="tl-sub">When your cleaner marks themselves as arrived</div></div></div><div class="toggle-row"><label class="sw"><input type="checkbox"><span class="sl"></span></label><div><div class="tl-main">Promotional emails</div></div></div></div></div>
+  <div class="pg-sub">Loading…</div>
 </div>
 
 <!-- ══════════════════════════════════════
@@ -1439,77 +956,33 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
 
 <div class="page" id="page-a-dashboard">
   <div class="pg-title">Platform dashboard</div>
-  <div class="pg-sub">Sparkle admin · April 26, 2025</div>
-  <div class="stats-grid"><div class="stat"><div class="stat-lbl">Active cleaners</div><div class="stat-val">2,418</div></div><div class="stat"><div class="stat-lbl">Active clients</div><div class="stat-val">8,741</div></div><div class="stat"><div class="stat-lbl">Jobs this month</div><div class="stat-val green">4,329</div></div><div class="stat"><div class="stat-lbl">Open disputes</div><div class="stat-val amber">12</div></div></div>
-  <div class="stats-grid"><div class="stat"><div class="stat-lbl">Total revenue</div><div class="stat-val green">$38,420</div></div><div class="stat"><div class="stat-lbl">vs last month</div><div class="stat-val gold">+34%</div></div><div class="stat"><div class="stat-lbl">Avg cleaner wage</div><div class="stat-val">$31.40/hr</div></div><div class="stat"><div class="stat-lbl">BG checks pending</div><div class="stat-val amber">34</div></div></div>
-  <div class="f2">
-    <div><div class="sect-hd"><div class="sect-title">Pending actions</div></div><div class="card-sm"><div class="row c"><div><strong>12</strong> open disputes</div><button class="btn warn sm" onclick="showPage('a-disputes')">Review →</button></div></div><div class="card-sm"><div class="row c"><div><strong>34</strong> background checks pending</div><button class="btn sm" onclick="showPage('a-bgchecks')">View →</button></div></div><div class="card-sm"><div class="row c"><div><strong>8</strong> accounts flagged</div><button class="btn danger sm" onclick="showPage('a-users')">View →</button></div></div></div>
-    <div><div class="sect-hd"><div class="sect-title">Revenue streams</div></div>
-      <div class="rev-chart"><div class="rev-chart-lbl">Monthly revenue (last 8 mo)</div><div class="rev-bar" style="height:38%"></div><div class="rev-bar" style="height:42%"></div><div class="rev-bar" style="height:48%"></div><div class="rev-bar" style="height:40%"></div><div class="rev-bar" style="height:56%"></div><div class="rev-bar" style="height:72%"></div><div class="rev-bar" style="height:85%"></div><div class="rev-bar hi" style="height:100%"></div></div>
-      <div class="rev-breakdown">
-        <div class="rev-src"><div class="rev-src-dot" style="background:var(--g)"></div><div class="rev-src-name">Platform fees</div><div><div class="rev-src-val">$15.7K</div><div class="rev-src-pct">40.9%</div></div></div>
-        <div class="rev-src"><div class="rev-src-dot" style="background:var(--gold)"></div><div class="rev-src-name">Pro memberships</div><div><div class="rev-src-val">$8.6K</div><div class="rev-src-pct">22.5%</div></div></div>
-        <div class="rev-src"><div class="rev-src-dot" style="background:var(--pu)"></div><div class="rev-src-name">Business accts</div><div><div class="rev-src-val">$5.5K</div><div class="rev-src-pct">14.3%</div></div></div>
-        <div class="rev-src"><div class="rev-src-dot" style="background:var(--b)"></div><div class="rev-src-name">Guarantee</div><div><div class="rev-src-val">$3.8K</div><div class="rev-src-pct">10.0%</div></div></div>
-        <div class="rev-src"><div class="rev-src-dot" style="background:var(--a)"></div><div class="rev-src-name">BG check fees</div><div><div class="rev-src-val">$2.2K</div><div class="rev-src-pct">5.7%</div></div></div>
-        <div class="rev-src"><div class="rev-src-dot" style="background:var(--gm)"></div><div class="rev-src-name">Insurance refs</div><div><div class="rev-src-val">$840</div><div class="rev-src-pct">2.2%</div></div></div>
-      </div>
-    </div>
-  </div>
+  <div class="pg-sub">Loading…</div>
 </div>
 
 <div class="page" id="page-a-disputes">
-  <div class="pg-title">Dispute resolution</div>
-  <div class="pg-sub">12 open · All resolved within 48 hours</div>
-  <div class="dispute-card"><div class="row c"><div><div style="font-size:13px;font-weight:500">Dispute #284 — Lockout fee contested</div><div class="meta">Filed Apr 25 · Alex P. (client) vs. Jordan M. (cleaner)</div></div><span class="tag red">Urgent</span></div><div style="font-size:13px;color:var(--tx2);margin-top:8px;line-height:1.6">Client claims the appointment was cancelled via text but app wasn't updated. Cleaner charged $35 lockout fee. Both submitted evidence.</div><div class="actions"><button class="btn primary sm" onclick="resolveDispute(this,'cleaner')">Rule: Fee valid</button><button class="btn danger sm" onclick="resolveDispute(this,'client')">Rule: Refund client</button><button class="btn sm">View evidence</button></div></div>
-  <div class="dispute-card review"><div class="row c"><div><div style="font-size:13px;font-weight:500">Dispute #281 — Quality complaint</div><div class="meta">Filed Apr 23 · Sarah T. vs. Mia K.</div></div><span class="tag amber">In review</span></div><div style="font-size:13px;color:var(--tx2);margin-top:8px">Client says bathrooms weren't cleaned. Awaiting photo evidence from client.</div><div class="actions"><button class="btn sm" onclick="saveSuccess(this,'Photos requested — client notified')">Request photos</button><button class="btn sm" onclick="showPage('a-dashboard')">Message parties</button></div></div>
-  <div class="dispute-card resolved"><div class="row c"><div><div style="font-size:13px;font-weight:500">Dispute #279 — No-show cleaner</div><div class="meta">Filed Apr 20 · Resolved Apr 21</div></div><span class="tag green">Resolved</span></div><div style="font-size:13px;color:var(--tx2);margin-top:8px">Full refund issued to client. Cleaner received a warning.</div></div>
+  <div class="pg-title">Disputes</div>
+  <div class="pg-sub">Loading…</div>
+</div>
+
+<div class="page" id="page-a-lockouts">
+  <div class="pg-title">Lockout fees</div>
+  <div class="pg-sub">Loading…</div>
 </div>
 
 <div class="page" id="page-a-bgchecks">
-  <div class="pg-title">Background check queue</div>
-  <div class="pg-sub">34 pending · Powered by Checkr · Avg 48hr turnaround</div>
-  <div class="card" style="padding:0;overflow:hidden">
-    <div class="admin-table-wrap">
-    <table class="admin-table">
-      <thead><tr><th>Cleaner</th><th>Submitted</th><th>ID check</th><th>Criminal</th><th>Status</th><th>Action</th></tr></thead>
-      <tbody>
-        <tr><td><div style="font-weight:500">Kevin Rosales</div><div style="font-size:11px;color:var(--tx2)">Seattle, WA</div></td><td>Apr 24</td><td><span class="tag green">✓ Clear</span></td><td><span class="tag amber">Pending</span></td><td><span class="tag amber">In progress</span></td><td><button class="btn sm" onclick="adminViewUser(this)">View</button></td></tr>
-        <tr><td><div style="font-weight:500">Maria Santos</div><div style="font-size:11px;color:var(--tx2)">Bellevue, WA</div></td><td>Apr 24</td><td><span class="tag green">✓ Clear</span></td><td><span class="tag green">✓ Clear</span></td><td><span class="tag green">Ready</span></td><td><button class="btn primary sm" onclick="this.textContent='Approved ✓';this.disabled=true">Approve</button></td></tr>
-        <tr><td><div style="font-weight:500">James Wright</div><div style="font-size:11px;color:var(--tx2)">Renton, WA</div></td><td>Apr 23</td><td><span class="tag red">⚠ Issue</span></td><td><span class="tag">Paused</span></td><td><span class="tag red">Needs review</span></td><td><button class="btn danger sm" onclick="adminReviewBgCheck('James Wright')">Review</button></td></tr>
-      </tbody>
-    </table>
-    </div>
-  </div>
+  <div class="pg-title">Background checks</div>
+  <div class="pg-sub">Loading…</div>
 </div>
 
 <div class="page" id="page-a-users">
   <div class="pg-title">User management</div>
-  <div class="pg-sub">All cleaners, clients, and flags</div>
-  <div class="f2" style="margin-bottom:1rem"><input class="inp" placeholder="Search by name or email…"><select class="inp"><option>All users</option><option>Cleaners</option><option>Clients</option><option>Flagged</option><option>Banned</option></select></div>
-  <div class="card" style="padding:0;overflow:hidden">
-    <div class="admin-table-wrap">
-    <table class="admin-table">
-      <thead><tr><th>User</th><th>Role</th><th>Rating</th><th>Status</th><th>Actions</th></tr></thead>
-      <tbody>
-        <tr><td><div style="font-weight:500">Jordan Martinez</div><div style="font-size:11px;color:var(--tx2)">jordan@example.com</div></td><td><span class="tag green">Cleaner</span></td><td>★ 4.9</td><td><span class="badge-verified">🛡️ Verified</span></td><td><button class="btn sm" onclick="adminViewUser(this)">View</button></td></tr>
-        <tr><td><div style="font-weight:500">Sarah K.</div><div style="font-size:11px;color:var(--tx2)">sarah@example.com</div></td><td><span class="tag blue">Client</span></td><td>★ 4.9</td><td><span class="tag green">Active</span></td><td><button class="btn sm" onclick="adminViewUser(this)">View</button></td></tr>
-        <tr><td><div style="font-weight:500">Mark H.</div><div style="font-size:11px;color:var(--tx2)">markh@example.com</div></td><td><span class="tag green">Cleaner</span></td><td>★ 3.1</td><td><span class="tag red">Banned</span></td><td><button class="btn sm" onclick="adminViewUser(this)">View</button><button class="btn primary sm" style="margin-left:4px" onclick="demoAdminReinstateUser(this,'Mark H.')">Reinstate</button></td></tr>
-        <tr><td><div style="font-weight:500">Alex P.</div><div style="font-size:11px;color:var(--tx2)">alexp@example.com</div></td><td><span class="tag blue">Client</span></td><td>★ 2.8</td><td><span class="tag amber">Flagged</span></td><td><button class="btn sm" onclick="adminViewUser(this)">View</button><button class="btn danger sm" style="margin-left:4px" onclick="demoAdminBanUser(this,'Alex P.')">Ban</button></td></tr>
-      </tbody>
-    </table>
-    </div>
-  </div>
+  <div class="pg-sub">Loading…</div>
 </div>
 
 <div class="page" id="page-a-notifs">
-  <div class="pg-title">Push notifications</div>
-  <div class="pg-sub">Send announcements and alerts to your users</div>
-  <div class="card"><div class="sect-title" style="margin-bottom:.875rem">Compose notification</div><div class="frow"><label class="flbl">Audience</label><select class="inp" id="notif-audience"><option value="all">All users</option><option value="cleaners">All cleaners</option><option value="clients">All clients</option><option value="unverified">Unverified cleaners</option></select></div><div class="frow"><label class="flbl">Title</label><input class="inp" id="notif-title" placeholder="Earn more with recurring clients"></div><div class="frow"><label class="flbl">Message</label><textarea class="inp" id="notif-body" rows="3" placeholder="Write the message your users will see…"></textarea></div><div class="f2"><div class="frow"><label class="flbl">Delivery</label><select class="inp"><option>Send now</option><option>Schedule</option></select></div><div class="frow"><label class="flbl">Channel</label><select class="inp"><option>In-app + push</option><option>In-app only</option><option>Email</option><option>All channels</option></select></div></div><div class="alert warn" style="font-size:12px">This sends a real in-app notification to every user in the selected audience. It cannot be unsent.</div><div style="display:flex;gap:8px"><button class="btn sm" onclick="previewNotif()">Preview</button><button class="btn primary sm" onclick="sendNotif(this)">Send notification</button></div></div>
-  <div class="divider"></div>
-  <div class="sect-title" style="margin-bottom:.75rem">Recent sends</div>
-  <div class="card-sm"><div class="row c"><div><div style="font-size:13px;font-weight:500">New: Recurring bookings</div><div style="font-size:11px;color:var(--tx2)">All users · Apr 20 · 11,159 sent · 68% open rate</div></div><span class="tag green">Sent</span></div></div>
-  <div class="card-sm"><div class="row c"><div><div style="font-size:13px;font-weight:500">Complete your background check</div><div style="font-size:11px;color:var(--tx2)">Unverified cleaners · Apr 15 · 412 sent · 82% open rate</div></div><span class="tag green">Sent</span></div></div>
+  <div class="pg-title">Send notifications</div>
+  <div class="pg-sub">Send an announcement to users' in-app notifications</div>
+  <div class="card"><div class="sect-title" style="margin-bottom:.875rem">Compose notification</div><div class="frow"><label class="flbl">Audience</label><select class="inp" id="notif-audience"><option value="all">All users</option><option value="cleaners">All cleaners</option><option value="clients">All clients</option><option value="unverified">Unverified cleaners</option></select></div><div class="frow"><label class="flbl">Title</label><input class="inp" id="notif-title" placeholder="Earn more with recurring clients"></div><div class="frow"><label class="flbl">Message</label><textarea class="inp" id="notif-body" rows="3" placeholder="Write the message your users will see…"></textarea></div><div class="alert warn" style="font-size:12px">This sends a real in-app notification to every user in the selected audience. It cannot be unsent.</div><div style="display:flex;gap:8px"><button class="btn sm" onclick="previewNotif()">Preview</button><button class="btn primary sm" onclick="sendNotif(this)">Send notification</button></div></div>
 </div>
 
 <div class="page" id="page-a-support">
@@ -1671,7 +1144,6 @@ let starRating = 4;
 let lockoutChecks = 0;
 let notifOpen = false;
 let activeConvo = 0;
-let adminViewingAs = 'admin'; // admin can view as cleaner/client/admin
 let adminSupportState = {
   tickets: [],
   activeId: null,
@@ -1704,36 +1176,6 @@ let clientSettingsState = {
   loaded: false,
   saving: false,
 };
-
-// Conversations data
-const convosCleaner = [
-  {name:'Sarah K.',init:'SK',cls:'av-b',sub:'Deep clean · May 3',msgs:[{t:'them',m:'Hi Jordan! Confirming for Saturday at 10am.'},{t:'me',m:'Confirmed! I\'ll be there right at 10.'},{t:'them',m:'Is it ok if my dog is home? He\'s friendly 🐶'},{t:'sys',m:'📋 Booking confirmed · May 3 · 10am · $126'}]},
-  {name:'Diana W.',init:'DW',cls:'av-g',sub:'Recurring · Apr 28',msgs:[{t:'them',m:'Thanks for the amazing clean!'},{t:'me',m:'My pleasure Diana! See you in two weeks.'},{t:'them',m:'Left you a 5-star review ⭐'}]},
-  {name:'Marcus T.',init:'MT',cls:'av-a',sub:'Standard · May 2',msgs:[{t:'them',m:'What time on Friday?'},{t:'me',m:'2pm works!'},{t:'them',m:'Perfect, see you then!'}]},
-  {name:'Ray J.',init:'RJ',cls:'av-b',sub:'Standard · Apr 30',msgs:[{t:'them',m:'Will you need the key code?'},{t:'me',m:'Yes please!'},{t:'them',m:'It\'s 4821. Side door.'}]}
-];
-const convosClient = [
-  {name:'Jordan M.',init:'JM',cls:'av-g',sub:'Deep clean · Apr 12',msgs:[{t:'me',m:'Hi Jordan! Just checking in about Saturday.'},{t:'them',m:'All confirmed! I\'ll be there at 10am sharp.'},{t:'sys',m:'📋 Booking confirmed · May 3 · 10am · $126'}]},
-  {name:'Aisha L.',init:'AL',cls:'av-b',sub:'Inquiry',msgs:[{t:'me',m:'Hi Aisha! Do you do move-in cleans?'},{t:'them',m:'Yes! I love move-in cleans. Happy to help.'}]}
-];
-
-// Notifications
-const notifsCleaner = [
-  {icon:'💼',title:'New job near you',body:'Deep clean · 3 bed / 2 bath in Seattle · $126 · May 3',time:'2 min ago',unread:true,action:'c-jobs'},
-  {icon:'⭐',title:'New 5-star review!',body:'Sarah K.: "Jordan was punctual and did a phenomenal job!"',time:'1 hr ago',unread:true,action:'c-reviews'},
-  {icon:'💰',title:'Payout sent',body:'$102.00 sent to your Chase account.',time:'Yesterday'},
-  {icon:'🛡️',title:'Complete your background check',body:'Earn your Verified badge and get 3× more bookings.',time:'2 days ago',action:'c-bgcheck'},
-];
-const notifsClient = [
-  {icon:'🧹',title:'Job accepted!',body:'Jordan M. accepted your Standard clean for Sat May 3.',time:'5 min ago',unread:true},
-  {icon:'📅',title:'Bi-weekly clean in 2 days',body:'Jordan M. is scheduled for Mon Apr 28 at 11am.',time:'Yesterday'},
-  {icon:'⭐',title:'Leave a review',body:'How was your Apr 12 deep clean with Jordan M.?',time:'Apr 13',action:'cl-review'},
-];
-const notifsAdmin = [
-  {icon:'⚖️',title:'New dispute filed',body:'Dispute #284: Alex P. vs Jordan M. — lockout fee contested.',time:'1 hr ago',unread:true,action:'a-disputes'},
-  {icon:'🛡️',title:'Background check ready',body:'Maria Santos passed — ready to approve Verified badge.',time:'2 hr ago',unread:true,action:'a-bgchecks'},
-  {icon:'🚫',title:'Account flagged',body:'Alex P. flagged after 2 dispute filings in 30 days.',time:'3 hr ago',action:'a-users'},
-];
 
 // ══════════════════════════════════════
 // AUTH
@@ -1787,7 +1229,7 @@ async function doSignIn() {
   } catch (err) {
     if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
     const msg = err.message.startsWith('Cannot reach')
-      ? 'Server not running. Start it with: node server.js — or use demo mode below.'
+      ? "Can't reach Sparkle right now. Check your connection and try again."
       : err.message;
     if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
   }
@@ -1838,13 +1280,9 @@ async function finishOnboard() {
     loginWithData(data.user, data.profile || null);
   } catch (err) {
     if (btn) { btn.disabled = false; btn.textContent = 'Get started →'; }
-    if (err.message.startsWith('Cannot reach')) {
-      // Backend not running — fall back to demo mode
-      showToast('Backend offline — entering demo mode.', 'warn');
-      loginAs(obRole);
-    } else {
-      showToast(err.message, 'error');
-    }
+    showToast(err.message.startsWith('Cannot reach')
+      ? "Can't reach Sparkle right now. Check your connection and try again."
+      : err.message, 'error');
   }
 }
 
@@ -1872,18 +1310,6 @@ function loginWithData(apiUser, apiProfile = null) {
   _openAuthScreen(false);
 }
 
-// ── loginAs: demo mode (hardcoded fake users, sessionStorage) ─────────────────
-function loginAs(role) {
-  const users = {
-    cleaner: {role:'cleaner',name:'Jordan M.',fullName:'Jordan Martinez',initials:'JM',avClass:'av-g'},
-    client:  {role:'client', name:'Sarah K.',  fullName:'Sarah K.',        initials:'SK',avClass:'av-b'},
-    admin:   {role:'admin',  name:'Admin',     fullName:'Platform Admin',  initials:'AD',avClass:'av-p'},
-  };
-  currentUser = users[role];
-  currentUser.isReal = false;
-  sessionStorage.setItem('sparkle_role', role);
-  _openAuthScreen(false);
-}
 
 // ── shared: hide auth screen and show app ─────────────────────────────────────
 function _openAuthScreen(show) {
@@ -1903,11 +1329,10 @@ function _openAuthScreen(show) {
   }, 400);
 }
 
-// On load: restore session so page refresh doesn't log the user out.
-// Priority order:
-//   1. Real session  — access token in localStorage  (from actual sign-in/register)
-//   2. Demo session  — role stored in sessionStorage  (from demo card click)
+// On load: restore the signed-in session so a page refresh doesn't sign the user out.
 (function restoreSession() {
+  // Demo mode no longer exists; a role left behind by an old demo visit means nothing.
+  sessionStorage.removeItem('sparkle_role');
   // Real session: access token present + user object cached
   if (SparkleAPI.isRealSession()) {
     const user = SparkleAPI.getUser();
@@ -1929,12 +1354,6 @@ function _openAuthScreen(show) {
       else init();
       return;
     }
-  }
-  // Demo session fallback
-  const saved = sessionStorage.getItem('sparkle_role');
-  if (saved) {
-    if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', () => loginAs(saved), { once: true });
-    else loginAs(saved);
   }
 })();
 
@@ -2005,8 +1424,6 @@ function setupApp() {
   // Role indicators
   document.getElementById('pill-cleaner').style.display = u.role==='cleaner'?'flex':'none';
   document.getElementById('pill-client').style.display  = u.role==='client'?'flex':'none';
-  document.getElementById('admin-switcher').style.display = u.role==='admin'?'flex':'none';
-  adminViewingAs = 'admin';
   // Build sidebar
   buildSidebar(u.role);
   // Build messages
@@ -2058,17 +1475,16 @@ const icons = {
 
 function buildSidebar(role) {
   const s = document.getElementById('sidebar');
-  const real = !!currentUser?.isReal;
   if(role === 'cleaner') {
     s.innerHTML = `
     <div class="nav-grp"><div class="nav-grp-lbl">Overview</div>
       ${navItem('c-dashboard',icons.grid,'Dashboard')}
     </div>
     <div class="nav-grp"><div class="nav-grp-lbl">Work</div>
-      ${real ? navItem('c-jobs',icons.grid,'Available jobs') : navItem('c-jobs',icons.grid,'Available jobs','4','nb-g')}
+      ${navItem('c-jobs',icons.grid,'Available jobs')}
       ${navItem('c-schedule',icons.cal,'My schedule')}
-      ${real ? navItem('c-recurring',icons.repeat,'Recurring') : navItem('c-recurring',icons.repeat,'Recurring','2','nb-g')}
-      ${real ? navItem('c-messages',icons.msg,'Messages') : navItem('c-messages',icons.msg,'Messages','1','nb-g')}
+      ${navItem('c-recurring',icons.repeat,'Recurring')}
+      ${navItem('c-messages',icons.msg,'Messages')}
     </div>
     <div class="nav-grp"><div class="nav-grp-lbl">Money</div>
       ${navItem('c-earnings',icons.dollar,'Earnings / Payouts')}
@@ -2110,13 +1526,13 @@ function buildSidebar(role) {
     <div class="nav-grp"><div class="nav-grp-lbl">Admin</div>
       ${navItem('a-dashboard',icons.grid,'Dashboard')}
       ${navItem('a-support',icons.msg,'Support')}
-      ${navItem('a-disputes',icons.shield,'Disputes','12','nb-r')}
-      ${navItem('a-bgchecks',icons.shield,'Background checks','34','nb-a')}
+      ${navItem('a-disputes',icons.shield,'Disputes')}
+      ${navItem('a-lockouts',icons.shield,'Lockout fees')}
+      ${navItem('a-bgchecks',icons.shield,'Background checks')}
       ${navItem('a-credentials',icons.shield,'License & insurance')}
       ${navItem('a-users',icons.people,'User management')}
-      ${navItem('a-notifs',icons.bell,'Push notifications')}
-    </div>
-    <div id="admin-extra-nav"></div>`;
+      ${navItem('a-notifs',icons.bell,'Send notifications')}
+    </div>`;
   }
 }
 
@@ -2129,35 +1545,6 @@ function toggleEarnMore() {
   arrow.classList.toggle('open', !open);
 }
 
-// Admin "view as" — shows cleaner or client nav in sidebar while keeping admin identity
-function adminViewAs(mode, btn) {
-  adminViewingAs = mode;
-  document.querySelectorAll('.avs-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  const extra = document.getElementById('admin-extra-nav');
-  if(!extra) return;
-  if(mode === 'cleaner') {
-    extra.innerHTML = `<div class="nav-grp"><div class="nav-grp-lbl" style="color:var(--gd)">Cleaner view</div>
-      ${navItem('c-dashboard',icons.grid,'Dashboard')}
-      ${navItem('c-jobs',icons.grid,'Available jobs')}
-      ${navItem('c-schedule',icons.cal,'Schedule')}
-      ${navItem('c-earnings',icons.dollar,'Earnings')}
-      ${navItem('c-profile',icons.user,'Profile')}
-    </div>`;
-    showPage('c-dashboard');
-  } else if(mode === 'client') {
-    extra.innerHTML = `<div class="nav-grp"><div class="nav-grp-lbl" style="color:var(--bd)">Client view</div>
-      ${navItem('cl-post',icons.plus,'Post a job')}
-      ${navItem('cl-bookings',icons.cal,'My bookings')}
-      ${navItem('cl-find',icons.search,'Find cleaners')}
-      ${navItem('cl-payments',icons.card,'Payments')}
-    </div>`;
-    showPage('cl-post');
-  } else {
-    extra.innerHTML = '';
-    showPage('a-dashboard');
-  }
-}
 
 // Cache active page/nav refs to avoid full querySelectorAll on every navigation
 let _activePage = null;
@@ -2212,7 +1599,7 @@ function showPage(id) {
   if (id === 'cl-review')   { loadClientReview(); }
   if (id === 'cl-settings') { loadClientSettings(); }
 
-  // Load live data from backend (no-ops in demo mode)
+  // Load live data from the backend
   if (id === 'c-jobs')        loadAvailableJobs();
   if (id === 'cl-bookings')   loadMyBookings();
   if (id === 'c-mileage')     loadMileageLog();
@@ -2230,6 +1617,7 @@ function showPage(id) {
   if (id === 'a-dashboard')   loadAdminDashboard();
   if (id === 'a-users')       loadAdminUsers();
   if (id === 'a-disputes')    loadAdminDisputes();
+  if (id === 'a-lockouts')    loadAdminLockouts();
   if (id === 'a-bgchecks')    loadAdminBgChecks();
   // Release any document blob when navigating away from the review page.
   if (id !== 'a-credentials') closeCredPreview();
@@ -2254,43 +1642,24 @@ window.addEventListener('popstate', e => {
   }
 });
 
-// ══════════════════════════════════════
-// JOBS
-// ══════════════════════════════════════
-function acceptJob(idx){
-  const c=document.getElementById('jc-'+idx);if(!c)return;
-  c.style.opacity='.5';c.style.pointerEvents='none';
-  c.querySelector('.btn.primary').textContent='Accepted ✓';
-  setTimeout(()=>{c.style.transition='max-height .4s,opacity .3s,margin .3s';c.style.maxHeight='0';c.style.opacity='0';c.style.overflow='hidden';c.style.marginBottom='0';setTimeout(()=>c.remove(),420)},700);
-}
-function declineJob(idx){
-  const c=document.getElementById('jc-'+idx);if(!c)return;
-  c.style.transition='opacity .3s';c.style.opacity='0';setTimeout(()=>c.remove(),300);
-}
-function hlJob(idx){
-  document.querySelectorAll('[id^=jc-]').forEach(c=>c.style.outline='');
-  const c=document.getElementById('jc-'+idx);
-  if(c){c.style.outline='2px solid var(--g)';c.scrollIntoView({behavior:'smooth',block:'nearest'});}
-}
 
 // ══════════════════════════════════════
 // LOCKOUT
 // ══════════════════════════════════════
-// Real accounts: the modal is tied to one scheduled job, uses that cleaner's own
-// fee and grace period, and can't charge until there's a photo at the door.
-// Demo accounts (no jobId) keep the sample behaviour.
+// The modal is tied to one scheduled job, uses that cleaner's own fee and grace
+// period, and can't charge until there's a photo at the door.
 let lockoutState = { jobId: null };
 function lockoutJob() {
   return lockoutState.jobId ? cleanerScheduleState.jobs.find(j => j.id === lockoutState.jobId) || null : null;
 }
 function lockoutFeeLabel() {
   const job = lockoutJob();
-  const fee = job ? Number(job.lockout_fee_amount || 0) : 35;
+  const fee = Number(job?.lockout_fee_amount || 0);
   return `Charge $${fee % 1 ? fee.toFixed(2) : fee} fee`;
 }
 function lockoutReady() {
   if (lockoutChecks !== 5) return false;
-  if (!lockoutState.jobId) return true;
+  if (!lockoutState.jobId) return false;
   const job = lockoutJob();
   return !!job && (job.lockout_photo_count || 0) >= 1 && !jpUploadStatus('j:' + job.id).pending;
 }
@@ -2318,10 +1687,10 @@ function jpRefreshLockoutPhotos() {
 }
 function showLockoutModal(jobId){
   lockoutChecks=0;
-  lockoutState.jobId = (currentUser?.isReal && jobId) ? jobId : null;
+  lockoutState.jobId = jobId || null;
   document.querySelectorAll('.check-item').forEach(el=>{el.classList.remove('checked');el.querySelector('input').checked=false;});
   const job = lockoutJob();
-  document.getElementById('lockout-grace-text').textContent = `${job ? (job.lockout_grace_mins || 15) : 15}-minute`;
+  document.getElementById('lockout-grace-text').textContent = `${job?.lockout_grace_mins || 15}-minute`;
   document.getElementById('lockout-btn').textContent = lockoutFeeLabel();
   jpRefreshLockoutPhotos();
   lockoutUpdateButton();
@@ -2353,11 +1722,7 @@ function closeModal(){
 }
 async function confirmLockout(){
   const job = lockoutJob();
-  if (!job) {
-    closeModal();
-    setTimeout(()=>showToast('Lockout fee of $35 charged. Client notified. Will appear in earnings within 24 hours.','success'),100);
-    return;
-  }
+  if (!job) { closeModal(); return; }
   const btn = document.getElementById('lockout-btn');
   btn.disabled = true;
   btn.textContent = 'Charging…';
@@ -2376,154 +1741,14 @@ async function confirmLockout(){
   }
 }
 
-// ── Frequency modal (for clients) ─────────────────────────────────────────────
-let _frequencyEditBtn = null;
-let _frequencyEditData = null;
 
-function openFrequencyModal(btn, data) {
-  _frequencyEditBtn = btn;
-  _frequencyEditData = data;
 
-  // Set the subtitle
-  const sub = document.getElementById('freq-modal-sub');
-  if (sub) sub.textContent = 'Currently ' + data.freq.toLowerCase() + ' with ' + data.name;
-
-  // Pre-select current frequency
-  const select = document.getElementById('freq-select');
-  if (select) select.value = data.freq;
-
-  // Show modal
-  const modal = document.getElementById('frequency-modal');
-  modal.classList.add('show');
-  if (select) select.focus();
-
-  // Add escape handler
-  const escapeHandler = (e) => {
-    if (e.key === 'Escape') closeFrequencyModal();
-  };
-  modal._escapeHandler = escapeHandler;
-  modal.addEventListener('keydown', escapeHandler);
-}
-
-function closeFrequencyModal() {
-  const modal = document.getElementById('frequency-modal');
-  modal.classList.remove('show');
-  if (modal._escapeHandler) {
-    modal.removeEventListener('keydown', modal._escapeHandler);
-    delete modal._escapeHandler;
-  }
-  if (_frequencyEditBtn) {
-    _frequencyEditBtn.focus();
-    _frequencyEditBtn = null;
-  }
-}
-
-function saveFrequencyChange() {
-  const freq = document.getElementById('freq-select')?.value;
-
-  if (!freq) {
-    showToast('Please select a frequency', 'error');
-    return;
-  }
-
-  closeFrequencyModal();
-  setTimeout(() => {
-    showToast(
-      `Cleaning frequency updated to ${freq}! Changes take effect on your next scheduled booking.`,
-      'success'
-    );
-  }, 100);
-}
 
 // ── Recurring edit modal ───────────────────────────────────────────────────────
 let _recurringEditBtn = null; // remember which button triggered the modal
 
-function openRecurringEdit(btn, data) {
-  // For clients, use the simpler frequency modal instead
-  if (data.isClient) {
-    openFrequencyModal(btn, data);
-    return;
-  }
 
-  _recurringEditBtn = btn;
 
-  // Populate subtitle with who this booking is with
-  const sub = document.getElementById('rec-edit-sub');
-  if (sub) sub.textContent = 'Updating your booking with ' + data.name;
-
-  // Pre-select current values
-  const setVal = (id, val) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    val = val || '';
-    if (!el.options) { el.value = val; return; } // textarea or other input
-    // For selects, try exact value match first, then text match
-    for (const opt of el.options) {
-      if (opt.value === val) { el.value = opt.value; return; }
-    }
-    // If no exact match, try matching by text
-    for (const opt of el.options) {
-      if (opt.text === val || opt.text.toLowerCase().includes(val.toLowerCase())) {
-        el.value = opt.value;
-        return;
-      }
-    }
-  };
-
-  setVal('rec-edit-freq',     data.freq);
-  setVal('rec-edit-day',      data.day);
-  setVal('rec-edit-time',     data.time);
-  setVal('rec-edit-duration', data.duration);
-
-  const noteEl = document.getElementById('rec-edit-note');
-  if (noteEl) noteEl.value = data.note || '';
-
-  // Show modal + focus trap
-  const modal = document.getElementById('recurring-edit-modal');
-  modal.classList.add('show');
-  const firstFocusable = modal.querySelector('select, textarea, button');
-  if (firstFocusable) firstFocusable.focus();
-
-  const trapHandler = (e) => {
-    if (e.key === 'Escape') { closeRecurringEdit(); return; }
-    if (e.key !== 'Tab') return;
-    const focusable = Array.from(modal.querySelectorAll('select, textarea, button:not([disabled])'));
-    const first = focusable[0], last = focusable[focusable.length - 1];
-    if (e.shiftKey ? document.activeElement === first : document.activeElement === last) {
-      e.preventDefault();
-      (e.shiftKey ? last : first).focus();
-    }
-  };
-  modal._trapHandler = trapHandler;
-  modal.addEventListener('keydown', trapHandler);
-}
-
-function closeRecurringEdit() {
-  const modal = document.getElementById('recurring-edit-modal');
-  modal.classList.remove('show');
-  if (modal._trapHandler) { modal.removeEventListener('keydown', modal._trapHandler); delete modal._trapHandler; }
-  if (_recurringEditBtn) { _recurringEditBtn.focus(); _recurringEditBtn = null; }
-}
-
-function saveRecurringEdit() {
-  const freq     = document.getElementById('rec-edit-freq')?.value;
-  const day      = document.getElementById('rec-edit-day')?.value;
-  const timeVal  = document.getElementById('rec-edit-time')?.value;
-  const duration = document.getElementById('rec-edit-duration')?.value;
-
-  // Format time for display (e.g. "11:00" → "11am")
-  const [h] = timeVal.split(':').map(Number);
-  const displayTime = h === 12 ? '12pm' : h > 12 ? `${h-12}pm` : `${h}am`;
-
-  closeRecurringEdit();
-  setTimeout(() => {
-    showToast(
-      `Recurring schedule updated to ${freq}, every ${day} at ${displayTime} for ${duration} hrs. ` +
-      'Changes take effect on the next booking.',
-      'success'
-    );
-  }, 100);
-}
 
 // ══════════════════════════════════════
 // NOTIFICATIONS
@@ -2538,7 +1763,12 @@ function jpNotifEmptyHtml() {
 // Where tapping a notification takes you, by its type and your role.
 function jpNotifTarget(type = '') {
   const role = currentUser?.role;
-  if (role === 'admin') return /dispute/.test(type) ? 'a-disputes' : null;
+  if (role === 'admin') {
+    if (/dispute/.test(type)) return 'a-disputes';
+    if (/support/.test(type)) return 'a-support';
+    if (/lockout/.test(type)) return 'a-lockouts';
+    return 'a-dashboard';
+  }
   if (/^payout/.test(type)) return role === 'cleaner' ? 'c-earnings' : null;
   if (/^dispute/.test(type)) return role === 'cleaner' ? 'c-earnings' : 'cl-bookings';
   if (['review_prompt', 'lockout_fee_charged', 'cleaner_arrived', 'job_accepted'].includes(type)) return 'cl-bookings';
@@ -2618,33 +1848,7 @@ function buildNotifs() {
     }, 60000);
     return;
   }
-  const notifs = currentUser.role==='cleaner'?notifsCleaner:currentUser.role==='client'?notifsClient:notifsAdmin;
-  // Use createElement + textContent (never innerHTML) to prevent XSS
-  list.innerHTML = '';
-  notifs.forEach(n => {
-    const item = document.createElement('div');
-    item.className = 'notif-item' + (n.unread ? ' unread' : '');
-    if (n.action) item.addEventListener('click', () => { showPage(n.action); toggleNotif(); });
-
-    const iconEl = document.createElement('div');
-    iconEl.style.cssText = 'font-size:18px;margin-bottom:4px';
-    iconEl.textContent = n.icon;
-
-    const titleEl = document.createElement('div');
-    titleEl.className = 'notif-title';
-    titleEl.textContent = n.title;
-
-    const bodyEl = document.createElement('div');
-    bodyEl.className = 'notif-body';
-    bodyEl.textContent = n.body;
-
-    const timeEl = document.createElement('div');
-    timeEl.className = 'notif-time';
-    timeEl.textContent = n.time;
-
-    item.append(iconEl, titleEl, bodyEl, timeEl);
-    list.appendChild(item);
-  });
+  list.innerHTML = jpNotifEmptyHtml();
 }
 function toggleNotif(){
   notifOpen = !notifOpen;
@@ -2672,7 +1876,7 @@ document.addEventListener('click', e => {
 function buildMsgList() {
   const list = document.getElementById('c-msg-list'); if (!list) return;
   const convos = getCleanerConversations();
-  const times = ['2m','1h','Yesterday','Mon'];
+  const times = [];   // conversations don't carry a display time yet
   list.innerHTML = '';
   if (cleanerMessageState.loaded && convos.length === 0) {
     renderClientMessageEmpty(list, 'No conversations yet', 'Conversations with clients will appear here once a job is booked.');
@@ -2687,7 +1891,7 @@ function buildMsgList() {
     const name = document.createElement('div'); name.className = 'msg-li-name'; name.textContent = c.name;
     const time = document.createElement('div'); time.className = 'msg-li-time'; time.textContent = times[i] || '';
     top.appendChild(name);
-    if (i === 0 || c.unread) { const dot = document.createElement('div'); dot.className = 'msg-unread'; dot.setAttribute('aria-label','Unread'); top.appendChild(dot); }
+    if (c.unread) { const dot = document.createElement('div'); dot.className = 'msg-unread'; dot.setAttribute('aria-label','Unread'); top.appendChild(dot); }
     top.appendChild(time);
 
     const preview = document.createElement('div'); preview.className = 'msg-li-preview';
@@ -2709,44 +1913,23 @@ function selConvo(idx,el,side){
 // REVIEWS
 // ══════════════════════════════════════
 function setStar(n){starRating=n;document.querySelectorAll('#star-pick span').forEach((s,i)=>s.style.color=i<n?'var(--a)':'var(--s200)');}
-function submitReview(){
-  const txt=document.getElementById('review-txt')?.value.trim();if(!txt){showToast('Please write a review before submitting.','warn');return;}
-  document.getElementById('review-card').innerHTML=`<div style="text-align:center;padding:2rem"><div style="font-size:32px;color:var(--a);margin-bottom:.75rem">${'★'.repeat(starRating)}</div><div style="font-size:16px;font-weight:500;margin-bottom:6px">Review submitted!</div><div style="font-size:13px;color:var(--tx2);margin-bottom:1.25rem">Your ${starRating}-star review for Jordan Martinez is now live.</div><button class="btn primary" onclick="showPage('cl-bookings')">Back to bookings</button></div>`;
-}
-
-// ══════════════════════════════════════
-// BACKGROUND CHECK
-// ══════════════════════════════════════
-function startBgCheck(){
-  document.getElementById('bg-pay-card').style.display='none';
-  document.getElementById('bg-progress-card').style.display='block';
-  ['bg2','bg3','bg4','bg5'].forEach((id,i)=>setTimeout(()=>{const el=document.getElementById(id);if(el){el.className='bgflow-num done';el.textContent='✓';}},500*(i+1)));
-}
-
-// ══════════════════════════════════════
-// ADMIN
-// ══════════════════════════════════════
-function resolveDispute(btn,ruling){
-  const card=btn.closest('.dispute-card');
-  card.style.borderLeftColor='var(--g)';
-  card.querySelector('.tag.red,.tag.amber').className='tag green';
-  card.querySelector('.tag.green').textContent='Resolved';
-  card.querySelector('.actions').innerHTML=`<div style="font-size:13px;color:var(--gd)">✓ Resolved — ${ruling==='cleaner'?'Lockout fee upheld, paid to cleaner':'Fee refunded to client'}. Both parties notified.</div>`;
-}
 
 // ══ BIDDING SYSTEM JS ═══════════════════════════════════════
 
 // ─── loadAvailableJobs: populate cleaner's "Open jobs near me" page ──────────
 function loadAvailableJobs() {
-  if (!currentUser?.isReal) return; // demo mode uses static HTML content
-  const container = document.querySelector('#page-c-jobs .jobs-list, #page-c-jobs');
+  if (!currentUser?.isReal) return;
+  const container = document.getElementById('page-c-jobs');
   if (!container) return;
+  const head = `<div class="pg-title">Open jobs near you</div>
+    <div class="pg-sub">Bidding is free — you only pay a success fee when you win</div>
+    <div class="alert warn" style="font-size:13px"><strong>How bidding works:</strong> Send a custom quote and message for any job. The client reviews all bids and picks the best fit. If chosen, a 10% success fee is deducted from your quote. If not chosen, it costs you nothing.</div>`;
 
   SparkleAPI.getAvailableJobs()
     .then(data => {
       const jobs = data?.jobs || [];
       if (jobs.length === 0) {
-        container.innerHTML = `
+        container.innerHTML = head + `
           <div style="text-align:center;padding:3rem 1rem;color:var(--tx2)">
             <div style="font-size:32px;margin-bottom:.75rem">🏡</div>
             <div style="font-weight:500;margin-bottom:4px">No open jobs nearby yet</div>
@@ -2755,7 +1938,7 @@ function loadAvailableJobs() {
         return;
       }
       // Render job cards
-      container.innerHTML = jobs.map((job, i) => `
+      container.innerHTML = head + jobs.map((job, i) => `
         <div class="card" id="bjc-real-${i}" style="margin-bottom:1rem">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.75rem">
             <div>
@@ -3072,7 +2255,7 @@ function closeMileageModal() {
 }
 
 function loadMileageLog() {
-  if (!currentUser?.isReal) return; // demo mode doesn't support mileage tracking
+  if (!currentUser?.isReal) return;
 
   SparkleAPI.getMileageStats('month')
     .then(stats => {
@@ -3131,8 +2314,7 @@ function loadMileageLog() {
 }
 
 // ══════════════════════════════════════════════════════════════
-// REAL DATA LOADERS — replace static demo content with the signed-in
-// user's real data. Every loader is a no-op in demo mode.
+// DATA LOADERS — each page is filled with the signed-in user's data when it opens.
 // ══════════════════════════════════════════════════════════════
 
 function loadCleanerDashboard() {
@@ -3166,7 +2348,7 @@ function loadCleanerDashboard() {
       `<div class="card-sm"><div class="row c"><div><div style="font-size:13px;font-weight:500">${escapeHtml(j.service_type || 'Cleaning')}</div><div class="meta">${escapeHtml(j.address || '')}</div></div><button class="btn primary sm" onclick="showPage('c-jobs')">View</button></div></div>`
     ).join('') : `<div class="card-sm" style="color:var(--tx2)">No open jobs near you right now — check back soon.</div>`;
 
-    const bgBanner = profile.is_verified ? '' : `<div class="alert warn" style="margin-top:.5rem">🛡️ Complete your <strong>background check</strong> to earn your Verified badge and get 3× more bookings. <a href="#" onclick="showPage('c-bgcheck');return false" style="color:var(--ad)">Start now — $30 →</a></div>`;
+    const bgBanner = profile.is_verified ? '' : `<div class="alert warn" style="margin-top:.5rem">🛡️ Complete your <strong>background check</strong> to earn your Verified badge and stand out to clients. <a href="#" onclick="showPage('c-bgcheck');return false" style="color:var(--ad)">Learn more →</a></div>`;
 
     const tier = profile.badge_tier || 'none';
     const credBanner = tier === 'licensed_and_insured'
@@ -4466,17 +3648,12 @@ let cleanerMessageState = {
 };
 
 function getCleanerConversations() {
-  return cleanerMessageState.loaded ? cleanerMessageState.conversations : convosCleaner;
+  return cleanerMessageState.conversations;
 }
 
 async function loadCleanerMessages() {
   const list = document.getElementById('c-msg-list'); if (!list) return;
-  if (!currentUser?.isReal) {
-    cleanerMessageState.loaded = false;
-    buildMsgList();
-    renderConvo(0, 'cleaner');
-    return;
-  }
+  if (!currentUser?.isReal) return;
   if (cleanerMessageState.loading) return;
   cleanerMessageState.loading = true;
   list.innerHTML = `<div style="padding:1.5rem;text-align:center;color:var(--tx2)"><div style="font-size:28px;margin-bottom:.5rem">💬</div><div style="font-weight:500">Loading messages…</div></div>`;
@@ -4520,10 +3697,6 @@ async function loadCleanerConversation(idx) {
   const bodyEl = document.getElementById('msg-body');
   if (!convo || !bodyEl) return;
   cleanerMessageState.activeIndex = idx;
-  if (!currentUser?.isReal) {
-    renderConvo(idx, 'cleaner');
-    return;
-  }
   if (!convo.userId) {
     renderClientConversationLoading(bodyEl, convo.name);
     return;
@@ -4569,11 +3742,11 @@ function postJob() {
     return;
   }
 
-  // Get selected service type (first "on" chip, default to Standard)
-  const serviceEl   = page?.querySelector('.svc-chip.on');
-  const serviceType = serviceEl?.textContent?.trim() || 'Standard';
+  // The "Type of cleaning" dropdown. (This used to look for service chips that
+  // don't exist on this form, so every job was posted as "Standard".)
+  const serviceType = document.getElementById('job-type')?.value || 'Standard clean';
 
-  if (currentUser?.isReal) {
+  if (currentUser) {
     // ── Real session: hit the backend API ──────────────────────────
     const postBtn = page?.querySelector('.btn-primary, button[onclick="postJob()"]');
     if (postBtn) { postBtn.disabled = true; postBtn.textContent = 'Posting…'; }
@@ -4599,11 +3772,6 @@ function postJob() {
         showToast('Could not post job: ' + err.message, 'error');
       }
     });
-  } else {
-    // ── Demo mode: navigate and show success toast ──────────────────
-    showPage('cl-bookings');
-    setTimeout(() => { document.getElementById('page-cl-bookings')?.scrollTo(0, 0); }, 100);
-    showToast('Job posted! Cleaners in your area will be notified within minutes.', 'success');
   }
 }
 
@@ -4637,44 +3805,12 @@ function updateBidBreakdown(idx) {
   document.getElementById('bd-net-' + idx).textContent  = '$' + net.toFixed(2);
 }
 
-function submitBid(idx, clientName) {
-  const price = document.getElementById('bid-price-' + idx)?.value;
-  const msg   = document.getElementById('bid-msg-' + idx)?.value;
-  if (!price || parseFloat(price) < 1) { showToast('Please enter your quote amount first.', 'warn'); return; }
-  if (!msg || msg.trim().length < 10) { showToast('Please write a short message to the client (at least 10 characters) — it really helps you get chosen!', 'warn'); return; }
-  // Animate the card
-  const card = document.getElementById('bjc-' + idx);
-  if(card) {
-    card.style.opacity = '.6';
-    card.style.pointerEvents = 'none';
-    const form = document.getElementById('bid-form-' + idx);
-    if(form) form.style.display = 'none';
-    // Update status badge
-    const badge = card.querySelector('.job-open-badge, .tag');
-    if(badge) { badge.className='tag green'; badge.textContent='Quote sent ✓'; }
-    const meta = card.querySelector('.meta');
-    if(meta) {
-      const extra = document.createElement('span');
-      extra.innerHTML = ' · Your quote: <strong>$' + parseFloat(price).toFixed(0) + '</strong> · Waiting for client decision';
-      meta.appendChild(extra);
-    }
-    card.style.opacity = '.7';
-    card.style.pointerEvents = '';
-  }
-  // Add notification
-  showToast('Quote sent to ' + clientName + '! You quoted $' + parseFloat(price).toFixed(0) + '. You\'ll be notified if they choose you.', 'success');
-}
 
 function skipJob(idx) {
   const card = document.getElementById('bjc-' + idx);
   if(card) { card.style.transition='opacity .3s'; card.style.opacity='0'; setTimeout(()=>card.remove(),300); }
 }
 
-function hlBidJob(idx) {
-  document.querySelectorAll('[id^=bjc-]').forEach(c=>c.style.outline='');
-  const c = document.getElementById('bjc-' + idx);
-  if(c) { c.style.outline='2px solid var(--g)'; c.scrollIntoView({behavior:'smooth',block:'nearest'}); }
-}
 
 function sortCleaners(by, btn) {
   // Update active button
@@ -4708,142 +3844,13 @@ function sortCleaners(by, btn) {
   cleaners.forEach(cleaner => container.appendChild(cleaner));
 }
 
-function sortBids(by, btn) {
-  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  const container = document.querySelector('#page-cl-bookings .card');
-  if (!container) return;
-  const bids = Array.from(container.querySelectorAll('.bid-card'));
-  if (!bids.length) return;
 
-  bids.sort((a, b) => {
-    if (by === 'price') {
-      const pa = parseFloat(a.querySelector('.bid-amount')?.textContent?.replace('$', '') || 999);
-      const pb = parseFloat(b.querySelector('.bid-amount')?.textContent?.replace('$', '') || 999);
-      return pa - pb;
-    }
-    if (by === 'rating') {
-      const ratings = { 'JM': 4.9, 'AL': 4.8, 'KR': 5.0 };
-      const ra = ratings[a.querySelector('.av')?.textContent] || 0;
-      const rb = ratings[b.querySelector('.av')?.textContent] || 0;
-      return rb - ra; // descending
-    }
-    if (by === 'speed') {
-      const getMin = el => {
-        const t = el.querySelector('.meta')?.textContent || '';
-        if (t.includes('12 min')) return 12;
-        if (t.includes('38 min')) return 38;
-        if (t.includes('1 hr'))   return 60;
-        return 999;
-      };
-      return getMin(a) - getMin(b);
-    }
-    return 0;
-  });
 
-  // Find the anchor row (the "Close job" div at the bottom of the card)
-  // and insert all sorted bid cards directly before it — single pass, correct order
-  const anchor = container.querySelector('[style*="border-top"]');
-  bids.forEach(bid => container.insertBefore(bid, anchor || null));
-}
-
-function chooseCleaner(name, quote, btn) {
-  const amount = parseFloat(quote.replace('$',''));
-  const fee    = (amount * 0.08).toFixed(2);
-  const total  = (amount + parseFloat(fee)).toFixed(2);
-
-  document.getElementById('confirm-title').textContent = 'Booking confirmed with ' + name + '!';
-  document.getElementById('confirm-sub').textContent   = 'Saturday May 3 at 10am · ' + name + ' has been notified.';
-  document.getElementById('confirm-quote').textContent = quote;
-  document.getElementById('confirm-fee').textContent   = '$' + fee;
-  document.getElementById('confirm-total').textContent = '$' + total;
-
-  // Hide the open job card
-  const openJob = document.querySelector('#page-cl-bookings .card[style*="border-color"]');
-  if(openJob) { openJob.style.display='none'; }
-
-  // Show confirmation
-  document.getElementById('booking-confirm-card').style.display = 'block';
-  document.getElementById('booking-confirm-card').scrollIntoView({behavior:'smooth'});
-}
-
-function viewProfile() {
-  showPage('cl-find');
-}
 
 
 // ══ PRO MEMBERSHIP PAYMENT MODAL ══════════════════════════════
 
-function openProPayment(plan, price) {
-  // Create and show payment modal
-  const existing = document.getElementById('pro-payment-modal');
-  if(existing) existing.remove();
 
-  const modal = document.createElement('div');
-  modal.id = 'pro-payment-modal';
-  modal.className = 'modal-overlay show';
-  modal.innerHTML = `
-    <div class="modal" style="width:420px">
-      <div style="text-align:center;margin-bottom:1.25rem">
-        <div style="font-size:28px;margin-bottom:6px">⭐</div>
-        <div style="font-size:17px;font-weight:500;color:var(--gold)">
-          Upgrade to Sparkle Pro ${plan === 'annual' ? '(Annual)' : '(Monthly)'}
-        </div>
-        <div style="font-size:13px;color:var(--tx2);margin-top:4px">${price} · Cancel anytime</div>
-      </div>
-      <div style="background:var(--goldl);border-radius:var(--rad);padding:.875rem 1rem;margin-bottom:1.25rem;font-size:13px;color:var(--ad)">
-        ✓ Priority job notifications &nbsp;·&nbsp; ✓ Featured badge &nbsp;·&nbsp; ✓ 10% monthly bonus
-      </div>
-      <div class="frow"><label class="flbl">Card number</label>
-        <input class="inp" placeholder="4242 4242 4242 4242" maxlength="19"
-          oninput="this.value=this.value.replace(/[^0-9]/g,'').replace(/(.{4})/g,'$1 ').trim()">
-      </div>
-      <div class="f2">
-        <div class="frow"><label class="flbl">Expiry</label><input class="inp" placeholder="MM / YY" maxlength="7"></div>
-        <div class="frow"><label class="flbl">CVC</label><input class="inp" placeholder="123" maxlength="3"></div>
-      </div>
-      <div class="frow"><label class="flbl">Name on card</label><input class="inp" placeholder="Jordan Martinez"></div>
-      <div style="font-size:11px;color:var(--tx3);text-align:center;margin-bottom:1rem">
-        🔒 Secured by Stripe · Your card info never touches our servers
-      </div>
-      <div class="modal-actions">
-        <button class="btn" onclick="document.getElementById('pro-payment-modal').remove()">Cancel</button>
-        <button class="btn gold-btn" onclick="completeProPayment('${plan}','${price}',this)">
-          Subscribe — ${price}
-        </button>
-      </div>
-    </div>`;
-  document.body.appendChild(modal);
-}
-
-function completeProPayment(plan, price, btn) {
-  const modal = document.getElementById('pro-payment-modal');
-  const cardInput = modal.querySelector('input[placeholder*="4242"]');
-  const nameInput = modal.querySelector('input[placeholder="Jordan Martinez"]');
-  
-  if(!cardInput.value || cardInput.value.replace(/\s/g,'').length < 16) {
-    cardInput.style.borderColor = 'var(--r)';
-    cardInput.focus();
-    return;
-  }
-  
-  btn.textContent = 'Processing…';
-  btn.disabled = true;
-  
-  setTimeout(() => {
-    modal.remove();
-    // Update Pro page to show active state
-    document.querySelectorAll('.btn.gold-btn.lg, .btn.purple-btn.lg').forEach(b => {
-      if(b.textContent.includes('Upgrade') || b.textContent.includes('Annual')) {
-        b.textContent = '✓ Pro Active';
-        b.disabled = true;
-        b.style.background = 'var(--gd)';
-      }
-    });
-    // Show success notification
-    showToast('⭐ Pro membership activated! Your badge is now live on your profile.', 'success');
-  }, 1800);
-}
 
 // ══ CASHOUT MODAL ══════════════════════════════════════════════
 
@@ -4851,12 +3858,11 @@ function openCashout() {
   const existing = document.getElementById('cashout-modal');
   if(existing) existing.remove();
 
-  const isReal  = !!currentUser?.isReal;
-  const pending = isReal ? cleanerEarningsState.pending : 419.00;
-  if (isReal && pending < 1) { showToast('No earnings available to cash out yet.', 'warn'); return; }
-  const instantFee = isReal ? cleanerEarningsState.instantFee : 10.00;
+  const pending = cleanerEarningsState.pending;
+  if (pending < 1) { showToast('No earnings available to cash out yet.', 'warn'); return; }
+  const instantFee = cleanerEarningsState.instantFee;
   const instantNet = Math.max(0, pending - instantFee);
-  const acct = isReal ? '' : ' · Chase ···4832';
+  const acct = '';
 
   const modal = document.createElement('div');
   modal.id = 'cashout-modal';
@@ -4868,7 +3874,7 @@ function openCashout() {
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:1.25rem">
         <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1.5px solid var(--bdr2);border-radius:var(--rad);cursor:pointer;transition:all .15s" onclick="selectCashoutType(this,'standard')">
           <input type="radio" name="cashout" value="standard" style="accent-color:var(--g);margin-top:2px" checked>
-          <div><div style="font-size:13px;font-weight:500">Standard payout — Free</div><div style="font-size:12px;color:var(--tx2)">${isReal ? 'Arrives in 1–3 business days' : 'Arrives by next Monday'}${acct}</div></div>
+          <div><div style="font-size:13px;font-weight:500">Standard payout — Free</div><div style="font-size:12px;color:var(--tx2)">Arrives in 1–3 business days${acct}</div></div>
           <div style="margin-left:auto;font-size:14px;font-weight:500;color:var(--gd)">$${pending.toFixed(2)}</div>
         </label>
         <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1.5px solid var(--bdr2);border-radius:var(--rad);cursor:pointer;transition:all .15s" onclick="selectCashoutType(this,'instant')">
@@ -4899,16 +3905,6 @@ function confirmCashout(btn) {
   btn.textContent = 'Processing…';
   btn.disabled = true;
 
-  if (!currentUser?.isReal) {
-    setTimeout(() => {
-      document.getElementById('cashout-modal').remove();
-      showToast(selected === 'instant'
-        ? '⚡ Instant payout of $409.00 sent — arriving within minutes!'
-        : '💰 Standard payout of $419.00 sent — arriving by Monday. Free!', 'success');
-    }, 1500);
-    return;
-  }
-
   SparkleAPI.cashout(selected).then(result => {
     document.getElementById('cashout-modal')?.remove();
     // 'processing' means the bank transfer's outcome isn't confirmed yet; the
@@ -4927,40 +3923,7 @@ function confirmCashout(btn) {
 
 // ══ ADD CARD MODAL ══════════════════════════════════════════════
 
-function openAddCard() {
-  const existing = document.getElementById('addcard-modal');
-  if(existing) existing.remove();
-  const modal = document.createElement('div');
-  modal.id = 'addcard-modal';
-  modal.className = 'modal-overlay show';
-  modal.innerHTML = `
-    <div class="modal">
-      <div class="modal-title">Add payment method</div>
-      <div class="frow"><label class="flbl">Card number</label>
-        <input class="inp" placeholder="4242 4242 4242 4242" maxlength="19"
-          oninput="this.value=this.value.replace(/[^0-9]/g,'').replace(/(.{4})/g,'$1 ').trim()">
-      </div>
-      <div class="f2">
-        <div class="frow"><label class="flbl">Expiry</label><input class="inp" placeholder="MM / YY"></div>
-        <div class="frow"><label class="flbl">CVC</label><input class="inp" placeholder="123" maxlength="3"></div>
-      </div>
-      <div class="frow"><label class="flbl">Name on card</label><input class="inp" placeholder="Sarah K."></div>
-      <div style="font-size:11px;color:var(--tx3);text-align:center;margin-bottom:.875rem">🔒 Secured by Stripe</div>
-      <div class="modal-actions">
-        <button class="btn" onclick="document.getElementById('addcard-modal').remove()">Cancel</button>
-        <button class="btn primary" onclick="confirmAddCard(this)">Add card</button>
-      </div>
-    </div>`;
-  document.body.appendChild(modal);
-}
 
-function confirmAddCard(btn) {
-  btn.textContent = 'Saving…'; btn.disabled = true;
-  setTimeout(() => {
-    document.getElementById('addcard-modal').remove();
-    showToast('💳 Card added successfully!', 'success');
-  }, 1200);
-}
 
 // ══ PARTNER LINKS ══════════════════════════════════════════════
 
@@ -4997,7 +3960,7 @@ function saveSuccess(btn, msg) {
 
 // LIVE client portal loaders
 function getClientConversations() {
-  return clientMessageState.loaded ? clientMessageState.conversations : convosClient;
+  return clientMessageState.conversations;
 }
 function getClientConversation(idx) {
   return getClientConversations()[idx] || null;
@@ -5005,8 +3968,7 @@ function getClientConversation(idx) {
 function getClientConversationLabel(convo, idx) {
   if (convo?.sub) return convo.sub;
   if (convo?.preview) return convo.preview;
-  const fallback = ['5m', 'Yesterday', 'Mon', 'Thu'];
-  return fallback[idx] || 'New conversation';
+  return 'New conversation';
 }
 function renderClientConversationLoading(bodyEl, name) {
   bodyEl.innerHTML = `<div style="padding:1.5rem;text-align:center;color:var(--tx2)">Loading conversation with ${escapeHtml(name)}…</div>`;
@@ -5030,12 +3992,7 @@ function renderClientMessageEmpty(listEl, title, body) {
 }
 async function loadClientMessages() {
   const list = document.getElementById('cl-msg-list'); if (!list) return;
-  if (!currentUser?.isReal) {
-    clientMessageState.loaded = false;
-    buildClMsgList();
-    renderConvo(0, 'client');
-    return;
-  }
+  if (!currentUser?.isReal) return;
   if (clientMessageState.loading) return;
   clientMessageState.loading = true;
   list.innerHTML = `<div style="padding:1.5rem;text-align:center;color:var(--tx2)"><div style="font-size:28px;margin-bottom:.5rem">💬</div><div style="font-weight:500">Loading messages…</div></div>`;
@@ -5078,10 +4035,6 @@ async function loadClientConversation(idx) {
   const bodyEl = document.getElementById('cl-msg-body');
   if (!convo || !bodyEl) return;
   clientMessageState.activeIndex = idx;
-  if (!currentUser?.isReal) {
-    renderConvo(idx, 'client');
-    return;
-  }
   if (!convo.userId) {
     renderClientConversationLoading(bodyEl, convo.name);
     return;
@@ -5106,7 +4059,7 @@ async function loadClientConversation(idx) {
 function buildClMsgList() {
   const list = document.getElementById('cl-msg-list'); if (!list) return;
   const convos = getClientConversations();
-  const times = ['5m','Yesterday','Mon','Thu'];
+  const times = [];   // conversations don't carry a display time yet
   list.innerHTML = '';
   if (clientMessageState.loaded && convos.length === 0) {
     renderClientMessageEmpty(list, 'No conversations yet', 'Send a message from a cleaner card to start your first thread.');
@@ -5121,7 +4074,7 @@ function buildClMsgList() {
     const name = document.createElement('div'); name.className = 'msg-li-name'; name.textContent = c.name;
     const time = document.createElement('div'); time.className = 'msg-li-time'; time.textContent = times[i] || '';
     top.appendChild(name);
-    if (i === 0 || c.unread) { const dot = document.createElement('div'); dot.className = 'msg-unread'; dot.setAttribute('aria-label','Unread'); top.appendChild(dot); }
+    if (c.unread) { const dot = document.createElement('div'); dot.className = 'msg-unread'; dot.setAttribute('aria-label','Unread'); top.appendChild(dot); }
     top.appendChild(time);
 
     const preview = document.createElement('div'); preview.className = 'msg-li-preview';
@@ -5190,13 +4143,7 @@ async function sendMsg() {
   const convo = getCleanerConversations()[idx];
   if (!convo) return;
 
-  if (!currentUser?.isReal || !cleanerMessageState.loaded || !convo.userId) {
-    convo.msgs = convo.msgs || [];
-    convo.msgs.push({ t:'me', m: txt });
-    renderConvo(idx, 'cleaner');
-    inp.value = '';
-    return;
-  }
+  if (!cleanerMessageState.loaded || !convo.userId) return;
 
   convo.msgs = convo.msgs || [];
   convo.msgs.push({ t:'me', m: txt });
@@ -5222,14 +4169,7 @@ async function sendClMsg() {
   const convo = getClientConversation(clientMessageState.activeIndex || activeConvo);
   if (!convo) return;
 
-  if (!currentUser?.isReal || !clientMessageState.loaded || !convo.userId) {
-    convo.msgs = convo.msgs || [];
-    convo.msgs.push({ t:'me', m: txt });
-    clientMessageState.activeIndex = clientMessageState.activeIndex || activeConvo;
-    renderConvo(clientMessageState.activeIndex, 'client');
-    inp.value = '';
-    return;
-  }
+  if (!clientMessageState.loaded || !convo.userId) return;
 
   convo.msgs = convo.msgs || [];
   convo.msgs.push({ t:'me', m: txt });
@@ -5396,8 +4336,7 @@ function renderClientPayments() {
   page.innerHTML = `
     <div class="pg-title">Payments</div>
     <div class="pg-sub">Payment methods and history</div>
-    <div class="alert info" style="margin-bottom:1rem;font-size:12px">Stripe customer: ${escapeHtml(customerId)}</div>
-    <div class="sect-hd" style="margin-bottom:.75rem"><div class="sect-title">Payment methods</div><button class="btn sm" onclick="openAddCard()">+ Add card</button></div>
+    <div class="sect-hd" style="margin-bottom:.75rem"><div class="sect-title">Payment methods</div></div>
     ${methodHtml}
     <div class="divider"></div>
     <div class="sect-title" style="margin-bottom:.75rem">Payment history</div>
@@ -5558,173 +4497,39 @@ async function submitReview() {
   }
 }
 
-function arrivedConfirm(btn) {
-  btn.textContent = '✓ Arrival confirmed!';
-  btn.style.background = 'var(--gd)';
-  btn.disabled = true;
-  showToast('Client notified — your arrival has been recorded. Timer started.', 'success');
-}
 
-function addSparkleGuarantee(btn) {
-  // Get the current total
-  const totalEl = document.getElementById('confirm-total');
-  if (!totalEl) return;
 
-  // Parse the current total (remove $ and convert to number)
-  const currentTotal = parseFloat(totalEl.textContent.replace('$', ''));
-  const guaranteeFee = 12.00;
-  const newTotal = currentTotal + guaranteeFee;
 
-  // Show the guarantee fee line
-  const guaranteeLine = document.getElementById('guarantee-fee-line');
-  if (guaranteeLine) guaranteeLine.style.display = '';
 
-  // Update the total
-  totalEl.textContent = '$' + newTotal.toFixed(2);
-
-  // Update the button
-  btn.textContent = '✓ Guarantee added';
-  btn.style.background = 'var(--gd)';
-  btn.style.color = '#fff';
-  btn.style.borderColor = 'var(--gd)';
-  btn.disabled = true;
-
-  // Show success toast
-  showToast('Sparkle Guarantee added! You\'re now protected against damage and quality issues.', 'success');
-}
-
-function rebookWithCleaner(booking) {
-  showConfirm({
-    title: 'Rebook with ' + booking.name + '?',
-    body: 'You\'ll post a new ' + booking.serviceType + ' job with the same details. When ' + booking.name + ' bids, you can instantly confirm.',
-    confirmLabel: 'Yes, rebook with ' + booking.name,
-    confirmClass: 'primary',
-    onConfirm: () => {
-      // Pre-fill the job posting form with previous booking details
-      const typeSelect = document.querySelector('#job-type');
-      if (typeSelect) typeSelect.value = booking.serviceType;
-
-      // Set bedrooms
-      const bedroomSelects = document.querySelectorAll('select.inp');
-      if (bedroomSelects[1]) bedroomSelects[1].value = booking.beds;
-      // Set bathrooms
-      if (bedroomSelects[2]) bedroomSelects[2].value = booking.baths;
-
-      // Set address
-      const addressInput = document.querySelector('#page-cl-post input.inp:not([type="date"])');
-      if (addressInput) addressInput.value = booking.address;
-
-      // Add note about preferring this cleaner
-      const notesTextarea = document.querySelector('#page-cl-post textarea.inp');
-      if (notesTextarea) {
-        notesTextarea.value = 'I previously worked with ' + booking.name + ' and would love to rebook with them!';
-      }
-
-      // Navigate to post page
-      showPage('cl-post');
-
-      // Show a toast confirming
-      showToast('Form prefilled with your previous booking. Ready to rebook!', 'success');
-    }
-  });
-}
-
-function cancelJob(btn) {
-  const card = btn.closest('.card');
-  showConfirm({
-    title: 'Cancel this job?',
-    body: 'This cannot be undone. The job will be removed from your schedule.',
-    confirmLabel: 'Yes, cancel job',
-    confirmClass: 'danger',
-    onConfirm: () => {
-      if (card) {
-        card.style.transition = 'opacity .4s';
-        card.style.opacity = '0';
-        setTimeout(() => card.remove(), 400);
-      }
-      showToast('Job cancelled.', 'info');
-    }
-  });
-}
-
-function endSeries(btn) {
-  const card = btn.closest('.card, .recurring-card');
-  const capturedBtn = btn;
-  showConfirm({
-    title: 'End recurring series?',
-    body: 'The next scheduled job will not be booked. This cannot be undone.',
-    confirmLabel: 'End series',
-    confirmClass: 'danger',
-    onConfirm: () => {
-      if (card) { const badge = card.querySelector('.tag.green'); if (badge) { badge.className = 'tag'; badge.textContent = 'Ended'; } }
-      capturedBtn.textContent = '✓ Series ended';
-      capturedBtn.disabled = true;
-      showToast('Recurring series ended. No more jobs will be scheduled.', 'info');
-    }
-  });
-}
 
 function confirmDelete() {
   showConfirm({
     title: 'Delete your account?',
-    body: 'This will permanently delete your account and all associated data. This cannot be undone.',
-    confirmLabel: 'Delete my account',
+    // There is no self-service deletion yet, so don't pretend one happened: route
+    // the request to Sparkle support, where an admin can act on it.
+    body: 'Sparkle support deletes accounts on request, so nothing is removed by accident. Continue to send the request from Contact support.',
+    confirmLabel: 'Request deletion',
     confirmClass: 'danger',
-    onConfirm: () => showToast('Account deletion requested. You will receive a confirmation email.', 'info')
-  });
-}
-
-function adminViewUser(btn) {
-  const row = btn.closest('tr');
-  const name = row?.querySelector('div[style*="font-weight"]')?.textContent || 'User';
-  showToast('Opening full profile for ' + name + '…', 'info');
-}
-
-function adminReviewBgCheck(name) {
-  showToast('Opening background check review for ' + name + '…', 'info');
-}
-
-function demoAdminReinstateUser(btn, name) {
-  const capturedBtn = btn;
-  showConfirm({
-    title: 'Reinstate ' + name + '?',
-    body: 'They will be able to log in and use the platform again immediately.',
-    confirmLabel: 'Reinstate',
-    confirmClass: 'primary',
     onConfirm: () => {
-      capturedBtn.textContent = '✓ Reinstated';
-      capturedBtn.disabled = true;
-      const badge = capturedBtn.closest('tr')?.querySelector('.tag.red');
-      if (badge) { badge.className = 'tag green'; badge.textContent = 'Active'; }
-      showToast(name + ' has been reinstated.', 'success');
+      const prefix = currentUser?.role === 'client' ? 'cl' : 'c';
+      const subject = document.getElementById(`${prefix}-support-subject`);
+      const message = document.getElementById(`${prefix}-support-message`);
+      if (!subject || !message) { showToast('Open Settings → Contact support to request account deletion.', 'info'); return; }
+      subject.value = 'Please delete my account';
+      subject.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      message.focus();
     }
   });
 }
 
-function demoAdminBanUser(btn, name) {
-  const capturedBtn = btn;
-  showConfirm({
-    title: 'Ban ' + name + '?',
-    body: 'They will be immediately locked out of the platform. This action is logged.',
-    confirmLabel: 'Ban user',
-    confirmClass: 'danger',
-    onConfirm: () => {
-      capturedBtn.textContent = '✓ Banned';
-      capturedBtn.disabled = true;
-      const badge = capturedBtn.closest('tr')?.querySelector('.tag.amber, .tag.green');
-      if (badge) { badge.className = 'tag red'; badge.textContent = 'Banned'; }
-      showToast(name + ' has been banned.', 'info');
-    }
-  });
-}
+
+
+
 
 // ══════════════════════════════════════
 // ADMIN — LIVE DATA (dashboard, users, disputes, background checks)
 // ══════════════════════════════════════
-// These pages ship with hardcoded sample markup so the demo tour looks complete.
-// For a real signed-in admin the loaders below replace that markup entirely with
-// data from the API — otherwise the console would keep reporting invented figures
-// no matter how many people actually sign up.
+// Every admin page is filled from the API when it opens.
 
 let adminUsersState = { users: [], total: 0, page: 1, limit: 50 };
 
@@ -5749,7 +4554,7 @@ function adminError(title, err) {
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
 async function loadAdminDashboard() {
-  if (!currentUser?.isReal) return;               // demo mode keeps the sample markup
+  if (!currentUser?.isReal) return;
   const page = document.getElementById('page-a-dashboard');
   if (!page) return;
 
@@ -6100,6 +4905,53 @@ async function adminRetryRefund(id, btn) {
   loadAdminDisputes();
 }
 
+// ── Lockout fees ─────────────────────────────────────────────────────────────
+// Every lockout fee a cleaner has charged, with the photo they took at the door
+// and whether the client disputed it.
+const LOCKOUT_STATUS_TAGS = { charged: ['green', 'Charged'], refunded: ['amber', 'Refunded'], disputed: ['red', 'Disputed'] };
+
+async function loadAdminLockouts() {
+  if (!currentUser?.isReal) return;
+  const page = document.getElementById('page-a-lockouts');
+  if (!page) return;
+
+  page.innerHTML = `<div class="pg-title">Lockout fees</div><div class="pg-sub">Loading…</div>`;
+  try {
+    const { lockout_fees: fees = [] } = await SparkleAPI.getAdminLockoutFees();
+    page.innerHTML = `
+      <div class="pg-title">Lockout fees</div>
+      <div class="pg-sub">Every lockout fee cleaners have charged, with the photo they took at the door</div>
+      ${!fees.length ? adminEmpty('No lockout fees have been charged yet.') : fees.map(f => {
+        const [color, label] = LOCKOUT_STATUS_TAGS[f.status] || ['', f.status];
+        const disputed = !!f.dispute_id;
+        const disputeText = !disputed ? 'Not disputed'
+          : f.dispute_status === 'resolved' ? `Disputed — ruled for the ${f.dispute_ruling === 'client' ? 'client' : 'cleaner'}`
+          : 'Disputed — awaiting a decision';
+        return `<div class="card">
+          <div class="row c" style="margin-bottom:.5rem">
+            <div>
+              <div style="font-size:13px;font-weight:500">${jpMoney(f.fee_amount)} lockout fee · ${escapeHtml(f.service_type || 'Job')}</div>
+              <div class="meta">${escapeHtml(f.cleaner_name || '')} (cleaner) charged ${escapeHtml(f.client_name || '')} (client) · ${escapeHtml(jpShortDateTime(f.created_at))}</div>
+            </div>
+            <span class="tag ${color}">${escapeHtml(label)}</span>
+          </div>
+          <div class="tags">
+            <span class="tag">📷 ${Number(f.door_photo_count) || 0} door photo${f.door_photo_count == 1 ? '' : 's'}</span>
+            <span class="tag">${f.charged_to_card ? 'Charged to card' : 'No card on file'}</span>
+            <span class="tag ${disputed && f.dispute_status !== 'resolved' ? 'red' : ''}">${escapeHtml(disputeText)}</span>
+          </div>
+          <div class="actions">
+            <button class="btn sm" data-act="gallery" data-job="${escapeHtml(f.job_id)}">View door photos</button>
+            ${disputed ? `<button class="btn sm" data-act="dispute-view" data-dispute="${escapeHtml(f.dispute_id)}">View dispute</button>` : ''}
+          </div>
+        </div>`;
+      }).join('')}`;
+  } catch (err) {
+    const html = adminError('Lockout fees', err);
+    if (html) page.innerHTML = html;
+  }
+}
+
 // ── Background checks ────────────────────────────────────────────────────────
 const BG_STATUS_TAGS = { pending: 'amber', clear: 'green', consider: 'red', suspended: 'red', dispute: 'red' };
 
@@ -6302,16 +5154,7 @@ async function loadAdminSupport() {
   const listEl = document.getElementById('support-ticket-list');
   if (!listEl) return;
 
-  if (!currentUser?.isReal) {
-    listEl.innerHTML = `
-      <div class="msg-li active"><div class="msg-li-top"><div class="msg-li-name">Demo: Jordan M.</div><span class="tag red" style="margin-left:auto;font-size:10px">Open</span></div><div class="msg-li-preview">Can't verify my background check status</div></div>
-      <div class="msg-li"><div class="msg-li-top"><div class="msg-li-name">Demo: Sarah K.</div><span class="tag amber" style="margin-left:auto;font-size:10px">In progress</span></div><div class="msg-li-preview">Refund question about last booking</div></div>
-      <div class="msg-li"><div class="msg-li-top"><div class="msg-li-name">Demo: Visitor</div><span class="tag green" style="margin-left:auto;font-size:10px">Resolved</span></div><div class="msg-li-preview">General question about pricing</div></div>`;
-    document.getElementById('support-thread-hdr').style.display = 'none';
-    document.getElementById('support-thread-foot').style.display = 'none';
-    document.getElementById('support-thread-body').innerHTML = `<div style="padding:1.5rem;text-align:center;color:var(--tx2)">Sign in with a real admin account to view and reply to live support tickets.</div>`;
-    return;
-  }
+  if (!currentUser?.isReal) return;
 
   listEl.innerHTML = `<div style="padding:1.5rem;text-align:center;color:var(--tx2)">Loading tickets…</div>`;
   try {
@@ -6418,14 +5261,7 @@ async function loadAdminCredentials() {
   const body = document.getElementById('cred-queue-body');
   if (!body) return;
 
-  // Demo mode: the loaders all no-op without a real session, so show sample rows.
-  if (!currentUser?.isReal) {
-    body.innerHTML = `
-      <tr><td><div style="font-weight:500">Jordan M.</div><div class="meta">Seattle</div></td><td>📜 License</td><td>Today</td><td>2027-06-30</td><td><span class="tag amber">Under review</span></td><td><button class="btn sm" disabled>View</button></td></tr>
-      <tr><td><div style="font-weight:500">Aisha L.</div><div class="meta">Renton</div></td><td>🛡️ Insurance</td><td>Yesterday</td><td>2026-11-01</td><td><span class="tag amber">Under review</span></td><td><button class="btn sm" disabled>View</button></td></tr>
-      <tr><td colspan="6" style="text-align:center;color:var(--tx2);padding:1rem">Sign in with a real admin account to review live documents.</td></tr>`;
-    return;
-  }
+  if (!currentUser?.isReal) return;
 
   const status = document.getElementById('cred-status-filter')?.value || 'pending';
   body.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--tx2);padding:1.5rem">Loading…</td></tr>`;
@@ -6607,11 +5443,7 @@ function sendNotif(btn) {
 
   if (!title || !body) { showToast('Add a title and a message before sending.', 'warn'); return; }
 
-  if (!currentUser?.isReal) {
-    // Demo mode has no backend to send through — don't pretend it worked.
-    showToast('Sign in with a real admin account to send notifications.', 'warn');
-    return;
-  }
+  if (!currentUser?.isReal) return;
 
   const labels = { all: 'all users', cleaners: 'all cleaners', clients: 'all clients', unverified: 'unverified cleaners' };
   showConfirm({
@@ -6799,35 +5631,13 @@ function resetCaptcha() {
 
 // ══════════════════════════════════════
 // URL PARAMETER DEEP-LINK HANDLER
-// Supports:
-//   ?role=client   → auto-open as client demo
-//   ?role=cleaner  → auto-open as cleaner demo
-//   ?mode=admin    → show admin card + auto-login (hidden from public)
-// Landing page CTAs use ?role= to route users straight in.
-// Admin uses the secret ?mode=admin URL — never linked publicly.
+//   ?role=client | ?role=cleaner  (landing page buttons) → the matching sign-up
+//   tab, or straight to the right page when already signed in as that role.
+// There is no special admin URL: admins sign in with the normal form.
 // ══════════════════════════════════════
 (function handleUrlParams() {
   const params = new URLSearchParams(window.location.search);
   const role   = params.get('role');
-  const mode   = params.get('mode');
-
-  // Hidden admin access — inject admin card dynamically so it's never in the HTML
-  if (mode === 'admin') {
-    const demoUsers = document.querySelector('.demo-users');
-    if (demoUsers) {
-      const adminCard = document.createElement('div');
-      adminCard.className = 'demo-user';
-      adminCard.setAttribute('onclick', "loginAs('admin')");
-      adminCard.innerHTML = `
-        <div class="du-av" style="background:var(--pul);color:var(--pud)">AD</div>
-        <div class="du-name">Admin</div>
-        <div class="du-role">Platform admin</div>`;
-      demoUsers.appendChild(adminCard);
-    }
-    // Auto-login as admin after a short delay so the DOM settles
-    setTimeout(() => loginAs('admin'), 300);
-    return;
-  }
 
   // Client or cleaner deep-link from landing page (?role=client or ?role=cleaner)
   // Three cases:
@@ -6839,7 +5649,7 @@ function resetCaptcha() {
   // screen so "Book a Cleaning" doesn't silently bypass authentication.
   if (role === 'client' || role === 'cleaner') {
     const targetPage = role === 'client' ? 'cl-post' : 'c-jobs';
-    const saved      = sessionStorage.getItem('sparkle_role');
+    const saved      = SparkleAPI.isRealSession() ? SparkleAPI.getUser()?.role : null;
 
     // Strip stale hash so it can't override a future showPage() call
     history.replaceState(null, '', window.location.pathname + window.location.search);

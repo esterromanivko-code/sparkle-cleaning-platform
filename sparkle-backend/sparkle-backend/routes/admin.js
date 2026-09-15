@@ -310,6 +310,28 @@ router.post('/jobs/:id/release-earnings', requireAuth, requireRole('admin'), (re
   res.json({ message: 'Earnings released' });
 });
 
+// GET /api/admin/lockout-fees — every lockout fee charged, with its door photos and dispute
+router.get('/lockout-fees', requireAuth, requireRole('admin'), (req, res) => {
+  const fees = db.prepare(`
+    SELECT lf.id, lf.job_id, lf.fee_amount, lf.status, lf.created_at,
+           (lf.stripe_charge_id IS NOT NULL) AS charged_to_card,
+           j.service_type, j.scheduled_at,
+           cl.first_name || ' ' || cl.last_name AS cleaner_name,
+           cu.first_name || ' ' || cu.last_name AS client_name,
+           (SELECT COUNT(*) FROM job_photos ph WHERE ph.job_id = lf.job_id AND ph.stage = 'lockout'
+              AND ph.deleted_at IS NULL) AS door_photo_count,
+           d.id AS dispute_id, d.status AS dispute_status, d.ruling AS dispute_ruling
+    FROM lockout_fees lf
+    JOIN jobs j   ON j.id = lf.job_id
+    JOIN users cl ON cl.id = lf.cleaner_id
+    JOIN users cu ON cu.id = lf.client_id
+    LEFT JOIN disputes d ON d.id = (SELECT id FROM disputes WHERE job_id = lf.job_id ORDER BY created_at DESC LIMIT 1)
+    WHERE lf.status != 'pending'          -- 'pending' is a charge still in flight
+    ORDER BY lf.created_at DESC LIMIT 200
+  `).all();
+  res.json({ lockout_fees: fees });
+});
+
 // POST /api/admin/notify — send platform-wide push notification
 router.post('/notify', requireAuth, requireRole('admin'), (req, res) => {
   const { audience, title, body: notifBody, type } = req.body;

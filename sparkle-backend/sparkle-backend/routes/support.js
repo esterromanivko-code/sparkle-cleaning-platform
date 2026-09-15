@@ -10,6 +10,7 @@ const db = require('../db');
 const { requireAuth, requireRole, verifyToken } = require('../middleware/auth');
 const { supportLimiter } = require('../middleware/security');
 const { sendSupportTicketReceived, sendSupportReply } = require('../lib/email');
+const { notifyAdmins } = require('../lib/notify');
 
 const router = express.Router();
 
@@ -46,6 +47,8 @@ router.post('/tickets', supportLimiter, optionalAuth, [
     .run(uuid(), id, 'user', userId, message);
 
   sendSupportTicketReceived(email, name, id, subject).catch(() => {});
+  notifyAdmins('🎧 New support request',
+    `${name}${userId ? '' : ' (not signed in)'}: ${subject}`.slice(0, 240), 'support_ticket');
 
   res.status(201).json({ id, status: 'open' });
 });
@@ -99,6 +102,8 @@ router.post('/tickets/:id/reply', requireAuth, [
       db.prepare(`INSERT INTO notifications (id, user_id, title, body, type) VALUES (?,?,?,?,?)`)
         .run(uuid(), ticket.user_id, '💬 Support replied to your ticket', req.body.message.slice(0, 140), 'support_reply');
     }
+  } else {
+    notifyAdmins('🎧 New reply on a support request', `${ticket.name}: ${ticket.subject}`.slice(0, 240), 'support_reply');
   }
 
   res.status(201).json({ id: msgId, status: newStatus });
