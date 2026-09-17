@@ -195,6 +195,10 @@ window.SparkleAPI = (function () {
   // later call would wait on a resolver that already fired, and hang until timeout.
   let _pendingResolve = null;
   let _captchaRequired = false;
+  // The same goes for per-call state the callbacks need: the current call's timer
+  // and whether it already retried. _captchaError is Cloudflare's last error code.
+  let _captchaCall = null;
+  let _captchaError = null;
 
   // Turnstile can legitimately fail for a real person — an ad blocker or privacy
   // extension blocking challenges.cloudflare.com, a locked-down network, or a
@@ -202,7 +206,40 @@ window.SparkleAPI = (function () {
   // required", which reads like a bug rather than something the user can act on.
   const CAPTCHA_HELP =
     "Couldn't complete the security check. Refresh the page and try again — " +
-    'if it keeps happening, disable any ad blocker for this site or try another browser.';
+    'if it keeps happening, disable any ad blocker or VPN for this site or try another browser.';
+  // Cloudflare's error code identifies the cause (see its Turnstile error-code list).
+  const captchaHelp = () => CAPTCHA_HELP + (_captchaError ? ` (code: ${_captchaError})` : '');
+
+  // Codes that retrying can't fix: a wrong or disabled site key, a hostname not
+  // added to the widget in Cloudflare, or the visitor's clock being wrong.
+  const CAPTCHA_FINAL_ERRORS = /^(110100|110110|110200|200100|400020|400070)/;
+  const CAPTCHA_AUTO_MS = 15000;          // a check that needs nothing from the visitor
+  const CAPTCHA_INTERACTIVE_MS = 120000;  // time to tick the box when Cloudflare asks
+
+  // The widget stays invisible unless Cloudflare wants the visitor to tick a box;
+  // then it appears at the bottom of the screen. It used to sit off-screen at zero
+  // size, so anyone Cloudflare asked to tick the box (common with VPNs, privacy
+  // browsers and some extensions) could never do it, and sign-in simply failed.
+  function captchaHost() {
+    let host = document.getElementById('sparkle-turnstile-host');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'sparkle-turnstile-host';
+      host.style.cssText = 'position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom, 0px));transform:translateX(-50%);' +
+        'z-index:10000;display:flex;flex-direction:column;align-items:center;gap:6px;max-width:calc(100vw - 32px)';
+      const note = document.createElement('div');
+      note.id = 'sparkle-turnstile-note';
+      note.hidden = true;
+      note.setAttribute('role', 'status');
+      note.textContent = 'Quick security check: tick the box to continue.';
+      note.style.cssText = 'background:#fff;color:#1a1a1a;border-radius:8px;padding:6px 12px;font:13px system-ui,sans-serif;box-shadow:0 2px 12px rgba(0,0,0,.18)';
+      const slot = document.createElement('div');
+      slot.id = 'sparkle-turnstile-slot';
+      host.append(note, slot);
+      document.body.appendChild(host);
+    }
+    return host;
+  }
 
   function _settleCaptcha(token) {
     const resolve = _pendingResolve;
@@ -256,46 +293,67 @@ window.SparkleAPI = (function () {
     // token into an explanation instead of the server's bare "token required".
     _captchaRequired = true;
 
+    _captchaError = null;
     try {
       const turnstile = await loadTurnstileScript();
-      if (!turnstile) return null;
-
-      let host = document.getElementById('sparkle-turnstile-host');
-      if (!host) {
-        host = document.createElement('div');
-        host.id = 'sparkle-turnstile-host';
-        host.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;left:-9999px';
-        document.body.appendChild(host);
-      }
+      if (!turnstile) { _captchaError = 'script'; return null; }
+      const host = captchaHost();
+      const note = host.querySelector('#sparkle-turnstile-note');
 
       return await new Promise(resolve => {
-        // Don't hang the sign-in button if Cloudflare is slow or blocked.
-        let timer = null;
-        const done = token => { if (timer) clearTimeout(timer); resolve(token || null); };
-        _pendingResolve = done;
-        timer = setTimeout(() => _settleCaptcha(null), 12000);
+        // Don't hang the sign-in button if Cloudflare is slow or blocked — but give
+        // someone who's been asked to tick the box time to do it.
+        const call = { retried: false, timer: null };
+        call.arm = ms => {
+          clearTimeout(call.timer);
+          call.timer = setTimeout(() => { _captchaError = _captchaError || 'timeout'; _settleCaptcha(null); }, ms);
+        };
+        _captchaCall = call;
+        _pendingResolve = token => {
+          clearTimeout(call.timer);
+          note.hidden = true;
+          resolve(token || null);
+        };
+        call.arm(CAPTCHA_AUTO_MS);
 
         try {
           if (_widgetId === null) {
-            _widgetId = turnstile.render(host, {
+            // Callbacks are bound once, so they act on whichever call is current.
+            _widgetId = turnstile.render(host.querySelector('#sparkle-turnstile-slot'), {
               sitekey: siteKey,
-              size: 'invisible',
-              // Route through _settleCaptcha so each call settles its own promise.
-              callback:           t => _settleCaptcha(t),
-              'error-callback':   () => _settleCaptcha(null),
-              'timeout-callback': () => _settleCaptcha(null),
+              appearance: 'interaction-only',
+              execution: 'execute',
+              callback: t => _settleCaptcha(t),
+              'error-callback': code => {
+                _captchaError = String(code || 'error');
+                const current = _captchaCall;
+                // Cloudflare's own advice for most failures is to try again, and a
+                // second attempt often passes. Once per sign-in, and never for
+                // configuration errors.
+                if (current && !current.retried && _pendingResolve && !CAPTCHA_FINAL_ERRORS.test(_captchaError)) {
+                  current.retried = true;
+                  try { turnstile.reset(_widgetId); turnstile.execute(_widgetId); return true; } catch { /* give up below */ }
+                }
+                _settleCaptcha(null);
+                return true;   // handled: don't also log it to the console
+              },
+              'timeout-callback': () => { _captchaError = 'interaction timeout'; _settleCaptcha(null); },
               'expired-callback': () => _settleCaptcha(null),
+              'before-interactive-callback': () => { note.hidden = false; _captchaCall?.arm(CAPTCHA_INTERACTIVE_MS); },
+              'after-interactive-callback': () => { note.hidden = true; },
             });
           } else {
             // Tokens are single-use, so always mint a fresh one.
             turnstile.reset(_widgetId);
           }
           turnstile.execute(_widgetId);
-        } catch {
+        } catch (err) {
+          _captchaError = err?.message || 'render';
           _settleCaptcha(null);
         }
       });
     } catch {
+      _captchaError = _captchaError || 'script';
       return null;
     }
   }
@@ -308,7 +366,7 @@ window.SparkleAPI = (function () {
    */
   async function register(data) {
     const cf_turnstile_response = await getCaptchaToken();
-    if (!cf_turnstile_response && _captchaRequired) throw new Error(CAPTCHA_HELP);
+    if (!cf_turnstile_response && _captchaRequired) throw new Error(captchaHelp());
     const res = await apiFetch('/api/auth/register', {
       method: 'POST',
       body:   JSON.stringify(cf_turnstile_response ? { ...data, cf_turnstile_response } : data),
@@ -329,7 +387,7 @@ window.SparkleAPI = (function () {
    */
   async function login(email, password) {
     const cf_turnstile_response = await getCaptchaToken();
-    if (!cf_turnstile_response && _captchaRequired) throw new Error(CAPTCHA_HELP);
+    if (!cf_turnstile_response && _captchaRequired) throw new Error(captchaHelp());
     const res = await apiFetch('/api/auth/login', {
       method: 'POST',
       body:   JSON.stringify(cf_turnstile_response ? { email, password, cf_turnstile_response } : { email, password }),
