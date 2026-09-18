@@ -149,8 +149,14 @@ window.SparkleAPI = (function () {
       );
     }
 
+    // Signing in, signing up and resetting a password carry no session, so a 401 or
+    // 403 from them is about the credentials, not an expired session. Sending them
+    // down the refresh path showed "Session expired — please sign in again" in place
+    // of "Invalid email or password", which reads like a bug in the site.
+    const isAuthEntry = /^\/api\/auth\/(login|register|refresh|forgot-password|reset-password)/.test(path);
+
     // 401: try silent token refresh once
-    if (res.status === 401 && !_retry) {
+    if (res.status === 401 && !_retry && !isAuthEntry) {
       const outcome = await tryRefresh();
       if (outcome === 'ok') return apiFetch(path, options, true);
       if (outcome === 'offline') throw new Error('Cannot reach Sparkle right now. Check your connection and try again.');
@@ -163,7 +169,7 @@ window.SparkleAPI = (function () {
     // path every screen already handles, so a suspended user is signed out rather
     // than left in a half-working app. Signing back in shows the real reason.
     // clone() so ordinary 403s (e.g. wrong role) keep their body for the caller.
-    if (res.status === 403) {
+    if (res.status === 403 && !isAuthEntry) {
       const body = await res.clone().json().catch(() => null);
       if (body?.code === 'ACCOUNT_SUSPENDED') {
         clearTokens();
