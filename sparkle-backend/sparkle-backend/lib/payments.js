@@ -558,6 +558,10 @@ async function runPaymentSweep() {
   // Completed jobs whose charge result was lost.
   const unsettled = db.prepare(`SELECT id FROM jobs WHERE status = 'completed' AND capture_status = 'processing' LIMIT 25`).all();
   for (const j of unsettled) await chargeCompletedJob(j.id);
+
+  // Handled webhook events are remembered only long enough to catch Stripe's
+  // retries (it gives up after about three days), so the table can't grow forever.
+  db.prepare("DELETE FROM stripe_events WHERE received_at <= datetime('now', '-14 days')").run();
 }
 
 function startPaymentSweep() {
