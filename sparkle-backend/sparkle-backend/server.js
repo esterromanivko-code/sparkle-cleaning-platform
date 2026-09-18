@@ -174,15 +174,7 @@ app.use((req, res, next) => {
 // as http:// while serving over https. Any of those mismatches silently killed
 // every browser request while curl kept working. Comparing hosts removes that
 // whole class of misconfiguration without widening the allowlist to other sites.
-function hostOf(value) {
-  const s = String(value || '').trim();
-  if (!s) return null;
-  try {
-    return new URL(/^https?:\/\//i.test(s) ? s : `https://${s}`).hostname.toLowerCase();
-  } catch {
-    return null;
-  }
-}
+const { hostOf } = require('./lib/frontendUrls');
 
 const ALLOWED_HOSTS = new Set([
   ...String(process.env.FRONTEND_URL || '').split(',').map(hostOf),
@@ -223,6 +215,7 @@ app.use(cors({
   methods: ['GET','POST','PUT','DELETE','PATCH'],
 }));
 app.use('/api/background-check/webhook', express.raw({ type: 'application/json' }));
+app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));   // Stripe signs the raw bytes
 app.use(express.json({ limit: '512kb' }));
 app.use(express.urlencoded({ extended: true, limit: '512kb' }));
 app.use('/api', apiLimiter);
@@ -246,9 +239,14 @@ app.get('/health', (req, res) => res.json({
 // environment, with no frontend edit or redeploy.
 app.get('/api/config', (req, res) => {
   const siteKey = process.env.TURNSTILE_SITE_KEY;
+  const { paymentsMode, publishableKey } = require('./lib/stripe');
   res.set('Cache-Control', 'public, max-age=300');
   res.json({
     turnstile_site_key: (siteKey && siteKey !== 'TURNSTILE_SITE_KEY_HERE') ? siteKey : null,
+    // Stripe's publishable key is public by design (it can only start card entry).
+    // payments_mode: live | test | mock (local, simulated) | off (not set up)
+    stripe_publishable_key: publishableKey(),
+    payments_mode: paymentsMode(),
   });
 });
 
@@ -336,6 +334,7 @@ app.use('/api/support',                 supportRoutes);
 app.use('/api/credentials',             credentialRoutes);
 app.use('/api/job-photos',              require('./routes/jobPhotos'));
 app.use('/api/disputes',                require('./routes/disputes'));
+app.use('/api/payments',                require('./routes/payments'));
 // NOTE: keep new mounts ABOVE this line — it is a catch-all on /api.
 app.use('/api',                         profileRoutes);
 
@@ -363,6 +362,15 @@ app.listen(PORT, () => {
   startCredentialExpirySweep();   // Daily licence/insurance expiry warnings + downgrades
   require('./lib/payouts').startCashoutReconciler();   // Settles cashouts whose Stripe result was lost
   require('./lib/retention').startRetentionSweep();    // Deletes job photos and location history after 180 days
+  require('./lib/payments').startPaymentSweep();       // Places card holds before cleans; settles lost charges
+
+  const stripeState = require('./lib/stripe');
+  const mode = stripeState.paymentsMode();
+  if (mode === 'off') {
+    console.warn('  ⚠️  STRIPE_SECRET_KEY is missing or a placeholder — bookings and payouts are switched off.');
+  } else if (mode !== 'mock' && !stripeState.publishableKey()) {
+    console.warn(`  ⚠️  STRIPE_PUBLISHABLE_KEY is missing or isn't a pk_${mode}_ key — clients can't add cards.`);
+  }
 });
 
 module.exports = app;

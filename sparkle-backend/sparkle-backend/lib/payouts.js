@@ -50,7 +50,7 @@ const HOLD_REASON_SQL = `
     ) THEN 'dispute'
     WHEN p.type = 'job' AND (j.id IS NULL OR j.status != 'completed') THEN 'not_completed'
     WHEN p.type = 'job' AND j.photos_required = 1 AND j.photos_verified_at IS NULL THEN 'photos'
-    WHEN p.type = 'job' AND j.capture_status = 'failed' THEN 'payment'
+    WHEN p.type = 'job' AND j.capture_status IN ('failed','processing') THEN 'payment'
     ELSE NULL
   END`;
 
@@ -65,7 +65,7 @@ const HOLD_LABELS = {
   dispute:       'The client reported a problem — frozen until Sparkle reviews it',
   not_completed: 'Available once the job is completed with before and after photos',
   photos:        'Waiting on before and after photos',
-  payment:       "The client's payment didn't go through — Sparkle is looking into it",
+  payment:       "Waiting for the client's payment to go through — they've been asked to pay",
 };
 
 function balanceFor(cleanerId) {
@@ -182,9 +182,12 @@ function transaction(fn) {
 // Claims every cashable row for a new cashout. No await inside: node:sqlite is
 // synchronous, so nothing else can run between reading the rows and claiming them.
 function claimCashout(cleanerId, method) {
-  const profile = db.prepare('SELECT stripe_connect_id FROM cleaner_profiles WHERE user_id = ?').get(cleanerId);
+  const profile = db.prepare('SELECT stripe_connect_id, connect_payouts_enabled FROM cleaner_profiles WHERE user_id = ?').get(cleanerId);
   if (!profile?.stripe_connect_id) {
-    throw new CashoutError(422, 'Bank account not connected. Add a payout account in your profile settings.');
+    throw new CashoutError(422, 'Set up payouts first: add your bank account or debit card in Earnings.', { code: 'PAYOUTS_NOT_SET_UP' });
+  }
+  if (!profile.connect_payouts_enabled) {
+    throw new CashoutError(422, "Your payout account isn't ready yet. Open Earnings to finish setting it up.", { code: 'PAYOUTS_NOT_READY' });
   }
   const feeCents = method === 'instant' ? instantFeeCents() : 0;
 
@@ -266,7 +269,16 @@ async function sendTransfer(c) {
     return 'paid';
   } catch (err) {
     if (isDefinitiveStripeError(err)) {
-      failCashout(c.id, err.message);
+      // Card payments take about two business days to become available in Sparkle's
+      // Stripe balance, so a cashout right after a job can outrun them.
+      if (err.code === 'balance_insufficient') {
+        failCashout(c.id, `balance_insufficient: ${err.message}`);
+        notifyAdmins('Stripe balance too low for a cashout',
+          `A cleaner tried to cash out $${Number(c.net_amount).toFixed(2)}, but Sparkle's available Stripe balance couldn't cover it yet. ` +
+          'Recent card payments are still settling. Adding funds to the Stripe balance lets cashouts go out straight away.');
+      } else {
+        failCashout(c.id, err.message);
+      }
       return 'failed';
     }
     db.prepare('UPDATE cashouts SET error = ? WHERE id = ?').run(String(err.message).slice(0, 500), c.id);

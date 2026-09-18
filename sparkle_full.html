@@ -271,6 +271,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
 .pay-line{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px;color:var(--tx2)}
 .pay-line.total{font-weight:500;font-size:14px;padding-top:8px;margin-top:4px;border-top:1px solid var(--bdr2);color:var(--tx)}
 .pay-line.green{color:var(--gd)}
+.pay-error{color:var(--rd);font-size:13px;line-height:1.5;margin:.5rem 0 0}
+.pay-error:empty{display:none}
+.pay-element{margin:.25rem 0 .5rem;min-height:44px}
 
 /* LOCKOUT MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:800;display:none;align-items:center;justify-content:center;padding:1rem}
@@ -908,7 +911,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
 <div class="page" id="page-cl-post">
   <div class="pg-title">Post a cleaning job</div>
   <div class="pg-sub">Describe what you need — cleaners will send you quotes within a few hours.</div>
-  <div class="alert info">No subscription. No upfront payment. You only pay after you choose a cleaner and the job is done. Sparkle adds a transparent booking fee at checkout.</div>
+  <div class="alert info">No subscription and nothing to pay up front. You add a card when you book the cleaner you choose, and it's charged after the clean is done: their quote plus a transparent booking fee.</div>
   <div class="card">
     <div class="frow"><label class="flbl">Type of cleaning</label><select class="inp" id="job-type"><option>Standard clean</option><option>Deep clean</option><option>Move-out clean</option><option>Move-in clean</option><option>Office / commercial</option></select></div>
     <div class="f2"><div class="frow"><label class="flbl">Bedrooms</label><select class="inp"><option>Studio</option><option>1</option><option selected>2</option><option>3</option><option>4+</option></select></div><div class="frow"><label class="flbl">Bathrooms</label><select class="inp"><option>1</option><option selected>2</option><option>3+</option></select></div></div>
@@ -1322,6 +1325,9 @@ function loginWithData(apiUser, apiProfile = null) {
 }
 
 
+// A page a deep link asked for, opened once the app is on screen.
+let _pendingPage = null;
+
 // ── shared: hide auth screen and show app ─────────────────────────────────────
 function _openAuthScreen(show) {
   if (show) {
@@ -1334,9 +1340,14 @@ function _openAuthScreen(show) {
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('app').classList.add('vis');
     setupApp();
-    // Restore page from URL hash if present
-    const hash = location.hash.slice(1);
-    if (hash && document.getElementById('page-' + hash)) showPage(hash);
+    // Open the page the URL asked for. setupApp() has already shown the role's
+    // default page and stamped it into the hash, so a page set by the deep-link
+    // handler at the end of this file is remembered separately.
+    // _pendingPage is not cleared here: restoring a session runs this twice (once
+    // from the saved user, once after the server confirms it), and the second pass
+    // would otherwise leave the default page showing. It clears itself shortly after.
+    const target = _pendingPage || location.hash.slice(1);
+    if (target && document.getElementById('page-' + target)) showPage(target);
   }, 400);
 }
 
@@ -1789,7 +1800,8 @@ function jpNotifTarget(type = '') {
   }
   if (/^payout/.test(type)) return role === 'cleaner' ? 'c-earnings' : null;
   if (/^dispute/.test(type)) return role === 'cleaner' ? 'c-earnings' : 'cl-bookings';
-  if (['review_prompt', 'lockout_fee_charged', 'cleaner_arrived', 'cleaner_en_route', 'cleaner_nearby', 'job_accepted'].includes(type)) return 'cl-bookings';
+  if (['review_prompt', 'lockout_fee_charged', 'cleaner_arrived', 'cleaner_en_route', 'cleaner_nearby', 'job_accepted',
+       'new_bid', 'payment_failed', 'payment_action_required'].includes(type)) return 'cl-bookings';
   if (type === 'job_cancelled') return role === 'cleaner' ? 'c-schedule' : 'cl-bookings';
   if (type === 'bid_chosen') return 'c-schedule';
   return null;
@@ -2496,6 +2508,7 @@ function scheduleCardHtml(j) {
       <span class="tag ${started ? 'amber' : 'green'}">${started ? 'In progress' : 'Confirmed'}</span></div>
     <div class="tags" style="margin-top:8px"><span class="tag blue">${escapeHtml(when)}</span></div>
     <div class="meta" style="margin-top:6px">Client: <strong>${escapeHtml(j.client_name || 'Client')}</strong></div>
+    ${j.payment_issue ? `<div class="alert warn" style="margin:8px 0 0;font-size:12px">💳 The client's card hasn't been approved for this clean yet. We've asked them to fix it. Check back before you head out.</div>` : ''}
     ${stage('before', before, started ? 'Photos of each room before you started cleaning.' : 'Take these when you arrive, before you start cleaning.')}
     ${started ? stage('after', after, 'Photos of the same rooms once you have finished.') : ''}
     ${uploadLine}
@@ -2535,11 +2548,16 @@ function loadCleanerEarnings() {
   if (!page) return;
   page.innerHTML = `<div class="pg-title">Earnings &amp; payouts</div><div class="pg-sub">Loading your earnings…</div>`;
 
+  // Back from Stripe's payout setup (?payouts=return), or "Check again": ask Stripe
+  // for the account's latest status rather than the last one saved.
+  const fromStripe = cleanerEarningsState.fromStripe;
+  cleanerEarningsState.fromStripe = null;
   Promise.all([
     SparkleAPI.getEarnings(),
     SparkleAPI.getMyJobHistory().catch(() => null),
     SparkleAPI.getMyDisputes().catch(() => null),
-  ]).then(([data, history, disputeData]) => {
+    SparkleAPI.getPayoutAccount(!!fromStripe).catch(() => null),
+  ]).then(([data, history, disputeData, payoutAccount]) => {
     const summary  = data?.summary || {};
     const balance  = data?.balance || { available: parseFloat(summary.pending_payout || 0), held: 0, holds: [], refunds_owed: 0, processing: 0, instant_fee: 10 };
     const payouts  = data?.payouts || [];
@@ -2549,6 +2567,8 @@ function loadCleanerEarnings() {
     const available = Number(balance.available || 0);
     cleanerEarningsState.pending    = available;
     cleanerEarningsState.instantFee = Number(balance.instant_fee ?? 10);
+    cleanerEarningsState.payout     = payoutAccount;
+    const canCashOut = available >= 1 && !!payoutAccount?.payouts_enabled;
 
     const payoutCard = `<div class="payout-card"><div class="payout-lbl">Available to cash out</div><div class="payout-amt">${jpMoney(available)}</div>
       <div class="payout-row">
@@ -2616,7 +2636,11 @@ function loadCleanerEarnings() {
       <div class="pg-sub">Your pay for a job is ready to cash out as soon as you complete it with before and after photos.</div>
       ${payoutCard}
       ${alerts}
-      <div class="f2" style="margin-bottom:1.25rem"><button class="btn primary" onclick="openCashout()"${available < 1 ? ' disabled style="opacity:.5;cursor:not-allowed"' : ''}>Cash out now</button><div><label class="flbl">Payout to</label><select class="inp"><option>Add a payout account in Settings</option></select></div></div>
+      ${payoutAccountHtml(payoutAccount)}
+      <div style="margin-bottom:1.25rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn primary" onclick="openCashout()"${canCashOut ? '' : ' disabled style="opacity:.5;cursor:not-allowed"'}>Cash out now</button>
+        ${available >= 1 && !payoutAccount?.payouts_enabled ? '<span class="jp-hint">Set up payouts above to cash out.</span>' : ''}
+      </div>
       ${disputesHtml}
       ${holdsHtml}
       <div class="sect-title" style="margin:1rem 0 .5rem">Recent jobs</div>
@@ -2624,6 +2648,14 @@ function loadCleanerEarnings() {
       ${cashoutsHtml}
       <div class="sect-title" style="margin:1rem 0 .5rem">Recent transactions</div>
       ${txHtml}`;
+    if (fromStripe === 'return') {
+      showToast(payoutAccount?.payouts_enabled
+        ? '🏦 Payouts are set up. You can cash out now.'
+        : "Thanks! Stripe is checking your details. We'll let you know when you can cash out.",
+        payoutAccount?.payouts_enabled ? 'success' : 'info');
+    } else if (fromStripe === 'refresh') {
+      showToast('That setup link expired. Tap Continue setup to pick up where you left off.', 'info');
+    }
   }).catch(err => {
     if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
     page.innerHTML = `<div class="pg-title">Earnings &amp; payouts</div><div class="alert warn">Could not load earnings: ${escapeHtml(err.message)}</div>`;
@@ -3497,6 +3529,16 @@ document.addEventListener('click', e => {
     case 'report':             return openReportProblem(d.job, d.kind);
     case 'admin-rule':         return openAdminRuling(d.dispute, d.ruling);
     case 'admin-retry-refund': return adminRetryRefund(d.dispute, el);
+    case 'modal-close':        return el.closest('.modal-overlay')?.remove();
+    case 'quotes':             return openQuotes(d.job);
+    case 'book-quote':         return openCheckout(d.bid);
+    case 'pay-job':            return openJobPayment(d.job);
+    case 'add-card':           return openAddCard();
+    case 'card-default':       return payCardAction('default', d.card, el);
+    case 'card-remove':        return payCardAction('remove', d.card, el);
+    case 'payout-setup':       return payoutSetup(el);
+    case 'payout-manage':      return payoutManage(el);
+    case 'payout-refresh':     cleanerEarningsState.fromStripe = 'check'; return loadCleanerEarnings();
   }
 });
 
@@ -4201,9 +4243,11 @@ function openCashout() {
 
   const pending = cleanerEarningsState.pending;
   if (pending < 1) { showToast('No earnings available to cash out yet.', 'warn'); return; }
+  const payout = cleanerEarningsState.payout;
+  if (!payout?.payouts_enabled) { showToast('Set up payouts first: add your bank account or debit card in Earnings.', 'warn'); return; }
   const instantFee = cleanerEarningsState.instantFee;
   const instantNet = Math.max(0, pending - instantFee);
-  const acct = '';
+  const acct = payout.label ? ` · to ${escapeHtml(payout.label)}` : '';
 
   const modal = document.createElement('div');
   modal.id = 'cashout-modal';
@@ -4262,7 +4306,481 @@ function confirmCashout(btn) {
   });
 }
 
-// ══ ADD CARD MODAL ══════════════════════════════════════════════
+// ══ CARD PAYMENTS (clients) ═════════════════════════════════════
+// Card numbers are typed into Stripe's own form, an iframe served by js.stripe.com,
+// so they never touch this page's code or Sparkle's servers: only the id of a
+// saved card does. How a booking is paid is explained in lib/payments.js.
+// payments_mode from /api/config: live | test = real Stripe; mock = a local test
+// server that simulates cards; off = the server has no Stripe key yet.
+// Rule for this section, as for photos: typed or server text reaches the page
+// only through escapeHtml(), and buttons use data-act, never inline handlers.
+
+const payState = { stripe: null, loading: null };
+const PAY_TEST_CARDS = [
+  ['pm_card_visa', 'Test Visa (approves)'],
+  ['pm_card_chargeDeclined', 'Test card (declines)'],
+  ['pm_card_authenticationRequired', 'Test card (asks for bank approval)'],
+];
+
+async function payConfig() {
+  const cfg = await SparkleAPI.getPublicConfig();
+  return { mode: cfg?.payments_mode || 'off', key: cfg?.stripe_publishable_key || null };
+}
+
+// Stripe.js must be loaded from js.stripe.com itself, so it's added on first use.
+function payLoadStripe(key) {
+  if (payState.stripe) return Promise.resolve(payState.stripe);
+  if (!key) return Promise.reject(new Error("Card payments aren't set up yet. Please try again later."));
+  if (!payState.loading) {
+    payState.loading = new Promise((resolve, reject) => {
+      const ready = () => {
+        try { payState.stripe = window.Stripe(key); resolve(payState.stripe); }
+        catch (err) { payState.loading = null; reject(err); }
+      };
+      if (window.Stripe) return ready();
+      const script = document.createElement('script');
+      script.src = 'https://js.stripe.com/v3/';
+      script.onload = ready;
+      script.onerror = () => {
+        payState.loading = null;
+        script.remove();
+        reject(new Error("Couldn't load the secure card form. Check your connection, or turn off any ad blocker for this site."));
+      };
+      document.head.appendChild(script);
+    });
+  }
+  return payState.loading;
+}
+
+const payCardLabel = c => `${String(c.brand || 'card').replace(/^\w/, ch => ch.toUpperCase())} •••• ${c.last4 || '----'}`;
+const payExpiry = c => (c.exp_month ? `${String(c.exp_month).padStart(2, '0')}/${String(c.exp_year || '').slice(-2)}` : '');
+
+// A card chooser in `box`: the client's saved cards plus "Use a new card", which
+// shows Stripe's card form. Resolves to { ready, paymentMethod() }, where
+// paymentMethod() gives the id of the card to use, saving a new card first, or
+// throws an error whose message can be shown as is.
+async function payCardPicker(box, { newOnly = false } = {}) {
+  box.innerHTML = '<div class="jp-hint">Loading your cards…</div>';
+  const [{ mode, key }, saved] = await Promise.all([
+    payConfig(),
+    newOnly ? { cards: [] } : SparkleAPI.getPaymentMethods().catch(() => ({ cards: [] })),
+  ]);
+  if (mode === 'off') {
+    box.innerHTML = `<div class="alert warn">Card payments aren't set up yet. Please try again later.</div>`;
+    return { ready: false };
+  }
+  const cards = saved.cards || [];
+  const state = { choice: newOnly ? 'new' : (saved.default_payment_method || cards[0]?.id || 'new'), stripe: null, elements: null, mounting: null };
+
+  const option = (value, title, sub) => `
+    <label class="pay-method${state.choice === value ? ' sel' : ''}">
+      <input type="radio" name="pay-card" value="${escapeHtml(value)}"${state.choice === value ? ' checked' : ''} style="accent-color:var(--g)">
+      <div style="flex:1"><div style="font-size:13px;font-weight:500">${escapeHtml(title)}</div>${sub ? `<div style="font-size:11px;color:var(--tx2)">${escapeHtml(sub)}</div>` : ''}</div>
+    </label>`;
+  box.innerHTML = newOnly ? '<div class="pay-new"></div>' : `
+    ${cards.map(c => option(c.id, payCardLabel(c), payExpiry(c) ? `Expires ${payExpiry(c)}` : '')).join('')}
+    ${option('new', '➕ Use a new card', '')}
+    <div class="pay-new" hidden></div>`;
+  const newBox = box.querySelector('.pay-new');
+
+  function showNewCard() {
+    newBox.hidden = false;
+    if (mode === 'mock') {
+      if (!newBox.firstChild) {
+        newBox.innerHTML = `<div class="alert info" style="font-size:12px;margin-bottom:6px">Local test server: no real card is used.</div>
+          <select class="inp pay-test-card" aria-label="Test card">${PAY_TEST_CARDS.map(([id, label]) => `<option value="${id}">${escapeHtml(label)}</option>`).join('')}</select>`;
+      }
+      return Promise.resolve();
+    }
+    if (state.elements) return Promise.resolve();
+    if (!state.mounting) {
+      newBox.innerHTML = '<div class="jp-hint">Loading the secure card form…</div>';
+      state.mounting = Promise.all([SparkleAPI.createSetupIntent(), payLoadStripe(key)])
+        .then(([{ client_secret }, stripe]) => {
+          state.stripe = stripe;
+          const elements = stripe.elements({
+            clientSecret: client_secret,
+            appearance: { theme: 'stripe', variables: { colorPrimary: '#1D9E75', borderRadius: '8px' } },
+          });
+          newBox.innerHTML = '<div class="pay-element"></div><div class="jp-hint">🔒 Your card details go straight to Stripe, our payment processor. Sparkle never sees your card number.</div>';
+          elements.create('payment', { layout: 'tabs' }).mount(newBox.querySelector('.pay-element'));
+          state.elements = elements;
+        })
+        .catch(err => {
+          state.mounting = null;
+          newBox.innerHTML = `<div class="alert warn">${escapeHtml(err.message)}</div>`;
+          throw err;
+        });
+    }
+    return state.mounting;
+  }
+
+  box.addEventListener('change', e => {
+    if (e.target.name !== 'pay-card') return;
+    state.choice = e.target.value;
+    box.querySelectorAll('.pay-method').forEach(l => l.classList.toggle('sel', l.querySelector('input').checked));
+    if (state.choice === 'new') showNewCard().catch(() => {});
+    else newBox.hidden = true;
+  });
+  if (state.choice === 'new') showNewCard().catch(() => {});
+
+  return {
+    ready: true,
+    mode,
+    async paymentMethod() {
+      if (state.choice !== 'new') return state.choice;
+      await showNewCard();
+      if (mode === 'mock') return newBox.querySelector('.pay-test-card').value;
+      const { error, setupIntent } = await state.stripe.confirmSetup({
+        elements: state.elements,
+        redirect: 'if_required',
+        confirmParams: { return_url: location.href },
+      });
+      if (error) throw new Error(error.message || "That card couldn't be saved.");
+      const id = typeof setupIntent.payment_method === 'string' ? setupIntent.payment_method : setupIntent.payment_method?.id;
+      // The card is saved now. Show it as a saved card, so trying again after a
+      // decline uses it rather than saving it a second time.
+      state.choice = id;
+      state.elements = null;
+      state.mounting = null;
+      if (!newOnly) {
+        box.querySelectorAll('input[name="pay-card"]').forEach(i => { i.checked = false; });
+        box.querySelectorAll('.pay-method').forEach(l => l.classList.remove('sel'));
+        newBox.hidden = true;
+        newBox.innerHTML = '';
+        newBox.insertAdjacentHTML('beforebegin', option(id, 'Your new card', 'Saved'));
+      }
+      return id;
+    },
+  };
+}
+
+// The bank asked the client to approve a payment (3-D Secure). Stripe shows its
+// approval screen, then the server records the result.
+async function payApprove(jobId, clientSecret, paymentIntentId) {
+  const { mode, key } = await payConfig();
+  if (mode !== 'mock') {
+    const stripe = await payLoadStripe(key);
+    const { error } = await stripe.handleNextAction({ clientSecret });
+    if (error) throw new Error(error.message || "Your bank didn't approve the payment.");
+  }
+  const result = await SparkleAPI.confirmJobPayment(jobId, paymentIntentId);
+  if (result.error || !['authorized', 'captured', 'processing'].includes(result.outcome)) {
+    throw new Error(result.error || "Your bank didn't approve the payment.");
+  }
+  return result;
+}
+
+function payModal(id, title, width = 460) {
+  document.getElementById(id)?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = id;
+  overlay.className = 'modal-overlay show';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.innerHTML = `<div class="modal" style="width:${width}px"><div class="modal-title">${escapeHtml(title)}</div><div class="pay-body"></div></div>`;
+  overlay.addEventListener('keydown', e => { if (e.key === 'Escape') overlay.remove(); });
+  document.body.appendChild(overlay);
+  return { body: overlay.querySelector('.pay-body'), close: () => overlay.remove(), isOpen: () => overlay.isConnected };
+}
+
+function paySessionExpired(err, close) {
+  if (err?.message !== 'SESSION_EXPIRED') return false;
+  close?.();
+  showToast('Session expired — please sign in again.', 'error');
+  logout();
+  return true;
+}
+
+// ── Quotes and booking ─────────────────────────────────────────────────────
+const quotesState = { byId: {} };
+
+async function openQuotes(jobId) {
+  const job = clientBookingState.jobs.find(j => j.id === jobId);
+  const { body, isOpen } = payModal('quotes-modal', 'Quotes for your clean', 560);
+  body.innerHTML = '<div class="jp-hint">Loading quotes…</div>';
+  const closeRow = '<div class="modal-actions"><button class="btn" data-act="modal-close">Close</button></div>';
+  try {
+    const { bids = [] } = await SparkleAPI.getBidsForJob(jobId);
+    if (!isOpen()) return;
+    const when = job?.scheduled_at ? new Date(job.scheduled_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+    body.innerHTML = `
+      <div class="modal-sub">${escapeHtml(job?.service_type || 'Cleaning')}${when ? ' · ' + escapeHtml(when) : ''}. Nothing is charged until your clean is done.</div>
+      ${bids.length ? bids.map(b => {
+        quotesState.byId[b.id] = { ...b, job_id: jobId };
+        const name = `${b.first_name || 'Cleaner'}${b.last_name ? ' ' + b.last_name.charAt(0) + '.' : ''}`;
+        const rating = b.total_jobs ? `★ ${Number(b.avg_rating || 0).toFixed(1)} · ${b.total_jobs} job${b.total_jobs === 1 ? '' : 's'}` : 'New cleaner';
+        return `<div class="card-sm" style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+            <div style="display:flex;gap:10px;align-items:center">
+              ${avatarHtml({ avatar_url: b.avatar_url, initials: (b.first_name || 'C').charAt(0).toUpperCase() }, 'av-g', 40)}
+              <div>
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><strong style="font-size:14px">${escapeHtml(name)}</strong>${b.is_verified ? '<span class="badge-verified">🛡️ Verified</span>' : ''}${b.is_pro ? '<span class="badge-pro">⭐ Pro</span>' : ''}${badgeTierHtml(b.badge_tier)}</div>
+                <div class="meta">${escapeHtml(rating)}</div>
+              </div>
+            </div>
+            <div style="text-align:right;flex-shrink:0"><div style="font-size:16px;font-weight:500;color:var(--gd)">${jpMoney(b.amount)}</div><div style="font-size:11px;color:var(--tx2)">${jpMoney(b.client_total)} with booking fee</div></div>
+          </div>
+          <div style="font-size:13px;color:var(--tx2);line-height:1.55;margin:.6rem 0;white-space:pre-line">${escapeHtml(b.message || '')}</div>
+          ${b.lockout_fee_enabled ? `<div class="jp-hint">🔒 ${jpMoney(b.lockout_fee_amount)} lockout fee if they can't get in at the booked time.</div>` : ''}
+          <div class="actions"><button class="btn primary sm" data-act="book-quote" data-bid="${escapeHtml(b.id)}">Book ${escapeHtml(b.first_name || 'this cleaner')}</button></div>
+        </div>`;
+      }).join('') : `<div class="alert info">No quotes yet. We'll notify you as soon as cleaners respond.</div>`}
+      ${closeRow}`;
+  } catch (err) {
+    if (paySessionExpired(err)) return;
+    if (isOpen()) body.innerHTML = `<div class="alert warn">${escapeHtml(err.message)}</div>${closeRow}`;
+  }
+}
+
+function refreshBookings() {
+  if (_activePage?.id === 'page-cl-bookings') loadMyBookings();
+  else showPage('cl-bookings');
+}
+
+async function openCheckout(bidId) {
+  const bid = quotesState.byId[bidId];
+  if (!bid) return;
+  document.getElementById('quotes-modal')?.remove();
+  const name = bid.first_name || 'your cleaner';
+  const total = jpMoney(bid.client_total);
+  const { body, close } = payModal('checkout-modal', `Book ${name}`);
+  body.innerHTML = `
+    <div class="pay-breakdown">
+      <div class="pay-line"><span>${escapeHtml(name)}'s quote</span><span>${jpMoney(bid.amount)}</span></div>
+      <div class="pay-line"><span>Sparkle booking fee (${escapeHtml(String(bid.fee_percent ?? 8))}%)</span><span>${jpMoney(bid.booking_fee)}</span></div>
+      <div class="pay-line total"><span>Total</span><span>${total}</span></div>
+    </div>
+    <div class="jp-hint" style="margin-bottom:.75rem">Nothing is charged now. Up to 5 days before your clean we place a hold for the total on your card, and we charge it once the clean is done. Cancel before your cleaner arrives and you pay nothing.</div>
+    <div class="flbl">Pay with</div>
+    <div class="pay-picker"></div>
+    <div class="pay-error" role="alert"></div>
+    <div class="modal-actions"><button class="btn" data-act="modal-close">Cancel</button><button class="btn primary pay-go" disabled>Book for ${total}</button></div>`;
+  const go = body.querySelector('.pay-go');
+  const errorBox = body.querySelector('.pay-error');
+
+  let picker;
+  try {
+    picker = await payCardPicker(body.querySelector('.pay-picker'));
+  } catch (err) {
+    if (!paySessionExpired(err, close)) errorBox.textContent = err.message;
+    return;
+  }
+  if (!picker.ready) return;
+  go.disabled = false;
+
+  go.addEventListener('click', async () => {
+    errorBox.textContent = '';
+    go.disabled = true;
+    go.textContent = 'Booking…';
+    try {
+      const pm = await picker.paymentMethod();
+      const result = await SparkleAPI.chooseBid(bid.id, pm);
+      if (result.payment?.status === 'action_required') {
+        go.textContent = 'Waiting for your bank…';
+        try {
+          await payApprove(result.job_id, result.payment.client_secret, result.payment.payment_intent_id);
+        } catch {
+          close();
+          showToast(`${name} is booked, but your bank hasn't approved the payment yet. Open the booking to try again.`, 'warn');
+          refreshBookings();
+          return;
+        }
+      }
+      close();
+      showToast(`🎉 ${name} is booked! Your card will be charged ${jpMoney(result.total_charged)} after the clean.`, 'success');
+      refreshBookings();
+    } catch (err) {
+      if (paySessionExpired(err, close)) return;
+      if (err.status === 404 || err.status === 409) {
+        close();
+        showToast(err.message, 'error');
+        refreshBookings();
+        return;
+      }
+      errorBox.textContent = err.message;
+      go.disabled = false;
+      go.textContent = `Book for ${total}`;
+    }
+  });
+}
+
+// ── Fixing a payment from My bookings ──────────────────────────────────────
+async function openJobPayment(jobId) {
+  const job = clientBookingState.jobs.find(j => j.id === jobId);
+  if (!job?.payment_needed) return;
+  const charge = job.payment_needed === 'charge';
+  const reason = String((charge ? job.payment_error : job.auth_error) || '').replace(/\.$/, '');
+  const service = escapeHtml(job.service_type || 'clean');
+  const buttonText = charge ? `Pay ${jpMoney(job.total_charged)}` : 'Use this card';
+  const { body, close } = payModal('pay-job-modal', charge ? 'Pay for your clean' : 'Update your payment');
+  body.innerHTML = `
+    <div class="modal-sub">${charge
+      ? `Your ${service} is done, but we couldn't charge your card${reason ? ` (${escapeHtml(reason)})` : ''}. Your cleaner's pay is waiting on this.`
+      : `We couldn't approve your card for your upcoming ${service}${reason ? ` (${escapeHtml(reason)})` : ''}. Choose a card so your cleaner can still come.`}</div>
+    <div class="pay-breakdown"><div class="pay-line total"><span>${charge ? 'Amount due' : 'Total for this clean'}</span><span>${jpMoney(job.total_charged)}</span></div></div>
+    <div class="flbl">Pay with</div>
+    <div class="pay-picker"></div>
+    <div class="pay-error" role="alert"></div>
+    <div class="modal-actions"><button class="btn" data-act="modal-close">Cancel</button><button class="btn primary pay-go" disabled>${buttonText}</button></div>`;
+  const go = body.querySelector('.pay-go');
+  const errorBox = body.querySelector('.pay-error');
+
+  let picker;
+  try {
+    picker = await payCardPicker(body.querySelector('.pay-picker'));
+  } catch (err) {
+    if (!paySessionExpired(err, close)) errorBox.textContent = err.message;
+    return;
+  }
+  if (!picker.ready) return;
+  go.disabled = false;
+
+  go.addEventListener('click', async () => {
+    errorBox.textContent = '';
+    go.disabled = true;
+    go.textContent = charge ? 'Paying…' : 'Checking your card…';
+    try {
+      const pm = await picker.paymentMethod();
+      const result = await SparkleAPI.payForJob(job.id, pm);
+      if (result.outcome === 'action_required') {
+        go.textContent = 'Waiting for your bank…';
+        await payApprove(job.id, result.client_secret, result.payment_intent_id);
+      } else if (result.outcome === 'failed') {
+        throw new Error(result.error || "That card couldn't be charged. Try another card.");
+      }
+      close();
+      showToast(charge ? '✅ Paid. Thank you!'
+        : result.outcome === 'scheduled' ? "✅ Card updated. We'll place the hold closer to your clean."
+        : "✅ Card approved. You're all set for your clean.", 'success');
+      loadMyBookings();
+    } catch (err) {
+      if (paySessionExpired(err, close)) return;
+      if (err.code === 'NOTHING_TO_PAY' || err.status === 404) {
+        close();
+        showToast(err.message, 'info');
+        loadMyBookings();
+        return;
+      }
+      errorBox.textContent = err.message;
+      go.disabled = false;
+      go.textContent = buttonText;
+    }
+  });
+}
+
+// ── Saved cards (Payments page) ────────────────────────────────────────────
+async function openAddCard() {
+  const { body, close } = payModal('add-card-modal', 'Add a card');
+  body.innerHTML = `
+    <div class="pay-picker"></div>
+    <div class="jp-hint" style="margin-top:.5rem">It becomes your default card for new bookings.</div>
+    <div class="pay-error" role="alert"></div>
+    <div class="modal-actions"><button class="btn" data-act="modal-close">Cancel</button><button class="btn primary pay-go" disabled>Save card</button></div>`;
+  const go = body.querySelector('.pay-go');
+  const errorBox = body.querySelector('.pay-error');
+
+  let picker;
+  try {
+    picker = await payCardPicker(body.querySelector('.pay-picker'), { newOnly: true });
+  } catch (err) {
+    if (!paySessionExpired(err, close)) errorBox.textContent = err.message;
+    return;
+  }
+  if (!picker.ready) return;
+  go.disabled = false;
+
+  go.addEventListener('click', async () => {
+    errorBox.textContent = '';
+    go.disabled = true;
+    go.textContent = 'Saving…';
+    try {
+      const pm = await picker.paymentMethod();
+      await SparkleAPI.setDefaultCard(pm);
+      close();
+      showToast('Card saved.', 'success');
+      loadClientPayments();
+    } catch (err) {
+      if (paySessionExpired(err, close)) return;
+      errorBox.textContent = err.message;
+      go.disabled = false;
+      go.textContent = 'Save card';
+    }
+  });
+}
+
+async function payCardAction(kind, cardId, el) {
+  if (kind === 'remove' && !confirm('Remove this card?')) return;
+  el.disabled = true;
+  try {
+    if (kind === 'default') await SparkleAPI.setDefaultCard(cardId);
+    else await SparkleAPI.removeCard(cardId);
+    showToast(kind === 'default' ? 'Default card updated.' : 'Card removed.', 'success');
+    loadClientPayments();
+  } catch (err) {
+    if (paySessionExpired(err)) return;
+    el.disabled = false;
+    showToast(err.message, 'error');
+  }
+}
+
+// ══ PAYOUT ACCOUNT (cleaners) ══════════════════════════════════
+// Stripe hosts the setup: bank account or debit card, ID check and tax details.
+// Sparkle only shows where the account stands (lib/connect.js).
+function payoutAccountHtml(acct) {
+  if (!acct || acct.mode === 'off') {
+    return `<div class="alert info">Payouts aren't switched on yet. Keep completing jobs: your earnings are saved here.</div>`;
+  }
+  const card = (title, text, button) => `<div class="card" style="margin-bottom:1rem">
+    <div style="font-size:14px;font-weight:500;margin-bottom:4px">${title}</div>
+    <div class="jp-hint" style="margin-bottom:.6rem">${text}</div>${button}</div>`;
+  switch (acct.state) {
+    case 'ready':
+      return acct.needs_info
+        ? card(`🏦 Payouts go to ${escapeHtml(acct.label || 'your bank account')}`, '⚠️ Stripe needs a little more information soon to keep your payouts going.', '<button class="btn primary sm" data-act="payout-setup">Add the details</button>')
+        : card(`🏦 Payouts go to ${escapeHtml(acct.label || 'your bank account')}`, 'You can change your bank account or debit card any time in your Stripe payout account.', '<button class="btn sm" data-act="payout-manage">Manage payout account</button>');
+    case 'verifying':
+      return card('⏳ Stripe is checking your details', "This usually takes a few minutes, occasionally a day or two. We'll let you know as soon as you can cash out.", '<button class="btn sm" data-act="payout-refresh">Check again</button>');
+    case 'incomplete':
+      return card('🏦 Finish setting up payouts', 'Stripe still needs a few details before it can send you money.', '<button class="btn primary sm" data-act="payout-setup">Continue setup</button>');
+    case 'rejected':
+      return card("Stripe couldn't verify your payout account", "Contact Sparkle support from Settings and we'll help sort it out.", '');
+    default:
+      return card('🏦 Set up payouts to get paid', "Add the bank account or debit card your earnings go to. Stripe, Sparkle's payment processor, verifies your identity and handles your tax forms. It takes about 5 minutes.", '<button class="btn primary sm" data-act="payout-setup">Set up payouts</button>');
+  }
+}
+
+async function payoutSetup(el) {
+  const label = el.textContent;
+  el.disabled = true;
+  el.textContent = 'Opening Stripe…';
+  try {
+    // Stripe's pages send the cleaner back here with ?payouts=return.
+    const { url } = await SparkleAPI.startPayoutSetup(location.origin + location.pathname);
+    window.location.assign(url);
+  } catch (err) {
+    if (paySessionExpired(err)) return;
+    el.disabled = false;
+    el.textContent = label;
+    showToast(err.message, 'error');
+  }
+}
+
+async function payoutManage(el) {
+  // Open the tab straight away, so pop-up blockers allow it, then send it to Stripe.
+  const tab = window.open('', '_blank');
+  el.disabled = true;
+  try {
+    const { url } = await SparkleAPI.openPayoutDashboard();
+    if (tab) { tab.opener = null; tab.location.href = url; }
+    else window.location.assign(url);
+  } catch (err) {
+    tab?.close();
+    if (!paySessionExpired(err)) showToast(err.message, 'error');
+  } finally {
+    el.disabled = false;
+  }
+}
 
 
 
@@ -4549,9 +5067,10 @@ function loadMyBookings() {
       const jobs = data?.jobs || [];
       clientBookingState.jobs = jobs;
       clientBookingState.loaded = true;
-      // While a clean is booked or underway, refresh so "on the way" and "arrived" appear.
+      // While quotes may come in, or a clean is booked or underway, refresh so new
+      // quotes, "on the way" and "arrived" appear.
       clearTimeout(clientBookingState.refreshTimer);
-      if (jobs.some(j => j.status === 'accepted' || j.status === 'in_progress')) {
+      if (jobs.some(j => ['open', 'accepted', 'in_progress'].includes(j.status))) {
         clientBookingState.refreshTimer = setTimeout(() => {
           if (_activePage?.id === 'page-cl-bookings' && currentUser?.role === 'client' && !document.getElementById('jp-report')) loadMyBookings();
         }, 60000);
@@ -4600,6 +5119,17 @@ function loadMyBookings() {
           trackHtml = `<div class="jp-hint" style="margin-top:.5rem">⏱️ On site ${trkDuration(mins)} (${escapeHtml(trkTime(job.arrived_at))} – ${escapeHtml(trkTime(job.completed_at))})</div>`;
         }
 
+        let paymentHtml = '';
+        if (job.payment_needed === 'hold') {
+          paymentHtml = `<div class="alert warn" style="margin:.75rem 0 0">💳 Your card needs attention before this clean${job.auth_error ? `: ${escapeHtml(job.auth_error)}` : '.'} <button class="btn primary sm" data-act="pay-job" data-job="${id}">Update payment</button></div>`;
+        } else if (job.payment_needed === 'charge') {
+          paymentHtml = `<div class="alert warn" style="margin:.75rem 0 0">💳 We couldn't charge your card for this clean${job.payment_error ? `: ${escapeHtml(job.payment_error)}` : '.'} <button class="btn primary sm" data-act="pay-job" data-job="${id}">Pay ${jpMoney(job.total_charged)}</button></div>`;
+        }
+        const payNote = job.payment_needed ? ''
+          : job.status === 'completed' ? ({ captured: ' · paid', processing: ' · payment processing' }[job.capture_status] || '')
+          : ['accepted', 'in_progress'].includes(job.status) ? ' · charged to your card after the clean'
+          : '';
+
         const actions = [
           photoCount ? `<button class="btn sm" data-act="gallery" data-job="${id}">📷 ${job.status === 'cancelled' ? 'Photos' : 'Before &amp; after photos'} (${photoCount})</button>` : '',
           job.dispute_id ? `<button class="btn sm" data-act="dispute-view" data-dispute="${escapeHtml(job.dispute_id)}">${job.dispute_status !== 'resolved' ? 'View report &amp; add photos' : 'View report'}</button>` : '',
@@ -4617,14 +5147,14 @@ function loadMyBookings() {
               <span class="tag ${color}">${escapeHtml(statusLabels[job.status] || job.status || 'Open')}</span>
             </div>
             <div class="meta" style="margin-bottom:.875rem">📅 ${date}</div>
-            ${job.status === 'open' ? `
-              <div style="font-size:12px;color:var(--tx2)">
-                Waiting for bids · job ID: ${escapeHtml(job.id.slice(0,8))}…
-              </div>` : ''}
+            ${job.status === 'open' ? (job.quote_count
+              ? `<div class="alert info" style="margin:0">💬 ${job.quote_count} ${job.quote_count === 1 ? 'cleaner has' : 'cleaners have'} sent you a quote. <button class="btn primary sm" data-act="quotes" data-job="${id}">View quotes</button></div>`
+              : `<div style="font-size:12px;color:var(--tx2)">Waiting for quotes. We'll notify you as soon as cleaners respond.</div>`) : ''}
+            ${paymentHtml}
             ${trackHtml}
-            ${job.total_charged ? `
+            ${job.total_charged && !['open', 'cancelled'].includes(job.status) ? `
               <div style="font-size:13px;font-weight:500;color:var(--gd);margin-top:.5rem">
-                Total: $${parseFloat(job.total_charged).toFixed(2)}
+                Total: $${parseFloat(job.total_charged).toFixed(2)}<span style="font-weight:400;color:var(--tx2)">${payNote}</span>
               </div>` : ''}
             ${job.status === 'cancelled' && job.lockout_fee_amount ? `<div class="jp-hint" style="margin-top:.5rem">A ${jpMoney(job.lockout_fee_amount)} lockout fee was charged because your cleaner couldn't get in.</div>` : ''}
             ${job.can_report && deadline ? `<div class="jp-hint" style="margin-top:.5rem">Something not right? You can report a problem until ${escapeHtml(deadline)}.</div>` : ''}
@@ -4669,17 +5199,19 @@ function renderClientPayments() {
   const methods = billing.payment_methods || [];
   const history = billing.history || [];
   const customerId = billing.customer_id || 'Not connected yet';
+  const defaultId = methods.some(m => m.id === billing.default_payment_method) ? billing.default_payment_method : methods[0]?.id;
   const methodHtml = methods.length
-    ? methods.map((m, i) => `
-        <div class="pay-method ${i === 0 ? 'sel' : ''}">
+    ? methods.map(m => `
+        <div class="pay-method" style="cursor:default;flex-wrap:wrap">
           <div class="pm-icon">${escapeHtml((m.brand || 'card').toUpperCase())}</div>
           <div style="flex:1">
-            <div style="font-size:13px;font-weight:500">${escapeHtml(m.brand || 'Card')} ending in ${escapeHtml(m.last4 || '----')}</div>
-            <div style="font-size:11px;color:var(--tx2)">Expires ${escapeHtml(String(m.exp_month || '--').padStart(2, '0'))}/${escapeHtml(String(m.exp_year || '--').slice(-2))}${billing.default_payment_method === m.id ? ' · Default' : ''}</div>
+            <div style="font-size:13px;font-weight:500">${escapeHtml(String(m.brand || 'card').replace(/^\w/, ch => ch.toUpperCase()))} ending in ${escapeHtml(m.last4 || '----')}</div>
+            <div style="font-size:11px;color:var(--tx2)">Expires ${escapeHtml(String(m.exp_month || '--').padStart(2, '0'))}/${escapeHtml(String(m.exp_year || '--').slice(-2))}</div>
           </div>
-          ${billing.default_payment_method === m.id ? '<span class="tag green">Default</span>' : ''}
+          ${m.id === defaultId ? '<span class="tag green">Default</span>' : `<button class="btn sm" data-act="card-default" data-card="${escapeHtml(m.id)}">Make default</button>`}
+          <button class="btn sm danger" data-act="card-remove" data-card="${escapeHtml(m.id)}" aria-label="Remove the card ending in ${escapeHtml(m.last4 || '')}">Remove</button>
         </div>`).join('')
-    : `<div class="card-sm"><div class="row c"><div><div style="font-size:13px;font-weight:500">No saved payment methods</div><div style="font-size:11px;color:var(--tx2)">Add a card when you post a booking.</div></div></div></div>`;
+    : `<div class="card-sm"><div class="row c"><div><div style="font-size:13px;font-weight:500">No saved cards</div><div style="font-size:11px;color:var(--tx2)">Add one now, or when you book a cleaner.</div></div></div></div>`;
   const historyHtml = history.length
     ? history.map(row => `
         <div class="card-sm">
@@ -4695,12 +5227,12 @@ function renderClientPayments() {
   page.innerHTML = `
     <div class="pg-title">Payments</div>
     <div class="pg-sub">Payment methods and history</div>
-    <div class="sect-hd" style="margin-bottom:.75rem"><div class="sect-title">Payment methods</div></div>
+    <div class="sect-hd" style="margin-bottom:.75rem;display:flex;justify-content:space-between;align-items:center;gap:8px"><div class="sect-title">Payment methods</div><button class="btn primary sm" data-act="add-card">+ Add a card</button></div>
     ${methodHtml}
     <div class="divider"></div>
     <div class="sect-title" style="margin-bottom:.75rem">Payment history</div>
     ${historyHtml}
-    <div class="alert info" style="margin-top:1rem;font-size:12px">Sparkle charges a transparent 8% booking fee, applied only after your job is complete. No subscriptions. No hidden charges. Ever.</div>`;
+    <div class="alert info" style="margin-top:1rem;font-size:12px">Your card is charged after each clean is done: the cleaner's quote plus Sparkle's booking fee (8%, or 10% for business accounts). No subscriptions or hidden charges. Your card details are stored by Stripe, never by Sparkle.</div>`;
 }
 function loadClientReview() {
   if (!currentUser?.isReal) return;
@@ -6065,6 +6597,16 @@ function resetCaptcha() {
 (function handleUrlParams() {
   const params = new URLSearchParams(window.location.search);
   const role   = params.get('role');
+
+  // Back from Stripe's payout setup pages (?payouts=return, or =refresh when the
+  // link expired): open Earnings, which asks Stripe for the account's latest status.
+  const payouts = params.get('payouts');
+  if (payouts === 'return' || payouts === 'refresh') {
+    cleanerEarningsState.fromStripe = payouts;
+    _pendingPage = 'c-earnings';
+    setTimeout(() => { _pendingPage = null; }, 5000);   // long enough for both startup passes
+    history.replaceState(null, '', window.location.pathname);
+  }
 
   // Client or cleaner deep-link from landing page (?role=client or ?role=cleaner)
   // Three cases:

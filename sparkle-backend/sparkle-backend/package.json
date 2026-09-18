@@ -8,7 +8,8 @@
     "dev": "node --experimental-sqlite --watch server.js",
     "test": "node --experimental-sqlite tests/run.js",
     "test:photos": "node --experimental-sqlite tests/job-photos.js",
-    "test:tracking": "node --experimental-sqlite tests/tracking-and-account.js"
+    "test:tracking": "node --experimental-sqlite tests/tracking-and-account.js",
+    "test:payments": "node --experimental-sqlite tests/payments.js"
   },
   "keywords": [],
   "author": "",

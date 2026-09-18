@@ -74,13 +74,19 @@ function seed() {
   const cp = db.prepare('INSERT INTO cleaner_profiles (user_id, hourly_rate, stripe_connect_id, lockout_fee_enabled, lockout_fee_amount) VALUES (?,?,?,?,?)');
   cp.run(ids.cleaner, 35, 'acct_test_cleaner', 1, 35);
   cp.run(ids.stranger, 35, 'acct_test_stranger', 0, 0);
+  db.prepare('UPDATE cleaner_profiles SET connect_payouts_enabled = 1').run();
+  db.prepare("UPDATE users SET stripe_customer_id = 'cus_pt_client' WHERE id = ?").run(ids.client);
 }
 
+// A booked job is paid with a saved card that already has a hold on it.
 function seedJob(id, status = 'accepted', cleanerId = ids.cleaner) {
+  const booked = !!cleanerId;
   db.prepare(`
-    INSERT INTO jobs (id, client_id, cleaner_id, service_type, address, scheduled_at, status, base_amount, platform_fee, total_charged)
-    VALUES (?, ?, ?, 'Deep clean', '1 Test St', '2026-09-20T10:00:00.000Z', ?, 100, 8, 108)
-  `).run(id, ids.client, cleanerId, status);
+    INSERT INTO jobs (id, client_id, cleaner_id, service_type, address, scheduled_at, status, base_amount, platform_fee, total_charged,
+                      payment_method_id, auth_status, stripe_payment_intent_id)
+    VALUES (?, ?, ?, 'Deep clean', '1 Test St', '2026-09-20T10:00:00.000Z', ?, 100, 8, 108, ?, ?, ?)
+  `).run(id, ids.client, cleanerId, status,
+         booked ? 'pm_card_visa' : null, booked ? 'authorized' : null, booked ? `pi_seeded_${id}` : null);
   return id;
 }
 
@@ -235,7 +241,7 @@ async function main() {
   const r2 = await resolve(d2.json.dispute.id, 'client');
   assert.equal(r2.status, 200, r2.text);
   assert.equal(r2.json.earnings.clawed_back, 100);
-  assert.equal(r2.json.refund_status, 'not_applicable', 'no card payment on this job');
+  assert.equal(r2.json.refund_status, 'succeeded', 'the client is refunded to their card');
   e = await earnings();
   assert.equal(e.balance.refunds_owed, 100);
   assert.equal(e.balance.available, 0);
@@ -298,8 +304,10 @@ async function main() {
   const J = seedJob('pt-job-j', 'open', null);
   db.prepare(`INSERT INTO bids (id, job_id, cleaner_id, amount, message, success_fee, expires_at)
               VALUES ('pt-bid-j', ?, ?, 120, 'I would love to take this clean for you.', 12, datetime('now', '+1 day'))`).run(J, ids.cleaner);
-  assert.equal((await api(`/api/jobs/${J}/accept`, { method: 'POST', token: T.stranger })).status, 200);
-  assert.equal(db.prepare("SELECT status FROM bids WHERE id = 'pt-bid-j'").get().status, 'declined');
+  assert.equal((await api(`/api/jobs/${J}/accept`, { method: 'POST', token: T.stranger })).status, 410, 'cleaners quote; they cannot take a job outright');
+  const chosen = await api('/api/bids/pt-bid-j/choose', { method: 'POST', token: T.client, body: { payment_method_id: 'pm_card_visa' } });
+  assert.equal(chosen.status, 200, chosen.text);
+  assert.equal(db.prepare("SELECT status FROM bids WHERE id = 'pt-bid-j'").get().status, 'chosen');
   assert.equal((await api(`/api/bids/job/${J}/close`, { method: 'POST', token: T.client })).status, 409, 'a booked job cannot be closed');
 
   const K = seedJob('pt-job-k');

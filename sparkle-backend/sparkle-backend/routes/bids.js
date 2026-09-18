@@ -7,17 +7,21 @@ const { v4: uuid } = require('uuid');
 const { body, validationResult } = require('express-validator');
 const db     = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
-const { getStripe } = require('../lib/stripe');
+const { paymentLimiter } = require('../middleware/security');
 const { queueNotification } = require('../lib/queue');
 const { audit } = require('../lib/logger');
-const { transaction } = require('../lib/payouts');
+const { transaction, cents } = require('../lib/payouts');
+const payments = require('../lib/payments');
 
 const router = express.Router();
 
 const SUCCESS_FEE_PCT = 0.10;   // 10% from cleaner when chosen
-const BOOKING_FEE_PCT = 0.08;   // 8% from client on top of quote
 const MAX_BIDS_PER_CLEANER_PER_DAY = 20;  // bid spam protection
 const BID_EXPIRY_HOURS = 48;    // client must choose within 48 hrs
+
+// expires_at is stored as an ISO string; compared as text with SQLite's
+// 'YYYY-MM-DD HH:MM:SS' it looked unexpired until the next day. Compare as dates.
+const BID_LIVE_SQL = "julianday(b.expires_at) > julianday('now')";
 
 // ─────────────────────────────────────────────────
 // POST /api/bids — cleaner submits a bid on an open job
@@ -92,7 +96,7 @@ router.post('/', requireAuth, requireRole('cleaner'), [
   await queueNotification(
     job.client_id,
     '💬 New quote received!',
-    `A cleaner quoted $${amount.toFixed(2)} for your ${job.service_type}. You have 48 hours to decide.`,
+    `A cleaner quoted $${Number(amount).toFixed(2)} for your ${job.service_type}. You have 48 hours to decide.`,
     'new_bid'
   );
 
@@ -126,18 +130,20 @@ router.get('/job/:job_id', requireAuth, requireRole('client', 'admin'), (req, re
   const orderBy = orderMap[sort] || orderMap.price;
 
   const bids = db.prepare(`
-    SELECT b.*,
+    SELECT b.id, b.job_id, b.cleaner_id, b.amount, b.message, b.status, b.submitted_at, b.expires_at,
            u.first_name, u.last_name, u.city, u.avatar_url,
            cp.hourly_rate, cp.avg_rating, cp.total_jobs, cp.is_verified, cp.is_pro, cp.badge_tier,
-           (b.amount * ${1 + BOOKING_FEE_PCT}) as client_total,
-           (b.amount - b.success_fee) as cleaner_receives
+           cp.lockout_fee_enabled, cp.lockout_fee_amount
     FROM bids b
     JOIN users u ON u.id = b.cleaner_id
     JOIN cleaner_profiles cp ON cp.user_id = b.cleaner_id
-    WHERE b.job_id = ? AND b.status = 'pending'
-    AND b.expires_at > datetime('now')
+    WHERE b.job_id = ? AND b.status = 'pending' AND ${BID_LIVE_SQL}
     ORDER BY ${orderBy}
-  `).all(req.params.job_id);
+  `).all(req.params.job_id).map(b => {
+    // What the client would pay, with their own booking fee (8%, or 10% for businesses).
+    const t = payments.bookingTotals(b.amount, job.client_id);
+    return { ...b, booking_fee: t.booking_fee, fee_percent: t.fee_percent, client_total: t.total };
+  });
 
   // Check if job is about to expire and flag it
   const hoursLeft = job.created_at
@@ -148,60 +154,53 @@ router.get('/job/:job_id', requireAuth, requireRole('client', 'admin'), (req, re
 });
 
 // ─────────────────────────────────────────────────
-// POST /api/bids/:bid_id/choose — client chooses a bid
-// This locks in the booking, charges the client, deducts success fee from cleaner
+// POST /api/bids/:bid_id/choose — client books a cleaner
+// Body: { payment_method_id } — one of the client's saved cards (see routes/payments.js).
+// Nothing is charged now. Inside the hold window (a few days before the clean) the
+// total is held on the card straight away; otherwise the hold is placed later. The
+// card is charged when the job is completed. See lib/payments.js.
 // ─────────────────────────────────────────────────
-router.post('/:bid_id/choose', requireAuth, requireRole('client'), async (req, res) => {
-  const { payment_method_id } = req.body;
+router.post('/:bid_id/choose', requireAuth, requireRole('client'), paymentLimiter, async (req, res) => {
+  if (!payments.paymentsReady()) return res.status(503).json(payments.PAYMENTS_OFF);
+  const { payment_method_id } = req.body || {};
 
   const bid = db.prepare(`
     SELECT b.*, j.client_id, j.service_type, j.scheduled_at, j.address, j.status AS job_status
     FROM bids b JOIN jobs j ON j.id = b.job_id
-    WHERE b.id = ? AND b.status = 'pending' AND b.expires_at > datetime('now')
+    WHERE b.id = ? AND b.status = 'pending' AND ${BID_LIVE_SQL}
   `).get(req.params.bid_id);
 
   if (!bid) return res.status(404).json({ error: 'Bid not found or has expired' });
   if (bid.client_id !== req.user.id) return res.status(403).json({ error: 'Not your job' });
   if (bid.job_status !== 'open') return res.status(409).json({ error: 'This job has already been booked or closed.' });
+  if (!payment_method_id) return res.status(422).json({ error: 'Choose a card to book with.', code: 'CARD_REQUIRED' });
 
-  const stripe = getStripe();
+  const totals = payments.bookingTotals(bid.amount, req.user.id);
+  let hold = null;
 
   try {
-    // Client pays: quote + 8% booking fee
-    const bookingFee  = parseFloat((bid.amount * BOOKING_FEE_PCT).toFixed(2));
-    const totalCharge = parseFloat((bid.amount + bookingFee).toFixed(2));
+    const customerId = await payments.ensureCustomer(req.user.id);
+    await payments.assertCardBelongs(customerId, payment_method_id);
 
-    // Get or create Stripe customer
-    let customerId = db.prepare('SELECT stripe_customer_id FROM users WHERE id = ?').get(req.user.id)?.stripe_customer_id;
-    if (!customerId && payment_method_id) {
-      const customer = await stripe.customers.create({
-        email: req.user.email,
-        payment_method: payment_method_id,
-        metadata: { sparkle_user_id: req.user.id }
+    // Inside the hold window, place the hold now, while the client is here to
+    // approve it with their bank if asked.
+    if (payments.withinHoldWindow(bid.scheduled_at)) {
+      hold = await payments.confirmOnCard({
+        job: { id: bid.job_id, client_id: req.user.id, service_type: bid.service_type },
+        customerId, paymentMethodId: payment_method_id, amountCents: cents(totals.total),
+        manual: true, onSession: true,
+        // Same bid and card → same key, so a retried request can't place a second hold.
+        idempotencyKey: `booking-hold-${bid.id}-${payment_method_id}`,
       });
-      customerId = customer.id;
-      db.prepare('UPDATE users SET stripe_customer_id = ? WHERE id = ?').run(customerId, req.user.id);
-    }
-
-    // Authorize (but don't capture yet — capture after job completes)
-    let paymentIntentId = null;
-    if (customerId) {
-      const pi = await stripe.paymentIntents.create({
-        amount:         Math.round(totalCharge * 100),
-        currency:       'usd',
-        customer:       customerId,
-        payment_method: payment_method_id,
-        capture_method: 'manual',
-        confirm:        true,
-        description:    `Sparkle - ${bid.service_type}`,
-        metadata: { bid_id: bid.id, job_id: bid.job_id, type: 'job_payment' },
-        automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
-      });
-      paymentIntentId = pi.id;
+      if (hold.outcome === 'failed') {
+        if (hold.intent) payments.releaseIntent(hold.intent.id);
+        return res.status(402).json({ error: hold.error || 'Your card was declined. Try another card.', code: 'CARD_DECLINED' });
+      }
     }
 
     // Book it only if the job is still open and this bid still pending. The Stripe
-    // call above awaited, so another choose request may have booked the job since.
+    // calls above awaited, so another request may have booked the job since.
+    const holdStatus = hold ? (hold.outcome === 'authorized' ? 'authorized' : 'action_required') : 'scheduled';
     const now = new Date().toISOString();
     const booked = transaction(() => {
       const stillPending = db.prepare("SELECT 1 FROM bids WHERE id = ? AND status = 'pending'").get(bid.id);
@@ -213,10 +212,17 @@ router.post('/:bid_id/choose', requireAuth, requireRole('client'), async (req, r
           base_amount  = ?,
           platform_fee = ?,
           total_charged= ?,
+          payment_method_id = ?,
           stripe_payment_intent_id = ?,
+          auth_status  = ?,
+          auth_attempts = ?,
+          auth_attempted_at = CASE WHEN ? THEN datetime('now') END,
+          auth_error   = ?,
+          capture_status = NULL,
           updated_at   = datetime('now')
         WHERE id = ? AND status = 'open'
-      `).run(bid.cleaner_id, bid.amount, bookingFee, totalCharge, paymentIntentId, bid.job_id);
+      `).run(bid.cleaner_id, bid.amount, totals.booking_fee, totals.total, payment_method_id,
+             hold?.intent?.id || null, holdStatus, hold ? 1 : 0, hold ? 1 : 0, hold?.error || null, bid.job_id);
       if (jobRes.changes !== 1) return false;
       db.prepare("UPDATE bids SET status = 'chosen', chosen_at = ? WHERE id = ?").run(now, bid.id);
       db.prepare("UPDATE bids SET status = 'declined' WHERE job_id = ? AND id != ? AND status = 'pending'").run(bid.job_id, bid.id);
@@ -224,26 +230,22 @@ router.post('/:bid_id/choose', requireAuth, requireRole('client'), async (req, r
     });
 
     if (!booked) {
-      if (paymentIntentId) {
-        stripe.paymentIntents.cancel(paymentIntentId)
-          .catch(err => console.error('Could not release authorization for a lost booking race:', paymentIntentId, err.message));
-      }
+      if (hold?.intent) payments.releaseIntent(hold.intent.id);
       return res.status(409).json({ error: 'This job has already been booked.' });
     }
+
+    payments.setDefaultCard(customerId, payment_method_id).catch(err => console.warn('Could not set default card:', err.message));
 
     // No payout is created here. The cleaner's earnings are created when the job is
     // completed with its before and after photos (routes/jobs.js) — a booking-time
     // payout could be cashed out for work that never happened.
 
-    // Notify cleaner
     await queueNotification(
       bid.cleaner_id,
       '🎉 You were chosen!',
       `A client chose your $${bid.amount} quote for their ${bid.service_type}. Check your schedule.`,
       'bid_chosen'
     );
-
-    // Notify declined cleaners
     const declinedBids = db.prepare("SELECT cleaner_id FROM bids WHERE job_id = ? AND status = 'declined'").all(bid.job_id);
     for (const d of declinedBids) {
       await queueNotification(d.cleaner_id, 'Another cleaner was chosen', 'The client chose a different quote for this job. Keep bidding — your next job is out there!', 'bid_declined');
@@ -252,17 +254,21 @@ router.post('/:bid_id/choose', requireAuth, requireRole('client'), async (req, r
     audit('BID_CHOSEN', { jobId: bid.job_id, bidId: bid.id, cleanerId: bid.cleaner_id, clientId: req.user.id, amount: bid.amount });
 
     res.json({
-      message:          'Booking confirmed!',
-      job_id:           bid.job_id,
-      cleaner_id:       bid.cleaner_id,
-      quote:            bid.amount,
-      booking_fee:      bookingFee,
-      total_charged:    totalCharge,
-      payment_intent:   paymentIntentId,
-      cleaner_earns:    bid.amount - bid.success_fee,
+      message:       'Booking confirmed!',
+      job_id:        bid.job_id,
+      cleaner_id:    bid.cleaner_id,
+      quote:         totals.quote,
+      booking_fee:   totals.booking_fee,
+      total_charged: totals.total,
+      payment: {
+        status: holdStatus,
+        ...(holdStatus === 'action_required' && { client_secret: hold.intent?.client_secret, payment_intent_id: hold.intent?.id }),
+      },
+      cleaner_earns: bid.amount - (bid.success_fee ?? bid.amount * SUCCESS_FEE_PCT),
     });
 
   } catch (err) {
+    if (err instanceof payments.PaymentError) return res.status(err.status).json({ error: err.message, code: err.code });
     // SECURITY: Never expose internal error details (Stripe messages, stack traces) to clients.
     console.error('Choose bid error:', err);
     res.status(500).json({ error: 'Booking failed. Please try again or contact support.' });
@@ -299,7 +305,7 @@ router.post('/expire', requireAuth, requireRole('admin'), (req, res) => {
   // Expire bids past their 48hr window
   const expiredBids = db.prepare(`
     UPDATE bids SET status = 'expired'
-    WHERE status = 'pending' AND expires_at < datetime('now')
+    WHERE status = 'pending' AND julianday(expires_at) < julianday('now')
     RETURNING job_id, cleaner_id
   `).all();
 

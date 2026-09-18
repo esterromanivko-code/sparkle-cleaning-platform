@@ -53,17 +53,20 @@ const PASSWORD = 'TrackTest!2345';
 const HASH = bcrypt.hashSync(PASSWORD, 10);
 const tokens = {};
 function user(id, role, first) {
-  db.prepare('INSERT INTO users (id, role, first_name, last_name, email, password_hash) VALUES (?,?,?,?,?,?)')
-    .run(id, role, first, 'Test', `${id}@tt.local`, HASH);
-  if (role === 'cleaner') db.prepare('INSERT INTO cleaner_profiles (user_id, stripe_connect_id, lockout_fee_enabled, lockout_fee_amount) VALUES (?,?,1,30)').run(id, 'acct_' + id);
+  db.prepare('INSERT INTO users (id, role, first_name, last_name, email, password_hash, stripe_customer_id) VALUES (?,?,?,?,?,?,?)')
+    .run(id, role, first, 'Test', `${id}@tt.local`, HASH, role === 'client' ? `cus_${id}` : null);
+  if (role === 'cleaner') db.prepare('INSERT INTO cleaner_profiles (user_id, stripe_connect_id, connect_payouts_enabled, lockout_fee_enabled, lockout_fee_amount) VALUES (?,?,1,1,30)').run(id, 'acct_' + id);
   if (role === 'client') db.prepare('INSERT INTO client_profiles (user_id, default_address) VALUES (?, ?)').run(id, '600 4th Ave');
   tokens[id] = signToken({ id, role });
 }
+// A booked job paid with a saved card that already has a hold on it.
 function job(id, clientId, cleanerId, status = 'accepted') {
   db.prepare(`
-    INSERT INTO jobs (id, client_id, cleaner_id, service_type, address, scheduled_at, status, base_amount, lat, lng)
-    VALUES (?, ?, ?, 'Deep clean', '600 4th Ave, Seattle', '2026-09-20T10:00:00.000Z', ?, 100, ?, ?)
-  `).run(id, clientId, cleanerId, status, HOME.lat, HOME.lng);
+    INSERT INTO jobs (id, client_id, cleaner_id, service_type, address, scheduled_at, status, base_amount, total_charged, lat, lng,
+                      payment_method_id, auth_status, stripe_payment_intent_id)
+    VALUES (?, ?, ?, 'Deep clean', '600 4th Ave, Seattle', '2026-09-20T10:00:00.000Z', ?, 100, 108, ?, ?,
+            'pm_card_visa', 'authorized', ?)
+  `).run(id, clientId, cleanerId, status, HOME.lat, HOME.lng, `pi_seeded_${id}`);
 }
 const addPhoto = (jobId, uploader, stage) => db.prepare(`
   INSERT INTO job_photos (id, job_id, uploaded_by, role, stage, filename, thumb_filename)

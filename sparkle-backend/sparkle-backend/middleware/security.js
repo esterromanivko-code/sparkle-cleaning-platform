@@ -137,6 +137,16 @@ const locationPingLimiter = rateLimit({
   message:      { error: 'Location updates are coming in too fast.' }
 });
 
+// Adding cards, paying, and opening Stripe's payout pages — each calls Stripe, so
+// they're capped per signed-in user.
+const paymentLimiter = rateLimit({
+  windowMs:     10 * 60 * 1000,
+  max:          30,
+  store:        redisStore || undefined,
+  keyGenerator: (req) => (req.user?.id ? `user:${req.user.id}` : rateLimit.ipKeyGenerator(req.ip)),
+  message:      { error: 'Too many payment attempts. Please wait a few minutes and try again.' }
+});
+
 // ══════════════════════════════════════════════════════
 //  2. INPUT SANITIZATION — strip dangerous characters
 //     Prevents XSS (cross-site scripting) attacks
@@ -173,7 +183,9 @@ function sanitizeInput(req, res, next) {
     return cleaned;
   }
 
-  if (req.body && typeof req.body === 'object') req.body = cleanObject(req.body);
+  // A Buffer is a webhook's raw body, which must reach its signature check byte for
+  // byte; cleaning it would turn it into a plain object and fail every webhook.
+  if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) req.body = cleanObject(req.body);
   // Do not mutate req.query (read-only in Node 22) — validate in routes via express-validator
   // Note: params are handled by express-validator in each route
   next();
@@ -317,6 +329,7 @@ module.exports = {
   credentialUploadLimiter,
   jobPhotoUploadLimiter,
   locationPingLimiter,
+  paymentLimiter,
   sanitizeInput,
   securityHeaders,
   detectSuspiciousActivity,

@@ -580,7 +580,38 @@ if (addColumn('jobs', 'photos_required INTEGER NOT NULL DEFAULT 1')) {
 }
 addColumn('jobs', 'photos_verified_at TEXT');   // set by /complete once the photos were checked
 addColumn('jobs', 'completed_at TEXT');         // the 72-hour problem-report window starts here
-addColumn('jobs', 'capture_status TEXT');       // captured | failed | not_required
+addColumn('jobs', 'capture_status TEXT');       // captured | processing | failed | waived | not_required (legacy)
+
+// Card payments (lib/payments.js): the saved card a booking is paid with, and the
+// hold placed on it a few days before the clean.
+for (const column of [
+  'payment_method_id TEXT',                     // a Stripe card saved on the client's customer
+  'auth_status TEXT',                           // scheduled | authorized | action_required | failed | canceled
+  'auth_attempts INTEGER NOT NULL DEFAULT 0',   // part of each hold request's idempotency key
+  'auth_attempted_at TEXT',
+  'auth_error TEXT',                            // the card's decline message, shown to the client
+  'charge_attempts INTEGER NOT NULL DEFAULT 0',
+  'payment_error TEXT',
+]) addColumn('jobs', column);
+
+// Cleaners' payout accounts (lib/connect.js), as Stripe last reported them.
+for (const column of [
+  'connect_details_submitted INTEGER NOT NULL DEFAULT 0',
+  'connect_payouts_enabled INTEGER NOT NULL DEFAULT 0',
+  'connect_due_count INTEGER NOT NULL DEFAULT 0',
+  'connect_disabled_reason TEXT',
+  'payout_method_label TEXT',                   // e.g. "CHASE •••• 6789"
+  'connect_synced_at TEXT',
+]) addColumn('cleaner_profiles', column);
+
+// Stripe can deliver a webhook more than once; each event is handled once.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS stripe_events (
+    id          TEXT PRIMARY KEY,
+    type        TEXT NOT NULL,
+    received_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`);
 
 // Location tracking: "On my way", arrival and completion check-ins, and the latest
 // live position (lib/tracking.js). geocode_status records the one address lookup.

@@ -10,15 +10,14 @@ const express = require('express');
 const { v4: uuid } = require('uuid');
 const { body, query, validationResult } = require('express-validator');
 const db     = require('../db');
- const { requireAuth, requireRole } = require('../middleware/auth');
-const { getStripe } = require('../lib/stripe');
+const { requireAuth, requireRole } = require('../middleware/auth');
 const { stageCounts, jobAccess } = require('../lib/jobPhotos');
 const { ensureJobPayout, reverseJobEarnings, transaction } = require('../lib/payouts');
 const { notify, notifyAdmins } = require('../lib/notify');
 const { readCoords, ensureJobCoordinates } = require('../lib/geo');
 const { recordLocation, trackingSummary, isFar, ARRIVAL_RADIUS_M, MIN_PING_GAP_SECONDS } = require('../lib/tracking');
 const { locationPingLimiter } = require('../middleware/security');
-const stripe = getStripe();
+const payments = require('../lib/payments');
 
 const router = express.Router();
 
@@ -34,6 +33,19 @@ const CLEANER_LOCATION_FIELDS = [
 function withoutCleanerLocation(job) {
   const out = { ...job };
   for (const field of CLEANER_LOCATION_FIELDS) delete out[field];
+  return out;
+}
+
+// Cleaners aren't shown the client's card, Stripe ids or decline messages — only
+// whether the client's payment for an upcoming job has a problem.
+const PAYMENT_FIELDS = [
+  'payment_method_id', 'stripe_payment_intent_id', 'auth_error', 'payment_error',
+  'auth_attempts', 'charge_attempts', 'auth_attempted_at',
+];
+function forCleaner(job) {
+  const out = { ...job };
+  for (const field of PAYMENT_FIELDS) delete out[field];
+  out.payment_issue = ['failed', 'action_required'].includes(job.auth_status);
   return out;
 }
 
@@ -77,7 +89,7 @@ router.get('/available', requireAuth, requireRole('cleaner'), (req, res) => {
     LIMIT 50
   `).all(req.user.id);
 
-  res.json({ jobs });
+  res.json({ jobs: jobs.map(forCleaner) });
 });
 
 // ─────────────────────────────────────────────────
@@ -101,7 +113,7 @@ router.get('/my-schedule', requireAuth, requireRole('cleaner'), (req, res) => {
     ORDER BY j.scheduled_at ASC
   `).all(req.user.id);
 
-  res.json({ jobs });
+  res.json({ jobs: jobs.map(forCleaner) });
 });
 
 // ─────────────────────────────────────────────────
@@ -151,7 +163,13 @@ router.get('/my-bookings', requireAuth, requireRole('client'), (req, res) => {
            (j.status = 'completed' AND j.cleaner_id IS NOT NULL AND j.completed_at IS NOT NULL AND d.id IS NULL
              AND (julianday('now') - julianday(j.completed_at)) * 24 <= ${REPORT_WINDOW_HOURS}) AS can_report,
            (j.status = 'cancelled' AND lf.id IS NOT NULL AND d.id IS NULL
-             AND (julianday('now') - julianday(lf.created_at)) * 24 <= ${REPORT_WINDOW_HOURS}) AS can_dispute_lockout
+             AND (julianday('now') - julianday(lf.created_at)) * 24 <= ${REPORT_WINDOW_HOURS}) AS can_dispute_lockout,
+           (SELECT COUNT(*) FROM bids b WHERE b.job_id = j.id AND b.status = 'pending'
+              AND julianday(b.expires_at) > julianday('now')) AS quote_count,
+           -- 'hold': the card for an upcoming clean was declined or needs the bank's approval.
+           -- 'charge': a finished clean couldn't be charged.
+           CASE WHEN j.status IN ('accepted','in_progress') AND j.auth_status IN ('failed','action_required') THEN 'hold'
+                WHEN j.status = 'completed' AND j.capture_status = 'failed' THEN 'charge' END AS payment_needed
     FROM jobs j
     LEFT JOIN users u ON u.id = j.cleaner_id
     LEFT JOIN cleaner_profiles cp ON cp.user_id = j.cleaner_id
@@ -184,7 +202,6 @@ router.post('/', requireAuth, requireRole('client'), [
     service_type, bedrooms, bathrooms, address, city, zip,
     scheduled_at, duration_hrs, supplies_by, pets, notes,
     is_recurring, recurring_freq, is_priority, has_guarantee,
-    payment_method_id
   } = req.body;
 
   try {
@@ -202,38 +219,22 @@ router.post('/', requireAuth, requireRole('client'), [
     const priorityFee  = is_priority   ?  7.00 : 0;
     const totalCharged = baseAmount + platformFee + guaranteeFee + priorityFee;
 
-    // Stripe: create payment intent (captured later when job completes)
-    let paymentIntentId = null;
-    if (payment_method_id) {
-      const client = db.prepare('SELECT stripe_customer_id FROM users WHERE id = ?').get(req.user.id);
-      const pi = await stripe.paymentIntents.create({
-        amount:         Math.round(totalCharged * 100),
-        currency:       'usd',
-        customer:       client.stripe_customer_id,
-        payment_method: payment_method_id,
-        capture_method: 'manual',   // authorize now, capture when job is complete
-        description:    `Sparkle - ${service_type}`,
-        metadata: { sparkle_user_id: req.user.id, type: 'job_payment' }
-      });
-      paymentIntentId = pi.id;
-    }
-
+    // Nothing is charged when a job is posted. The client adds a card when they book
+    // one of the quotes (routes/bids.js), and the amounts above are replaced then.
     const id = uuid();
     db.prepare(`
       INSERT INTO jobs
         (id, client_id, service_type, bedrooms, bathrooms, address, city, zip,
          scheduled_at, duration_hrs, supplies_by, pets, notes,
          is_recurring, recurring_freq, is_priority, has_guarantee,
-         base_amount, platform_fee, guarantee_fee, priority_fee, total_charged,
-         stripe_payment_intent_id)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         base_amount, platform_fee, guarantee_fee, priority_fee, total_charged)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `).run(
       id, req.user.id, service_type, bedrooms||null, bathrooms||null,
       address, city||null, zip||null, scheduled_at, duration_hrs||null,
       supplies_by||'client', pets||null, notes||null,
       is_recurring?1:0, recurring_freq||null, is_priority?1:0, has_guarantee?1:0,
-      baseAmount, platformFee, guaranteeFee, priorityFee, totalCharged,
-      paymentIntentId
+      baseAmount, platformFee, guaranteeFee, priorityFee, totalCharged
     );
 
     // Look up the address's map coordinates in the background, for arrival checks.
@@ -245,7 +246,6 @@ router.post('/', requireAuth, requireRole('client'), [
       message:       'Job posted successfully',
       job_id:        id,
       estimated_total: totalCharged,
-      payment_intent_id: paymentIntentId,
     });
 
   } catch (err) {
@@ -255,27 +255,13 @@ router.post('/', requireAuth, requireRole('client'), [
 });
 
 // ─────────────────────────────────────────────────
-// POST /api/jobs/:id/accept  (cleaner only)
+// POST /api/jobs/:id/accept  (cleaner only) — retired
+// A cleaner used to be able to take an open job outright, which booked it with no
+// card and no say from the client. Cleaners send a quote instead; the client books
+// the one they want and adds a card (POST /api/bids/:bid_id/choose).
 // ─────────────────────────────────────────────────
 router.post('/:id/accept', requireAuth, requireRole('cleaner'), (req, res) => {
-  // One synchronous step, so two cleaners accepting at once can't both win.
-  const job = transaction(() => {
-    const j = db.prepare('SELECT * FROM jobs WHERE id = ? AND status = ?').get(req.params.id, 'open');
-    if (!j) return null;
-    db.prepare(`
-      UPDATE jobs SET cleaner_id = ?, status = 'accepted', updated_at = datetime('now') WHERE id = ? AND status = 'open'
-    `).run(req.user.id, j.id);
-    // Anyone else's quotes on this job are moot now.
-    db.prepare("UPDATE bids SET status = 'declined' WHERE job_id = ? AND status = 'pending'").run(j.id);
-    notify(j.client_id,
-      '🧹 Cleaner accepted your job!',
-      `A cleaner has confirmed your ${j.service_type} for ${j.scheduled_at}.`,
-      'job_accepted');
-    return j;
-  });
-  if (!job) return res.status(404).json({ error: 'Job not found or already taken' });
-
-  res.json({ message: 'Job accepted', job_id: job.id });
+  res.status(410).json({ error: 'Send the client a quote instead — they book the cleaner they choose.', code: 'QUOTE_REQUIRED' });
 });
 
 // ─────────────────────────────────────────────────
@@ -410,36 +396,6 @@ router.post('/:id/arrive', requireAuth, requireRole('cleaner'), async (req, res)
   });
 });
 
-// Capture the client's authorized payment. Never throws: a failure is recorded on
-// the job, holds the cleaner's earnings, and tells the admins. Calling it again
-// is safe — Stripe's idempotency key makes a repeated capture a no-op.
-async function capturePayment(job) {
-  let status;
-  if (!job.stripe_payment_intent_id) {
-    status = 'not_required';
-  } else {
-    try {
-      const pi = await stripe.paymentIntents.retrieve(job.stripe_payment_intent_id);
-      if (pi.status === 'requires_capture') {
-        await stripe.paymentIntents.capture(pi.id, {}, { idempotencyKey: `capture-${job.id}` });
-        status = 'captured';
-      } else {
-        status = pi.status === 'succeeded' ? 'captured' : 'failed';
-      }
-    } catch (err) {
-      console.error('Payment capture failed for job', job.id, err.message);
-      status = 'failed';
-    }
-  }
-  db.prepare('UPDATE jobs SET capture_status = ? WHERE id = ?').run(status, job.id);
-  if (status === 'failed') {
-    notifyAdmins('Payment capture failed',
-      `Job ${job.id} was completed but the client's payment could not be captured. ` +
-      "The cleaner's earnings are on hold until you retry the payment or release them.");
-  }
-  return status;
-}
-
 // ─────────────────────────────────────────────────
 // POST /api/jobs/:id/complete  (cleaner only)
 // Requires ≥1 before and ≥1 after photo. Captures the client's payment and makes
@@ -485,11 +441,14 @@ router.post('/:id/complete', requireAuth, requireRole('cleaner'), async (req, re
 
   try {
     let job = step.job;
-    if (!job.capture_status) await capturePayment(job);
+    // Collect the client's payment (lib/payments.js). A charge that already failed
+    // isn't retried from here — tapping Complete again mustn't keep retrying a
+    // declined card; the client pays from My bookings.
+    if (!job.capture_status || job.capture_status === 'processing') await payments.chargeCompletedJob(job.id);
     job = db.prepare('SELECT * FROM jobs WHERE id = ?').get(job.id);
 
     const payout = ensureJobPayout(job);
-    const onHold = job.capture_status === 'failed';
+    const onHold = ['failed', 'processing'].includes(job.capture_status);
     const earns = payout ? payout.amount : 0;
 
     if (!step.alreadyCompleted) {
@@ -501,7 +460,7 @@ router.post('/:id/complete', requireAuth, requireRole('cleaner'), async (req, re
       notify(req.user.id,
         onHold ? '✅ Job complete — payment under review' : '💰 Job complete — ready to cash out',
         onHold
-          ? `Your $${earns.toFixed(2)} for this job is on hold while Sparkle sorts out the client's payment.`
+          ? `Your $${earns.toFixed(2)} for this job is on hold until the client's payment goes through. They've been asked to pay.`
           : `$${earns.toFixed(2)} is available to cash out now.`,
         onHold ? 'payout_held' : 'payout_available');
     }
@@ -539,7 +498,9 @@ router.post('/:id/cancel', requireAuth, async (req, res) => {
 
   const cancelled = transaction(() => {
     const result = db.prepare(`
-      UPDATE jobs SET status = 'cancelled', updated_at = datetime('now') WHERE id = ? AND status IN ('open','accepted')
+      UPDATE jobs SET status = 'cancelled', auth_status = CASE WHEN auth_status IS NOT NULL THEN 'canceled' END,
+             updated_at = datetime('now')
+      WHERE id = ? AND status IN ('open','accepted')
     `).run(job.id);
     if (result.changes !== 1) return false;
     db.prepare("UPDATE bids SET status = 'declined' WHERE job_id = ? AND status = 'pending'").run(job.id);
@@ -555,14 +516,8 @@ router.post('/:id/cancel', requireAuth, async (req, res) => {
   });
   if (!cancelled) return res.status(409).json({ error: 'Job cannot be cancelled' });
 
-  // Refund if payment was captured
-  if (job.stripe_payment_intent_id) {
-    try {
-      await stripe.paymentIntents.cancel(job.stripe_payment_intent_id);
-    } catch {
-      // PI may already be captured — handle refund separately
-    }
-  }
+  // Nothing is charged before a clean happens, so cancelling just releases the hold.
+  if (job.stripe_payment_intent_id) await payments.releaseIntent(job.stripe_payment_intent_id);
 
   res.json({ message: 'Job cancelled' });
 });
@@ -633,26 +588,21 @@ router.post('/:id/lockout-fee', requireAuth, requireRole('cleaner'), async (req,
   const job = reserved.job;
 
   let chargeId = null;
+  const feeText = `$${Number(feeAmount).toFixed(2)}`;
   try {
-    const clientUser = db.prepare(
-      'SELECT stripe_customer_id FROM users WHERE id = ?'
-    ).get(job.client_id);
-
-    // Charge the lockout fee to the client's saved payment method
-    if (clientUser.stripe_customer_id) {
-      const charge = await stripe.charges.create({
-        amount:      Math.round(feeAmount * 100),
-        currency:    'usd',
-        customer:    clientUser.stripe_customer_id,
-        description: `Sparkle lockout fee - job ${job.id}`,
-        metadata: { job_id: job.id, cleaner_id: req.user.id, type: 'lockout_fee' }
-      }, { idempotencyKey: `lockout-${lockoutId}` });
-      chargeId = charge.id;
-    }
+    ({ chargeId } = await payments.chargeLockoutFee(job.id, lockoutId, feeAmount));
   } catch (err) {
-    db.prepare("DELETE FROM lockout_fees WHERE id = ? AND status = 'pending'").run(lockoutId);
+    if (err instanceof payments.PaymentError) {
+      db.prepare("DELETE FROM lockout_fees WHERE id = ? AND status = 'pending'").run(lockoutId);
+      notifyAdmins('Lockout fee could not be charged',
+        `A cleaner was locked out of a ${job.service_type} job (${job.id}), but the client's card couldn't be charged the ${feeText} lockout fee. Follow up with the client.`);
+      return res.status(err.status).json({ error: err.message, code: err.code });
+    }
+    // No answer from Stripe: keep the reservation, so a retry can't charge twice.
     console.error('Lockout fee error:', err);
-    return res.status(500).json({ error: 'Failed to charge lockout fee' });
+    notifyAdmins('Lockout fee needs checking',
+      `Charging the ${feeText} lockout fee on job ${job.id} got no answer from Stripe. Check Stripe for the charge before retrying.`);
+    return res.status(502).json({ error: "We couldn't confirm the lockout fee charge. Sparkle will check it and let you know." });
   }
 
   transaction(() => {

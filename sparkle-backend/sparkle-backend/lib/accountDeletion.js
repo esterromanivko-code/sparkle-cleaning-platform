@@ -29,6 +29,9 @@ function deletionBlockers(user) {
   if (user.role === 'client') {
     const n = count(`SELECT COUNT(*) AS n FROM jobs WHERE client_id = ? AND status IN ('accepted','in_progress')`, user.id);
     if (n) blockers.push(`You have ${n} booked ${plural(n, 'clean', 'cleans')} that ${plural(n, "hasn't", "haven't")} finished yet. Cancel ${plural(n, 'it', 'them')} in My bookings or wait until ${plural(n, "it's", "they're")} done.`);
+
+    const unpaid = count(`SELECT COUNT(*) AS n FROM jobs WHERE client_id = ? AND status = 'completed' AND capture_status IN ('failed','processing')`, user.id);
+    if (unpaid) blockers.push(`You have ${unpaid} finished ${plural(unpaid, 'clean', 'cleans')} that ${plural(unpaid, "hasn't", "haven't")} been paid for yet. Pay in My bookings first.`);
   }
 
   if (user.role === 'cleaner') {

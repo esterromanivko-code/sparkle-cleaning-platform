@@ -470,7 +470,9 @@ router.post('/earnings/cashout', requireAuth, requireRole('cleaner'), async (req
 
     if (c.status === 'failed') {
       return res.status(502).json({
-        error: "The payout couldn't be sent, so nothing left your balance. Please try again later or contact support.",
+        error: /^balance_insufficient/.test(c.error || '')
+          ? "The money from your recent jobs is still settling with the bank, so it can't be sent yet. Nothing left your balance — please try again in a day or two."
+          : "The payout couldn't be sent, so nothing left your balance. Please try again later or contact support.",
       });
     }
 

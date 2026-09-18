@@ -505,18 +505,14 @@ window.SparkleAPI = (function () {
   }
 
   /**
-   * Client: choose a bid (locks booking and authorizes payment).
-   * @param {string} bid_id
-   * @param {string} [payment_method_id]  - Stripe payment method (optional in dev)
+   * Client: book a cleaner's quote, paid with one of their saved cards.
+   * Resolves to { job_id, total_charged, payment: { status, client_secret?, payment_intent_id? } }
+   * where status is authorized | scheduled | action_required (the bank wants approval).
+   * Errors carry err.code: CARD_REQUIRED | CARD_NOT_FOUND | CARD_DECLINED | PAYMENTS_UNAVAILABLE.
    */
-  async function chooseBid(bid_id, payment_method_id) {
-    const res = await apiFetch(`/api/bids/${encodeURIComponent(bid_id)}/choose`, {
-      method: 'POST',
-      body:   JSON.stringify({ payment_method_id }),
-    });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error || 'Failed to confirm booking');
-    return json;
+  function chooseBid(bid_id, payment_method_id) {
+    return jsonCall(`/api/bids/${encodeURIComponent(bid_id)}/choose`,
+      { method: 'POST', body: JSON.stringify({ payment_method_id }) }, 'Failed to confirm booking');
   }
 
   // â”€â”€â”€ Messaging â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1020,6 +1016,28 @@ window.SparkleAPI = (function () {
     adminPost(`/api/admin/jobs/${encodeURIComponent(jobId)}/release-earnings`, { reason }, 'release earnings');
   const getAdminLockoutFees = () => adminGet('/api/admin/lockout-fees', 'lockout fees');
 
+  // ─── Cards, booking payments and payout accounts ────────────────────────────
+  // Card numbers never pass through here: they go from Stripe's card form straight
+  // to Stripe. These calls only handle the ids of cards a client has saved.
+
+  const getPaymentMethods = () => jsonCall('/api/payments/methods', {}, 'Failed to load your cards');
+  const createSetupIntent = () => post('/api/payments/setup-intent', {}, "Couldn't start adding a card");
+  const setDefaultCard    = (id) => post(`/api/payments/methods/${encodeURIComponent(id)}/default`, {}, "Couldn't update your default card");
+  const removeCard        = (id) => jsonCall(`/api/payments/methods/${encodeURIComponent(id)}`, { method: 'DELETE' }, "Couldn't remove the card");
+  /** Resolves to { outcome }: authorized | scheduled | captured | processing | failed (with error) | action_required (with client_secret, payment_intent_id). */
+  const payForJob         = (jobId, paymentMethodId) =>
+    post(`/api/payments/jobs/${encodeURIComponent(jobId)}/pay`, { payment_method_id: paymentMethodId }, 'Payment failed');
+  /** After the client approved a payment with their bank in the browser. */
+  const confirmJobPayment = (jobId, paymentIntentId) =>
+    post(`/api/payments/jobs/${encodeURIComponent(jobId)}/pay/confirm`, { payment_intent_id: paymentIntentId }, "Couldn't confirm the payment");
+
+  /** Cleaner: { state: not_started | incomplete | verifying | ready | rejected, payouts_enabled, label, needs_info, mode } */
+  const getPayoutAccount    = (refresh = false) =>
+    jsonCall(`/api/payments/connect/status${refresh ? '?refresh=1' : ''}`, {}, 'Failed to load your payout account');
+  /** Resolves to { url } — Stripe's setup pages, which send the cleaner back to returnTo. */
+  const startPayoutSetup    = (returnTo) => post('/api/payments/connect/onboard', { return_to: returnTo }, "Couldn't open payout setup");
+  const openPayoutDashboard = () => post('/api/payments/connect/dashboard', {}, "Couldn't open your payout account");
+
   // ─── Public API ─────────────────────────────────────────────────────────────
   return {
     isRealSession,
@@ -1100,5 +1118,15 @@ window.SparkleAPI = (function () {
     retryDisputeRefund,
     releaseJobEarnings,
     getAdminLockoutFees,
+    getPublicConfig,
+    getPaymentMethods,
+    createSetupIntent,
+    setDefaultCard,
+    removeCard,
+    payForJob,
+    confirmJobPayment,
+    getPayoutAccount,
+    startPayoutSetup,
+    openPayoutDashboard,
   };
 })();
