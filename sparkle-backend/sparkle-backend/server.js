@@ -335,6 +335,7 @@ app.use('/api/credentials',             credentialRoutes);
 app.use('/api/job-photos',              require('./routes/jobPhotos'));
 app.use('/api/disputes',                require('./routes/disputes'));
 app.use('/api/payments',                require('./routes/payments'));
+app.use('/api/devices',                 require('./routes/devices'));
 // NOTE: keep new mounts ABOVE this line — it is a catch-all on /api.
 app.use('/api',                         profileRoutes);
 

@@ -78,6 +78,9 @@ function deleteAccountData(user) {
       run('UPDATE client_profiles SET default_address = NULL, home_size = NULL, stripe_customer_id = NULL WHERE user_id = ?', user.id);
     }
 
+    // Their phones stop receiving push notifications.
+    run('DELETE FROM device_tokens WHERE user_id = ?', user.id);
+
     if (user.role === 'cleaner') {
       run(`UPDATE bids SET status = 'expired' WHERE cleaner_id = ? AND status = 'pending'`, user.id);
       run('DELETE FROM cleaner_services WHERE cleaner_id = ?', user.id);

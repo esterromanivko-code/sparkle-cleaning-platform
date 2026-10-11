@@ -1322,6 +1322,7 @@ function loginWithData(apiUser, apiProfile = null) {
   currentProfile = apiProfile || currentProfile;
   // SparkleAPI.login/register already stored tokens + 'sparkle_role' in localStorage
   _openAuthScreen(false);
+  nativeRegisterPush();            // in the phone apps only; a no-op in a browser
 }
 
 
@@ -1380,6 +1381,7 @@ function _openAuthScreen(show) {
 })();
 
 function logout() {
+  nativeUnregisterPush();          // first: it needs the session that's about to go
   SparkleAPI.logout();             // clears localStorage tokens + sparkle_role
   currentUser = null;
   sessionStorage.removeItem('sparkle_role');
@@ -3225,10 +3227,67 @@ function trkCoords(pos) {
 const trkTime = value => { const d = jpServerDate(value); return d ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''; };
 
 // One reading, or null when location is blocked or unavailable. Never rejects.
+// ══════════════════════════════════════
+// PHONE APP BRIDGE
+// ══════════════════════════════════════
+// This page runs both in a web browser and inside the Sparkle phone apps. The app
+// shell (the sparkle-mobile project) defines window.SparkleNative before this page
+// loads; in a browser it simply isn't there, and everything below falls back to
+// what the browser can do.
+//   platform             'ios' | 'android'
+//   location             the shape of the browser's geolocation API, but able to
+//                        keep reporting while the phone is locked in a pocket
+//   requestPushToken()   asks permission; resolves to a device token, or null
+//   openExternal(url)    opens a page outside the app's own window
+const nativeApp = () => window.SparkleNative || null;
+const isNativeApp = () => !!nativeApp()?.platform;
+
+// Where location readings come from. In a browser this only works while the page
+// is open, which is why the cleaner is told to keep Sparkle open while driving.
+const trkGeo = () => nativeApp()?.location || navigator.geolocation;
+
+function nativeRegisterPush() {
+  const native = nativeApp();
+  if (!native?.requestPushToken || !currentUser?.isReal) return;
+  Promise.resolve()
+    .then(() => native.requestPushToken())
+    .then(token => {
+      if (!token) return null;
+      localStorage.setItem('sparkle_push_token', token);
+      return SparkleAPI.registerDevice(token, native.platform);
+    })
+    .catch(err => console.warn('Push notifications are not set up on this phone:', err?.message || err));
+}
+
+function nativeUnregisterPush() {
+  const token = localStorage.getItem('sparkle_push_token');
+  if (!token) return;
+  localStorage.removeItem('sparkle_push_token');
+  // Called before the session is cleared, so the request still carries the token.
+  SparkleAPI.unregisterDevice(token).catch(() => {});
+}
+
+// Tapping a push notification opens the page it is about; the app shell calls this.
+window.SparkleHandlePushTap = (data = {}) => {
+  if (!currentUser?.isReal) return;
+  const page = jpNotifTarget(String(data.type || ''));
+  if (page) showPage(page);
+};
+
+// Stripe's own pages can't open inside the app's window. Returns false in a
+// browser, where an ordinary link or redirect does the job.
+function openOutsideApp(url) {
+  const native = nativeApp();
+  if (!native?.openExternal) return false;
+  native.openExternal(url);
+  return true;
+}
+
 function trkGetPosition({ timeout = 12000, maximumAge = 30000 } = {}) {
   return new Promise(resolve => {
-    if (!navigator.geolocation) { resolve(null); return; }
-    navigator.geolocation.getCurrentPosition(
+    const geo = trkGeo();
+    if (!geo) { resolve(null); return; }
+    geo.getCurrentPosition(
       pos => { trk.denied = false; resolve(trkCoords(pos)); },
       err => { if (err.code === 1) trk.denied = true; resolve(null); },
       { enableHighAccuracy: true, timeout, maximumAge });
@@ -3254,11 +3313,12 @@ async function trkSend(coords) {
 }
 
 function trkStartWatch(jobId, phase) {
-  if (!navigator.geolocation) return;
+  const geo = trkGeo();
+  if (!geo) return;
   if (trk.watchId !== null && trk.jobId === jobId && trk.phase === phase) { rerenderScheduleCard(jobId); return; }
   trkStop();
   Object.assign(trk, { jobId, phase, lastSentAt: Date.now(), lastSent: null });
-  trk.watchId = navigator.geolocation.watchPosition(pos => {
+  trk.watchId = geo.watchPosition(pos => {
     trk.denied = false;
     const c = trkCoords(pos);
     const sinceLast = Date.now() - trk.lastSentAt;
@@ -3273,15 +3333,17 @@ function trkStartWatch(jobId, phase) {
 
 // Returns the job id that was being shared, if any.
 function trkStop() {
-  if (trk.watchId !== null && navigator.geolocation) navigator.geolocation.clearWatch(trk.watchId);
+  if (trk.watchId !== null) trkGeo()?.clearWatch(trk.watchId);
   const jobId = trk.jobId;
   Object.assign(trk, { watchId: null, jobId: null, phase: null, lastSent: null });
   trkKeepAwake(false);
   return jobId;
 }
 
-// Keeps a phone's screen on while driving, so the page — and sharing — keeps running.
+// Keeps a phone's screen on while driving, so the page — and sharing — keeps
+// running. The app doesn't need this: it can report location with the screen off.
 async function trkKeepAwake(on) {
+  if (isNativeApp()) return;
   try {
     if (on && !trk.wakeLock && 'wakeLock' in navigator) {
       trk.wakeLock = await navigator.wakeLock.request('screen');
@@ -3337,9 +3399,13 @@ async function trkShareNow(jobId, btn) {
 
 // After a reload, resume sharing without a permission prompt when location is already allowed.
 async function trkResume() {
-  if (trk.watchId !== null || !navigator.permissions?.query) return;
+  if (trk.watchId !== null) return;
   const job = cleanerScheduleState.jobs.find(j => j.status === 'in_progress' || (j.status === 'accepted' && j.en_route_at));
   if (!job) return;
+  // In the app, permission was granted when tracking started and sharing survives
+  // the app being closed, so it picks straight back up.
+  if (isNativeApp()) { trkStartWatch(job.id, job.status === 'in_progress' ? 'on_site' : 'en_route'); return; }
+  if (!navigator.permissions?.query) return;
   try {
     const permission = await navigator.permissions.query({ name: 'geolocation' });
     if (permission.state === 'granted') trkStartWatch(job.id, job.status === 'in_progress' ? 'on_site' : 'en_route');
@@ -3351,7 +3417,7 @@ function trkCardStatusHtml(j) {
   const sharingHere = trk.watchId !== null && trk.jobId === j.id;
   if (j.status === 'accepted' && j.en_route_at) {
     if (sharingHere) return `<div class="trk-line on">🟢 Sharing your location with the client. Keep Sparkle open while you drive.</div>`;
-    return `<div class="trk-line">🚗 The client knows you're on the way.${navigator.geolocation ? ` <button class="btn sm" data-act="share-location" data-job="${id}">Share my location</button>` : ''}</div>`;
+    return `<div class="trk-line">🚗 The client knows you're on the way.${trkGeo() ? ` <button class="btn sm" data-act="share-location" data-job="${id}">Share my location</button>` : ''}</div>`;
   }
   if (j.status === 'in_progress' && j.arrived_at) {
     const since = jpServerDate(j.arrived_at);
@@ -4757,7 +4823,9 @@ async function payoutSetup(el) {
   try {
     // Stripe's pages send the cleaner back here with ?payouts=return.
     const { url } = await SparkleAPI.startPayoutSetup(location.origin + location.pathname);
-    window.location.assign(url);
+    if (!openOutsideApp(url)) window.location.assign(url);
+    el.disabled = false;
+    el.textContent = label;
   } catch (err) {
     if (paySessionExpired(err)) return;
     el.disabled = false;
@@ -4768,11 +4836,12 @@ async function payoutSetup(el) {
 
 async function payoutManage(el) {
   // Open the tab straight away, so pop-up blockers allow it, then send it to Stripe.
-  const tab = window.open('', '_blank');
+  const tab = isNativeApp() ? null : window.open('', '_blank');
   el.disabled = true;
   try {
     const { url } = await SparkleAPI.openPayoutDashboard();
-    if (tab) { tab.opener = null; tab.location.href = url; }
+    if (openOutsideApp(url)) { /* the app opened it */ }
+    else if (tab) { tab.opener = null; tab.location.href = url; }
     else window.location.assign(url);
   } catch (err) {
     tab?.close();

@@ -604,6 +604,20 @@ for (const column of [
   'connect_synced_at TEXT',
 ]) addColumn('cleaner_profiles', column);
 
+// Phones signed in to the apps, for push notifications (lib/push.js). One row per
+// device: the same person's phone and tablet both get told.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS device_tokens (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL REFERENCES users(id),
+    token        TEXT NOT NULL UNIQUE,
+    platform     TEXT NOT NULL CHECK(platform IN ('ios','android','web')),
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    last_used_at TEXT
+  )
+`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_device_tokens_user ON device_tokens(user_id)');
+
 // Stripe can deliver a webhook more than once; each event is handled once.
 db.exec(`
   CREATE TABLE IF NOT EXISTS stripe_events (

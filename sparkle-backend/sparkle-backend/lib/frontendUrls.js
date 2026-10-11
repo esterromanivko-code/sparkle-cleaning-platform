@@ -4,11 +4,14 @@
 // Match on HOSTNAME, not the full origin string. FRONTEND_URL is hand-entered in a
 // dashboard, so it routinely differs from the real browser origin by a trailing
 // slash, a path, or http:// vs https://.
+// A scheme of any kind is kept as it is, so the phone apps' own origins
+// (capacitor://localhost on iOS, https://localhost on Android) resolve to
+// "localhost" rather than to the scheme name.
 function hostOf(value) {
   const s = String(value || '').trim();
   if (!s) return null;
   try {
-    return new URL(/^https?:\/\//i.test(s) ? s : `https://${s}`).hostname.toLowerCase();
+    return new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : `https://${s}`).hostname.toLowerCase();
   } catch {
     return null;
   }

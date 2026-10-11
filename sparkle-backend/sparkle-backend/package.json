@@ -9,7 +9,8 @@
     "test": "node --experimental-sqlite tests/run.js",
     "test:photos": "node --experimental-sqlite tests/job-photos.js",
     "test:tracking": "node --experimental-sqlite tests/tracking-and-account.js",
-    "test:payments": "node --experimental-sqlite tests/payments.js"
+    "test:payments": "node --experimental-sqlite tests/payments.js",
+    "test:mobile": "node --experimental-sqlite tests/mobile.js"
   },
   "keywords": [],
   "author": "",

@@ -9,6 +9,12 @@ const db = require('../db');
 function notify(userId, title, body, type = 'platform') {
   db.prepare('INSERT INTO notifications (id, user_id, title, body, type) VALUES (?,?,?,?,?)')
     .run(uuid(), userId, title, body, type);
+  // Also buzz their phone, if they have the app. Deferred and never awaited: this
+  // runs inside database transactions, which must not wait on the network — and a
+  // push that fails changes nothing, the notification above is the record.
+  setImmediate(() => {
+    require('./push').pushToUser(userId, { title, body, type }).catch(err => console.error('[PUSH]', err.message));
+  });
 }
 
 function notifyAdmins(title, body, type = 'admin_alert') {

@@ -1044,6 +1044,12 @@ window.SparkleAPI = (function () {
   const startPayoutSetup    = (returnTo) => post('/api/payments/connect/onboard', { return_to: returnTo }, "Couldn't open payout setup");
   const openPayoutDashboard = () => post('/api/payments/connect/dashboard', {}, "Couldn't open your payout account");
 
+  // ─── Phone apps: push notifications ─────────────────────────────────────────
+  // The app registers its device on sign-in and unregisters on sign-out, so a
+  // shared phone never buzzes with someone else's notifications.
+  const registerDevice   = (token, platform) => post('/api/devices', { token, platform }, "Couldn't switch on notifications");
+  const unregisterDevice = (token) => jsonCall('/api/devices', { method: 'DELETE', body: JSON.stringify({ token }) }, "Couldn't switch off notifications");
+
   // ─── Public API ─────────────────────────────────────────────────────────────
   return {
     isRealSession,
@@ -1134,5 +1140,7 @@ window.SparkleAPI = (function () {
     getPayoutAccount,
     startPayoutSetup,
     openPayoutDashboard,
+    registerDevice,
+    unregisterDevice,
   };
 })();
