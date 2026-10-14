@@ -178,7 +178,10 @@ async function main() {
   });
   assert.equal(review.res.status, 201, review.text);
 
-  const reviews = await request(`/api/reviews/${encodeURIComponent(cleanerId)}`);
+  // Reviews are for signed-in users only (they used to be public, with full names).
+  const anonymousReviews = await request(`/api/reviews/${encodeURIComponent(cleanerId)}`);
+  assert.equal(anonymousReviews.res.status, 401, 'reviews need a sign-in');
+  const reviews = await request(`/api/reviews/${encodeURIComponent(cleanerId)}`, { token: clientToken });
   assert.equal(reviews.res.status, 200, reviews.text);
   assert.ok(reviews.json.reviews.length >= 1, 'should return review records');
 

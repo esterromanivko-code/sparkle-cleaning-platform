@@ -299,39 +299,11 @@ router.post('/job/:job_id/close', requireAuth, requireRole('client'), (req, res)
 });
 
 // ─────────────────────────────────────────────────
-// POST /api/bids/expire — auto-expire jobs after 48hrs (run via cron or queue)
+// POST /api/bids/expire — run the expiry sweep now (admin). It also runs by itself
+// every 15 minutes; the rules live in lib/expiry.js.
 // ─────────────────────────────────────────────────
 router.post('/expire', requireAuth, requireRole('admin'), (req, res) => {
-  // Expire bids past their 48hr window
-  const expiredBids = db.prepare(`
-    UPDATE bids SET status = 'expired'
-    WHERE status = 'pending' AND julianday(expires_at) < julianday('now')
-    RETURNING job_id, cleaner_id
-  `).all();
-
-  // Close jobs where all bids have expired and job is still open
-  const expiredJobs = db.prepare(`
-    UPDATE jobs SET status = 'cancelled'
-    WHERE status = 'open'
-    AND created_at < datetime('now', '-48 hours')
-    AND id NOT IN (SELECT job_id FROM bids WHERE status IN ('pending','chosen'))
-    RETURNING id, client_id, service_type
-  `).all();
-
-  // Notify clients their job expired
-  for (const job of expiredJobs) {
-    queueNotification(
-      job.client_id,
-      '⏰ Your job expired without a booking',
-      `Your ${job.service_type} job didn't receive any bids in 48 hours. Try posting again with more flexibility on timing.`,
-      'job_expired'
-    );
-  }
-
-  res.json({
-    expired_bids: expiredBids.length,
-    expired_jobs: expiredJobs.length,
-  });
+  res.json(require('../lib/expiry').runExpirySweep());
 });
 
 // ─────────────────────────────────────────────────

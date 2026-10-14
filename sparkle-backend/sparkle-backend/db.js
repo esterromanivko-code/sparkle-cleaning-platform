@@ -582,6 +582,10 @@ addColumn('jobs', 'photos_verified_at TEXT');   // set by /complete once the pho
 addColumn('jobs', 'completed_at TEXT');         // the 72-hour problem-report window starts here
 addColumn('jobs', 'capture_status TEXT');       // captured | processing | failed | waived | not_required (legacy)
 
+// The arrival window the client picked ("Morning 8–12pm"). scheduled_at is the start
+// of it, so cleaners see "8:00 AM" for what is really a window — this keeps the words.
+addColumn('jobs', 'arrival_window TEXT');
+
 // Card payments (lib/payments.js): the saved card a booking is paid with, and the
 // hold placed on it a few days before the clean.
 for (const column of [

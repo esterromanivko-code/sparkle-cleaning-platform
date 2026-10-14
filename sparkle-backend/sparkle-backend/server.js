@@ -286,20 +286,17 @@ app.get('/api/config', (req, res) => {
 }
 
 // ── Admin-only: backup status & manual trigger ───────────────────────────────
-app.get('/api/admin/backups', (req, res) => {
-  // Simple check — in production use requireAuth + requireRole('admin')
-  const key = req.headers['x-admin-key'];
-  if (process.env.NODE_ENV === 'production' && key !== process.env.ADMIN_KEY) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
+// These used to compare an x-admin-key header with ADMIN_KEY and let the request
+// through in any environment that wasn't "production". When ADMIN_KEY was unset,
+// the missing header and the missing variable were both `undefined`, so nothing
+// equalled nothing and anyone could list the backups or start one. A signed-in
+// admin account is the only way in now.
+const { requireAuth: requireAdminAuth, requireRole: requireAdminRole } = require('./middleware/auth');
+app.get('/api/admin/backups', requireAdminAuth, requireAdminRole('admin'), (req, res) => {
   res.json({ backups: listBackups() });
 });
 
-app.post('/api/admin/backups/run', (req, res) => {
-  const key = req.headers['x-admin-key'];
-  if (process.env.NODE_ENV === 'production' && key !== process.env.ADMIN_KEY) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
+app.post('/api/admin/backups/run', requireAdminAuth, requireAdminRole('admin'), (req, res) => {
   const result = backupDatabase();
   res.json({ success: !!result, path: result });
 });
@@ -364,6 +361,7 @@ app.listen(PORT, () => {
   require('./lib/payouts').startCashoutReconciler();   // Settles cashouts whose Stripe result was lost
   require('./lib/retention').startRetentionSweep();    // Deletes job photos and location history after 180 days
   require('./lib/payments').startPaymentSweep();       // Places card holds before cleans; settles lost charges
+  require('./lib/expiry').startExpirySweep();          // Closes jobs nobody booked, expires old quotes
 
   const stripeState = require('./lib/stripe');
   const mode = stripeState.paymentsMode();

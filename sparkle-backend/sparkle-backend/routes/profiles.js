@@ -18,24 +18,38 @@ const router = express.Router();
 //  CLEANER PROFILE
 // ══════════════════════════════════════════════════════
 
-// GET /api/profile/cleaner/:id  — public cleaner profile (any user can view)
-router.get('/cleaner/:id', (req, res) => {
+// GET /api/profile/cleaner/:id  — a cleaner's profile, for any signed-in user.
+//
+// Only the columns listed here ever leave the server. This endpoint used to be
+// public and spread the whole cleaner_profiles row into the response, which put the
+// cleaner's Stripe account id and the label of their bank account ("CHASE •••• 6789")
+// in front of anyone who guessed an id. New columns are private until added here.
+const PUBLIC_CLEANER_PROFILE_FIELDS = [
+  'hourly_rate', 'bio', 'lockout_fee_enabled', 'lockout_fee_amount', 'lockout_grace_mins',
+  'is_verified', 'is_pro', 'avg_rating', 'total_jobs', 'badge_tier',
+];
+const pick = (row, fields) => Object.fromEntries(fields.map(f => [f, row?.[f] ?? null]));
+
+// A reviewer is shown as "Cara T." — first name and last initial, never the full name.
+const reviewerName = r => ({ first_name: r.first_name, last_name: r.last_name ? `${r.last_name.charAt(0)}.` : '' });
+
+router.get('/cleaner/:id', requireAuth, (req, res) => {
   const user = db.prepare(
-    'SELECT id, first_name, last_name, city, zip, avatar_url, created_at FROM users WHERE id = ? AND role = ?'
+    'SELECT id, first_name, city, avatar_url, created_at FROM users WHERE id = ? AND role = ? AND deleted_at IS NULL'
   ).get(req.params.id, 'cleaner');
   if (!user) return res.status(404).json({ error: 'Cleaner not found' });
 
   const profile = db.prepare('SELECT * FROM cleaner_profiles WHERE user_id = ?').get(user.id);
   const services = db.prepare('SELECT service FROM cleaner_services WHERE cleaner_id = ?').all(user.id);
   const reviews  = db.prepare(`
-    SELECT r.*, u.first_name, u.last_name FROM reviews r
-    JOIN users u ON u.id = r.reviewer_id
+    SELECT r.id, r.rating, r.body, r.tags_json, r.created_at, u.first_name, u.last_name
+    FROM reviews r JOIN users u ON u.id = r.reviewer_id
     WHERE r.reviewee_id = ? ORDER BY r.created_at DESC LIMIT 10
-  `).all(user.id);
+  `).all(user.id).map(({ first_name, last_name, ...rest }) => ({ ...rest, ...reviewerName({ first_name, last_name }) }));
 
   res.json({
     user:     { id: user.id, first_name: user.first_name, city: user.city, avatar_url: user.avatar_url, created_at: user.created_at },
-    profile:  { ...profile, password_hash: undefined },
+    profile:  pick(profile, PUBLIC_CLEANER_PROFILE_FIELDS),
     services: services.map(s => s.service),
     reviews,
   });
@@ -373,14 +387,15 @@ router.post('/reviews', requireAuth, [
   }
 });
 
-// GET /api/reviews/:userId  — get reviews for a user
-router.get('/reviews/:userId', (req, res) => {
+// GET /api/reviews/:userId  — reviews for a user, for any signed-in user.
+// Explicit columns, and the reviewer as "first name + last initial" (see above).
+router.get('/reviews/:userId', requireAuth, (req, res) => {
   const reviews = db.prepare(`
-    SELECT r.*, u.first_name, u.last_name, u.role AS reviewer_role
+    SELECT r.id, r.rating, r.body, r.tags_json, r.created_at, u.first_name, u.last_name, u.role AS reviewer_role
     FROM reviews r JOIN users u ON u.id = r.reviewer_id
     WHERE r.reviewee_id = ?
     ORDER BY r.created_at DESC LIMIT 50
-  `).all(req.params.userId);
+  `).all(req.params.userId).map(({ first_name, last_name, ...rest }) => ({ ...rest, ...reviewerName({ first_name, last_name }) }));
 
   const stats = db.prepare(`
     SELECT

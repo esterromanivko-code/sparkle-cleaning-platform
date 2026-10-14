@@ -228,20 +228,31 @@ function securityHeaders(req, res, next) {
 //  5. SUSPICIOUS ACTIVITY DETECTOR
 //     Flags and logs unusual patterns
 // ══════════════════════════════════════════════════════
+// Only patterns that no honest message contains. A SQL-keyword rule used to live
+// here ("delete … from", "update … table", "select … where"), and it rejected
+// ordinary sentences — "Please clean the table", "Delete the old notes from the
+// fridge" — with "Invalid request". It protected nothing: every database query in
+// this app is parameterised, so text is never run as SQL. Output is escaped by the
+// pages, and sanitizeInput strips tags on the way in.
+//
+// No /g flag: a global regex remembers where its last match ended, so reusing one
+// across requests made the same check pass or fail depending on the request before.
 const suspiciousPatterns = [
-  // SQL injection attempts
-  /(\bUNION\b|\bSELECT\b|\bDROP\b|\bINSERT\b|\bDELETE\b|\bUPDATE\b).+(\bFROM\b|\bWHERE\b|\bTABLE\b)/gi,
-  // Script injection
-  /<script|javascript:|on\w+\s*=/gi,
-  // Path traversal
-  /\.\.\//g,
-  // Null byte injection
-  /\%00/g,
+  /<script/i,         // script injection
+  /javascript:/i,
+  /\.\.[\/\\]/,       // path traversal
+  /%00|\\u0000/i,     // null bytes
 ];
+
+// Secrets typed by a person are never inspected or logged here.
+const UNINSPECTED_FIELDS = new Set(['password', 'current_password', 'new_password', 'confirm_password']);
+const withoutSecrets = body => (body && typeof body === 'object' && !Array.isArray(body) && !Buffer.isBuffer(body))
+  ? Object.fromEntries(Object.entries(body).filter(([k]) => !UNINSPECTED_FIELDS.has(k)))
+  : body;
 
 function detectSuspiciousActivity(req, res, next) {
   const checkString = JSON.stringify({
-    body:   req.body,
+    body:   withoutSecrets(req.body),
     query:  req.query,
     params: req.params,
   });

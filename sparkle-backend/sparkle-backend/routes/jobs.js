@@ -69,27 +69,51 @@ const PHOTO_COUNT_COLUMNS = `
 // GET /api/jobs/available  (cleaner only)
 // Returns open jobs near the cleaner that match their services
 // ─────────────────────────────────────────────────
-router.get('/available', requireAuth, requireRole('cleaner'), (req, res) => {
-  const services = db.prepare(
-    'SELECT service FROM cleaner_services WHERE cleaner_id = ?'
-  ).all(req.user.id).map(s => s.service);
+// What a cleaner may know about an open job BEFORE the client has chosen them: enough
+// to price it, not enough to find the house. The street address, the map position and
+// the client's special instructions (which is where door codes tend to end up) are
+// shared only with the cleaner the client books — through /my-schedule.
+const OPEN_JOB_FIELDS = [
+  'id', 'service_type', 'bedrooms', 'bathrooms', 'city', 'zip', 'scheduled_at', 'arrival_window',
+  'duration_hrs', 'supplies_by', 'pets', 'is_recurring', 'recurring_freq', 'is_priority', 'created_at',
+];
 
-  // Get all open jobs (in production add distance filtering via lat/lng)
-  const jobs = db.prepare(`
+// "12 Test Lane, Seattle, WA 98101" → "Seattle, WA 98101". With no comma to split on,
+// nothing safe can be shown, so the area is left for the booking.
+function generalArea(job) {
+  const parts = String(job.address || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (parts.length > 1) return parts.slice(1).join(', ');
+  return [job.city, job.zip].filter(Boolean).join(' ') || null;
+}
+
+router.get('/available', requireAuth, requireRole('cleaner'), (req, res) => {
+  // Open, still in the future, and not the cleaner's own job. (Quotes expire after 48
+  // hours on their own, and lib/expiry.js closes jobs nobody booked in time.)
+  const rows = db.prepare(`
     SELECT j.*,
-           u.first_name || ' ' || u.last_name AS client_name,
+           u.first_name || ' ' || substr(u.last_name, 1, 1) || '.' AS client_name,
            cp.avg_rating AS client_rating,
-           cp.total_bookings
+           cp.total_bookings,
+           EXISTS (SELECT 1 FROM bids b WHERE b.job_id = j.id AND b.cleaner_id = ?) AS already_bid
     FROM jobs j
     JOIN users u ON u.id = j.client_id
     JOIN client_profiles cp ON cp.user_id = j.client_id
     WHERE j.status = 'open'
-    AND j.client_id != ?
+      AND j.client_id != ?
+      AND julianday(j.scheduled_at) > julianday('now')
     ORDER BY j.is_priority DESC, j.created_at ASC
     LIMIT 50
-  `).all(req.user.id);
+  `).all(req.user.id, req.user.id);
 
-  res.json({ jobs: jobs.map(forCleaner) });
+  const jobs = rows.map(row => ({
+    ...Object.fromEntries(OPEN_JOB_FIELDS.map(f => [f, row[f] ?? null])),
+    area: generalArea(row),
+    client_name: row.client_name,
+    client_rating: row.client_rating,
+    total_bookings: row.total_bookings,
+    already_bid: !!row.already_bid,
+  }));
+  res.json({ jobs });
 });
 
 // ─────────────────────────────────────────────────
@@ -191,16 +215,27 @@ router.get('/my-bookings', requireAuth, requireRole('client'), (req, res) => {
 // Post a new job
 // ─────────────────────────────────────────────────
 router.post('/', requireAuth, requireRole('client'), [
-  body('service_type').notEmpty(),
-  body('address').notEmpty(),
-  body('scheduled_at').isISO8601(),
+  body('service_type').trim().isLength({ min: 2, max: 60 }).withMessage('Choose a type of cleaning'),
+  body('address').trim().isLength({ min: 5, max: 200 }).withMessage('Enter the full address'),
+  body('scheduled_at').isISO8601().withMessage('Choose a date')
+    .custom(v => new Date(v).getTime() > Date.now()).withMessage('Choose a date in the future'),
+  body('city').optional({ nullable: true }).trim().isLength({ max: 80 }),
+  body('zip').optional({ nullable: true }).trim().isLength({ max: 12 }),
+  body('bedrooms').optional({ nullable: true }).isInt({ min: 0, max: 20 }),
+  body('bathrooms').optional({ nullable: true }).isInt({ min: 0, max: 20 }),
+  body('duration_hrs').optional({ nullable: true }).isFloat({ min: 0.5, max: 24 }),
+  body('supplies_by').optional({ nullable: true }).isIn(['client', 'cleaner']),
+  body('pets').optional({ nullable: true }).trim().isLength({ max: 120 }),
+  body('notes').optional({ nullable: true }).trim().isLength({ max: 1500 }).withMessage('Instructions are limited to 1,500 characters'),
+  body('arrival_window').optional({ nullable: true }).trim().isLength({ max: 40 }),
+  body('recurring_freq').optional({ nullable: true, values: 'falsy' }).isIn(['weekly', 'biweekly', 'monthly']),
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(422).json({ errors: errors.array() });
 
   const {
     service_type, bedrooms, bathrooms, address, city, zip,
-    scheduled_at, duration_hrs, supplies_by, pets, notes,
+    scheduled_at, arrival_window, duration_hrs, supplies_by, pets, notes,
     is_recurring, recurring_freq, is_priority, has_guarantee,
   } = req.body;
 
@@ -225,15 +260,15 @@ router.post('/', requireAuth, requireRole('client'), [
     db.prepare(`
       INSERT INTO jobs
         (id, client_id, service_type, bedrooms, bathrooms, address, city, zip,
-         scheduled_at, duration_hrs, supplies_by, pets, notes,
+         scheduled_at, arrival_window, duration_hrs, supplies_by, pets, notes,
          is_recurring, recurring_freq, is_priority, has_guarantee,
          base_amount, platform_fee, guarantee_fee, priority_fee, total_charged)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `).run(
-      id, req.user.id, service_type, bedrooms||null, bathrooms||null,
-      address, city||null, zip||null, scheduled_at, duration_hrs||null,
+      id, req.user.id, service_type, bedrooms ?? null, bathrooms ?? null,
+      address, city||null, zip||null, scheduled_at, arrival_window||null, duration_hrs||null,
       supplies_by||'client', pets||null, notes||null,
-      is_recurring?1:0, recurring_freq||null, is_priority?1:0, has_guarantee?1:0,
+      (is_recurring || recurring_freq) ? 1 : 0, recurring_freq||null, is_priority?1:0, has_guarantee?1:0,
       baseAmount, platformFee, guaranteeFee, priorityFee, totalCharged
     );
 
