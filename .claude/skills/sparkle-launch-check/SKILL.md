@@ -23,6 +23,7 @@ Do these in order. "It works on my machine" is not done; **live and green is don
    - `.../api/profile/cleaner/x` and `.../api/reviews/x` signed out → **401**
    - `https://sparklecleaningplatform.netlify.app/sparkle-backend/sparkle-backend/server.js` and `/LAUNCH.md` → **404**; `/`, `/app`, `/blog`, `/privacy`, `/terms`, `/og-image.png` → **200**
    - `.../api/config` → `payments_mode` is what you expect (see Money below)
+6. **Keep the phone app in step.** `C:\Users\ester\Projects\sparkle-mobile` holds a *copy* of the website in `www/`. If `sparkle_full.html`, `sparkle_api.js` or a legal page changed, run `npm run sync:web` there, commit, push, and wait for the *Android debug APK* run. An app that wasn't re-synced shows the old screens against a server that has moved on (this already happened once: the bundle still read street addresses the server had stopped sending).
 
 ## Mistakes that actually happened, and what stops them now
 
@@ -50,7 +51,7 @@ Do these in order. "It works on my machine" is not done; **live and green is don
 - **Money**: test mode first; every Stripe call that moves money carries an idempotency key; amounts come from the server, never the browser; card numbers never touch our servers.
 - **Secrets**: never ask the user to paste a key into chat; they set them in Railway or Netlify. Never commit one. Never use any password that appeared in chat.
 - **Isolation**: do not read or touch `C:\Users\ester\Downloads\sln-enterprise-site` or her other projects.
-- **Dependencies**: `npm audit` must be clean; Dependabot opens PRs, and CI makes a green one safe to merge.
+- **Dependencies**: `npm audit` must be clean. Dependabot opens PRs, but **don't merge them on GitHub**: that puts commits on `main` that `master` doesn't have, and then `git push origin master:main` is rejected. Apply the update on `master` locally, run the checks, and push both. A green PR is not proof for the payments library: the tests use a Stripe stand-in, so a `stripe` major version needs a real test-mode booking first. Skip majors that bring nothing (`bullmq`/`ioredis` while there is no Redis). A workflow that claims something ("runs on every pull request") must really do it; check the `on:` block.
 - **Commits** end with the `Co-Authored-By` line from the session's attribution instruction.
 
 ## When asked to "review everything"
