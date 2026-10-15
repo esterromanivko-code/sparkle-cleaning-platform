@@ -1,0 +1,11 @@
+#!/bin/sh
+# Runs the fast safety checks before anything is pushed, so a mistake is caught on this
+# computer instead of on the live site. Takes a few seconds.
+#
+# Turn it on once per copy of the repository:   git config core.hooksPath .githooks
+# (Skipping it with --no-verify is possible, and the same checks run again on GitHub.)
+
+echo "Running the launch check before pushing..."
+node scripts/launch-check.js || { echo; echo "Push blocked: fix the problems above first."; exit 1; }
+(cd sparkle-backend/sparkle-backend && node tests/route-guard.js) || { echo; echo "Push blocked: an API route is open by accident."; exit 1; }
+exit 0

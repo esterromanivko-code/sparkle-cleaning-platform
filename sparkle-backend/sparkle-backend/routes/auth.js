@@ -14,6 +14,7 @@ const { requireCaptcha, requireCaptchaStrict } = require('../middleware/captcha'
 const { deletionBlockers, deleteAccountData } = require('../lib/accountDeletion');
 const { notifyAdmins } = require('../lib/notify');
 const { getStripe } = require('../lib/stripe');
+const { stripPrivate } = require('../lib/privateFields');
 
 const router = express.Router();
 // SECURITY: Short-lived access tokens (15 min). If a token is stolen, the
@@ -140,11 +141,11 @@ router.post('/login', requireCaptcha, [body('email').isEmail().normalizeEmail(),
     const refreshToken = createRefreshToken(db, user.id, req.headers['user-agent']);
     let profile = null;
     if (user.role==='cleaner') {
-      profile = db.prepare('SELECT * FROM cleaner_profiles WHERE user_id=?').get(user.id);
+      profile = stripPrivate(db.prepare('SELECT * FROM cleaner_profiles WHERE user_id=?').get(user.id));
       const services = db.prepare('SELECT service FROM cleaner_services WHERE cleaner_id=?').all(user.id);
       if(profile) profile.services = services.map(s=>s.service);
     } else if (user.role==='client') {
-      profile = db.prepare('SELECT * FROM client_profiles WHERE user_id=?').get(user.id);
+      profile = stripPrivate(db.prepare('SELECT * FROM client_profiles WHERE user_id=?').get(user.id));
     }
     res.json({
       access_token:accessToken, refresh_token:refreshToken, token:accessToken,
@@ -161,11 +162,11 @@ router.get('/me', requireAuth, (req, res) => {
   if (!user) return res.status(404).json({error:'User not found'});
   let profile = null;
   if (user.role==='cleaner') {
-    profile = db.prepare('SELECT * FROM cleaner_profiles WHERE user_id=?').get(user.id);
+    profile = stripPrivate(db.prepare('SELECT * FROM cleaner_profiles WHERE user_id=?').get(user.id));
     const services = db.prepare('SELECT service FROM cleaner_services WHERE cleaner_id=?').all(user.id);
     if(profile) profile.services = services.map(s=>s.service);
   } else if (user.role==='client') {
-    profile = db.prepare('SELECT * FROM client_profiles WHERE user_id=?').get(user.id);
+    profile = stripPrivate(db.prepare('SELECT * FROM client_profiles WHERE user_id=?').get(user.id));
   }
   res.json({user,profile});
 });
@@ -206,11 +207,11 @@ router.patch('/me', requireAuth, [
   const user = db.prepare('SELECT id,role,first_name,last_name,email,phone,city,zip,avatar_url,created_at FROM users WHERE id=?').get(req.user.id);
   let profile = null;
   if (user.role === 'cleaner') {
-    profile = db.prepare('SELECT * FROM cleaner_profiles WHERE user_id=?').get(user.id);
+    profile = stripPrivate(db.prepare('SELECT * FROM cleaner_profiles WHERE user_id=?').get(user.id));
     const services = db.prepare('SELECT service FROM cleaner_services WHERE cleaner_id=?').all(user.id);
     if (profile) profile.services = services.map(s => s.service);
   } else if (user.role === 'client') {
-    profile = db.prepare('SELECT * FROM client_profiles WHERE user_id=?').get(user.id);
+    profile = stripPrivate(db.prepare('SELECT * FROM client_profiles WHERE user_id=?').get(user.id));
   }
 
   res.json({ message: 'Profile updated', user, profile });

@@ -622,17 +622,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
         <button class="auth-tab active" onclick="switchAuthTab('cleaner',this)">Join as cleaner</button>
         <button class="auth-tab" onclick="switchAuthTab('client',this)">Book cleaning</button>
       </div>
-      <!-- DISABLED FOR DEV: Cloudflare Turnstile — using placeholder site key, will enable on production -->
-      <!-- <div id="captcha-status-login" class="captcha-status" style="display:none"></div> -->
-      <!-- <div class="cf-turnstile" id="turnstile-login"
-           data-sitekey="0x4AAAAAAAAbAAAB_dev_placeholder_key"
-           data-theme="light"
-           data-size="flexible"
-           style="margin-bottom:.75rem;display:none"
-           data-callback="onTurnstileSuccess"
-           data-error-callback="onTurnstileError"
-           data-expired-callback="onTurnstileExpired">
-      </div> -->
       <button class="ob-btn" onclick="startOnboard()">Create account →</button>
       <div class="auth-legal" style="text-align:center;margin-top:.875rem"><a href="terms.html" target="_blank" rel="noopener">Terms</a> · <a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="accessibility.html" target="_blank" rel="noopener">Accessibility</a></div>
     </div>
@@ -654,17 +643,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
         <div class="ob-field"><label class="ob-lbl">Password</label><input class="ob-inp" type="password" id="ob-password" placeholder="Choose a password (8+ characters)" autocomplete="new-password"></div>
         <div class="ob-field"><label class="ob-lbl">Phone <span style="color:var(--tx3);font-weight:400">(optional)</span></label><input class="ob-inp" type="tel" id="ob-phone" placeholder="(555) 000-0000" autocomplete="tel"></div>
         <div class="ob-field"><label class="ob-lbl">City / ZIP <span style="color:var(--tx3);font-weight:400">(optional)</span></label><input class="ob-inp" id="ob-city" placeholder="Seattle, WA 98101" autocomplete="postal-code"></div>
-        <!-- DISABLED FOR DEV: Turnstile verifies before advancing to step 1 (using placeholder site key) -->
-        <!-- <div id="captcha-status" class="captcha-status" style="display:none"></div> -->
-        <!-- <div class="cf-turnstile" id="turnstile-register"
-             data-sitekey="0x4AAAAAAAAbAAAB_dev_placeholder_key"
-             data-theme="light"
-             data-size="flexible"
-             style="margin-bottom:.75rem;display:none"
-             data-callback="onTurnstileSuccess"
-             data-error-callback="onTurnstileError"
-             data-expired-callback="onTurnstileExpired">
-        </div> -->
         <div class="auth-legal">By creating an account, you agree to Sparkle's <a href="terms.html" target="_blank" rel="noopener">Terms of Service</a> and <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</div>
         <button class="ob-btn" id="ob-continue-btn" onclick="obStepWithCaptcha(1)">Continue →</button>
         <button class="ob-btn-ghost" onclick="cancelOnboard()">← Back to sign in</button>

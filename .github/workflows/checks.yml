@@ -1,0 +1,43 @@
+# Runs on every push and pull request. A red run means something that must not ship is
+# about to: an open API route, private data in a response, a false claim on the public
+# site, the backend's source being published, a committed secret, or a package with a
+# known vulnerability. Fix it before anything else.
+#
+# To make Railway and Netlify wait for this to pass before deploying, turn on
+#   Railway → the service → Settings → "Wait for CI"
+# (Netlify: Site configuration → Build & deploy → Build settings → "Stop builds"
+# can't wait for GitHub checks, so the pre-push hook and this run are its safety net.)
+
+name: Checks
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: sparkle-backend/sparkle-backend/package-lock.json
+
+      - name: Install the backend's packages
+        working-directory: sparkle-backend/sparkle-backend
+        run: npm ci
+
+      - name: Launch check — site, links, claims, publishing, secrets, routes, dependencies
+        run: node scripts/launch-check.js --full
+
+      - name: Launch check can still fail (it breaks the site on purpose and expects to be told)
+        run: node scripts/launch-check-selftest.js
+
+      - name: Backend tests — every route, every private field, payments, photos, tracking
+        working-directory: sparkle-backend/sparkle-backend
+        run: node tests/run-all.js

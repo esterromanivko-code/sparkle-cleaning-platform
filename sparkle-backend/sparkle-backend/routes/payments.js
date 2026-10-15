@@ -39,7 +39,7 @@ router.get('/methods', requireAuth, requireRole('client'), async (req, res) => {
     const cards = payments.paymentsReady() && customerId
       ? await payments.listCards(customerId)
       : { cards: [], default_payment_method: null };
-    res.json({ ...cards, mode: paymentsMode() });
+    res.json({ ...cards, mode: paymentsMode() }); // leak-ok: cards are mapped to brand/last4/expiry in lib/payments.js
   } catch (err) { fail(res, err, 'Could not load your cards'); }
 });
 
@@ -137,7 +137,7 @@ router.get('/connect/status', requireAuth, requireRole('cleaner'), async (req, r
         console.warn('[CONNECT] Could not refresh account status:', err.message);
       }
     }
-    res.json({ ...status, mode: paymentsMode() });
+    res.json({ ...status, mode: paymentsMode() }); // leak-ok: built field by field in lib/connect.js payoutAccountStatus()
   } catch (err) { fail(res, err, 'Could not load your payout account'); }
 });
 

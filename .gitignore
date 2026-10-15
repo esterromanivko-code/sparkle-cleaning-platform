@@ -1,5 +1,6 @@
-# Claude Code session files
-.claude/
+# Claude Code session files (but keep the project skills, which are part of the code)
+.claude/*
+!.claude/skills/
 
 sparkle-backend-final.zip
 

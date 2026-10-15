@@ -1,0 +1,20 @@
+# GitHub opens a pull request when a package the backend uses has a new version, and
+# straight away when one has a security fix. Each PR runs the Checks workflow, so a
+# green one is safe to merge. Minor and patch updates arrive together to keep the
+# number of pull requests down.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /sparkle-backend/sparkle-backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

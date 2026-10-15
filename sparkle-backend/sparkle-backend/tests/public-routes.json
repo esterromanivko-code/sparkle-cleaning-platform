@@ -1,0 +1,22 @@
+{
+  "_why": "Every API route that can be called WITHOUT signing in must be listed here, with the reason it is safe. tests/route-guard.js fails when a route is open but not listed, and when a listed route no longer exists. If you are adding a route and it is not meant to be public, don't edit this file: add requireAuth to the route instead.",
+
+  "GET /health": "Uptime check. Returns status and the allowed website hostnames; no secrets.",
+  "GET /api/config": "Public settings the page needs before sign-in: the Turnstile site key and the Stripe publishable key. Both are public by design.",
+
+  "POST /api/auth/register": "Creating an account. Protected by the CAPTCHA and a rate limit.",
+  "POST /api/auth/login": "Signing in. Protected by the CAPTCHA and a rate limit.",
+  "POST /api/auth/refresh": "Swaps a valid refresh token for new tokens.",
+  "POST /api/auth/forgot-password": "Starts a password reset. Answers the same whether or not the email exists.",
+  "POST /api/auth/reset-password": "Finishes a reset; needs the emailed one-time token.",
+  "POST /api/auth/verify-reset-token": "Checks a reset token is still valid.",
+  "POST /api/auth/2fa/verify": "Second step of sign-in; needs the short-lived token from step one.",
+  "POST /api/auth/bootstrap-admin": "Creates the FIRST admin only: inert unless ADMIN_BOOTSTRAP_TOKEN is set, refuses once any admin exists, and compares the token in constant time.",
+
+  "GET /api/verify-email/:token": "Link in the verification email; the unguessable token is the credential.",
+  "POST /api/support/tickets": "The contact form on the landing page. Rate limited, and the message is stored, never run.",
+
+  "POST /api/payments/webhook": "Stripe's webhook. Rejected unless the Stripe signature verifies.",
+  "POST /api/background-check/webhook/checkr": "Checkr's webhook. Rejected unless the HMAC signature verifies.",
+  "POST /api/background-check/webhook/stripe-identity": "Stripe Identity's webhook. Rejected unless the Stripe signature verifies."
+}
