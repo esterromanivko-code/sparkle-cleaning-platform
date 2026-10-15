@@ -914,12 +914,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
   <div class="alert info">No subscription and nothing to pay up front. You add a card when you book the cleaner you choose, and it's charged after the clean is done: their quote plus a transparent booking fee.</div>
   <div class="card">
     <div class="frow"><label class="flbl">Type of cleaning</label><select class="inp" id="job-type"><option>Standard clean</option><option>Deep clean</option><option>Move-out clean</option><option>Move-in clean</option><option>Office / commercial</option></select></div>
-    <div class="f2"><div class="frow"><label class="flbl">Bedrooms</label><select class="inp"><option>Studio</option><option>1</option><option selected>2</option><option>3</option><option>4+</option></select></div><div class="frow"><label class="flbl">Bathrooms</label><select class="inp"><option>1</option><option selected>2</option><option>3+</option></select></div></div>
+    <div class="f2"><div class="frow"><label class="flbl" for="job-beds">Bedrooms</label><select class="inp" id="job-beds"><option value="0">Studio</option><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4+</option></select></div><div class="frow"><label class="flbl" for="job-baths">Bathrooms</label><select class="inp" id="job-baths"><option value="1">1</option><option value="2" selected>2</option><option value="3">3+</option></select></div></div>
     <div class="frow"><label class="flbl">Address</label><input class="inp" id="job-address" placeholder="Street address, city, state ZIP" autocomplete="street-address"></div>
-    <div class="f2"><div class="frow"><label class="flbl">Preferred date</label><input class="inp" type="date" id="job-date"></div><div class="frow"><label class="flbl">Preferred time</label><select class="inp"><option>Morning 8–12pm</option><option>Afternoon 12–5pm</option><option>Evening 5–8pm</option></select></div></div>
-    <div class="f2"><div class="frow"><label class="flbl">Supplies</label><select class="inp"><option>I'll provide</option><option>Cleaner brings</option></select></div><div class="frow"><label class="flbl">Pets</label><select class="inp"><option>No pets</option><option>Dog(s)</option><option>Cat(s)</option></select></div></div>
-    <div class="frow"><label class="flbl">Make it recurring?</label><select class="inp" onchange="this.nextElementSibling.style.display=this.value?'block':'none'"><option value="">One-time booking</option><option value="weekly">Weekly (save 10%)</option><option value="biweekly">Bi-weekly (save 10%)</option><option value="monthly">Monthly (save 5%)</option></select><div class="alert info" style="display:none;margin-top:.5rem;font-size:12px">Recurring bookings lock in your preferred cleaner and include an automatic discount.</div></div>
-    <div class="frow"><label class="flbl">Special instructions (optional)</label><textarea class="inp" rows="3" placeholder="Access codes, focus areas, anything the cleaner should know…"></textarea></div>
+    <div class="f2"><div class="frow"><label class="flbl">Preferred date</label><input class="inp" type="date" id="job-date"></div><div class="frow"><label class="flbl" for="job-time">Preferred time</label><select class="inp" id="job-time"><option value="8">Morning 8–12pm</option><option value="12">Afternoon 12–5pm</option><option value="17">Evening 5–8pm</option></select></div></div>
+    <div class="f2"><div class="frow"><label class="flbl" for="job-supplies">Supplies</label><select class="inp" id="job-supplies"><option value="client">I'll provide</option><option value="cleaner">Cleaner brings</option></select></div><div class="frow"><label class="flbl" for="job-pets">Pets</label><select class="inp" id="job-pets"><option value="">No pets</option><option value="Dog(s)">Dog(s)</option><option value="Cat(s)">Cat(s)</option></select></div></div>
+    <div class="frow"><label class="flbl" for="job-recurring">Make it recurring?</label><select class="inp" id="job-recurring" onchange="this.nextElementSibling.style.display=this.value?'block':'none'"><option value="">One-time booking</option><option value="weekly">Weekly (save 10%)</option><option value="biweekly">Bi-weekly (save 10%)</option><option value="monthly">Monthly (save 5%)</option></select><div class="alert info" style="display:none;margin-top:.5rem;font-size:12px">Recurring bookings lock in your preferred cleaner and include an automatic discount.</div></div>
+    <div class="frow"><label class="flbl" for="job-notes">Special instructions (optional)</label><textarea class="inp" rows="3" id="job-notes" maxlength="1500" placeholder="Access codes, focus areas, anything the cleaner should know…"></textarea><div style="font-size:11px;color:var(--tx3);margin-top:4px">🔒 Only the cleaner you book can see this, and only after you book them. Cleaners who are quoting see your general area, not your address.</div></div>
     <button class="btn primary lg" onclick="postJob()">Post job &amp; receive quotes →</button>
     <div style="font-size:11px;color:var(--tx3);text-align:center;margin-top:8px">Cleaners in your area will be notified. Most jobs receive bids within 2–4 hours. You have 48 hours to pick a cleaner before the job expires.</div>
   </div>
@@ -1975,18 +1975,19 @@ function loadAvailableJobs() {
           <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.75rem">
             <div>
               <div style="font-weight:500;font-size:15px">${escapeHtml(job.service_type)}</div>
-              <div class="meta">${escapeHtml(job.address || '')}</div>
+              <div class="meta">📍 ${escapeHtml(job.area || 'Area shared once you are booked')}${job.client_name ? ' · ' + escapeHtml(job.client_name) : ''}</div>
             </div>
-            <span class="tag green">Open</span>
+            <span class="tag green">${job.already_bid ? 'Quote sent ✓' : 'Open'}</span>
           </div>
-          <div class="meta" style="margin-bottom:.875rem">
-            📅 ${job.scheduled_at ? new Date(job.scheduled_at).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : 'TBD'}
-            ${job.duration_hrs ? ' · ~' + job.duration_hrs + ' hrs' : ''}
+          <div class="meta" style="margin-bottom:.5rem">
+            📅 ${job.scheduled_at ? new Date(job.scheduled_at).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : 'TBD'}${job.arrival_window ? ' · ' + escapeHtml(job.arrival_window) : ''}
+            ${job.duration_hrs ? ' · ~' + escapeHtml(String(job.duration_hrs)) + ' hrs' : ''}
           </div>
-          <div style="display:flex;gap:8px">
+          <div class="tags" style="margin-bottom:.875rem">${openJobTagsHtml(job)}</div>
+          ${job.already_bid ? '' : `<div style="display:flex;gap:8px">
             <button class="btn primary" onclick="toggleBidForm('real-${i}')">Place bid</button>
             <button class="btn" onclick="skipJob('real-${i}')">Skip</button>
-          </div>
+          </div>`}
           <div id="bid-form-real-${i}" style="display:none;margin-top:1rem;border-top:1px solid var(--bdr);padding-top:1rem">
             <label class="lbl">Your quote ($)</label>
             <input type="number" class="inp" id="bid-price-real-${i}" min="10" max="9999" placeholder="e.g. 95"
@@ -2011,6 +2012,18 @@ function loadAvailableJobs() {
       if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
       showToast('Could not load jobs: ' + err.message, 'error');
     });
+}
+
+// The facts a cleaner needs to price an open job. All of it is escaped: pets and the
+// arrival window are typed or chosen by another person.
+function openJobTagsHtml(job) {
+  const tags = [];
+  if (job.bedrooms != null) tags.push(job.bedrooms === 0 ? 'Studio' : `${job.bedrooms}${job.bedrooms >= 4 ? '+' : ''} bed`);
+  if (job.bathrooms != null) tags.push(`${job.bathrooms}${job.bathrooms >= 3 ? '+' : ''} bath`);
+  tags.push(job.supplies_by === 'cleaner' ? 'You bring supplies' : 'Client provides supplies');
+  if (job.pets) tags.push('🐾 ' + job.pets);
+  if (job.is_recurring) tags.push('🔁 ' + ({ weekly: 'Weekly', biweekly: 'Every 2 weeks', monthly: 'Monthly' }[job.recurring_freq] || 'Recurring'));
+  return tags.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('');
 }
 
 // Real bid submission that hits the API
@@ -2377,7 +2390,7 @@ function loadCleanerDashboard() {
 
     const availableJobs = (available?.jobs || []).slice(0, 3);
     const nearbyHtml = availableJobs.length ? availableJobs.map(j =>
-      `<div class="card-sm"><div class="row c"><div><div style="font-size:13px;font-weight:500">${escapeHtml(j.service_type || 'Cleaning')}</div><div class="meta">${escapeHtml(j.address || '')}</div></div><button class="btn primary sm" onclick="showPage('c-jobs')">View</button></div></div>`
+      `<div class="card-sm"><div class="row c"><div><div style="font-size:13px;font-weight:500">${escapeHtml(j.service_type || 'Cleaning')}</div><div class="meta">${escapeHtml(j.area || '')}</div></div><button class="btn primary sm" onclick="showPage('c-jobs')">View</button></div></div>`
     ).join('') : `<div class="card-sm" style="color:var(--tx2)">No open jobs near you right now — check back soon.</div>`;
 
     const bgBanner = profile.is_verified ? '' : `<div class="alert warn" style="margin-top:.5rem">🛡️ Complete your <strong>background check</strong> to earn your Verified badge and stand out to clients. <a href="#" onclick="showPage('c-bgcheck');return false" style="color:var(--ad)">Learn more →</a></div>`;
@@ -2469,6 +2482,23 @@ function photoPickerHtml(stage, jobId, extraAttrs = '') {
        + `<label class="btn sm">🖼️ Choose photos<input type="file" accept="image/*" multiple hidden data-photo-input="${stage}" data-job="${id}"${extraAttrs}></label>`;
 }
 
+// What the booked cleaner needs on the day: the size of the home, supplies, pets, the
+// arrival window, and the client's own instructions (door codes live here). Shown only
+// on a booked job — the open-jobs list never carries the notes.
+function scheduleDetailsHtml(j) {
+  const bits = [];
+  if (j.arrival_window) bits.push('🕐 ' + j.arrival_window);
+  if (j.bedrooms != null || j.bathrooms != null) {
+    bits.push([j.bedrooms == null ? null : (j.bedrooms === 0 ? 'Studio' : j.bedrooms + (j.bedrooms >= 4 ? '+' : '') + ' bed'),
+               j.bathrooms == null ? null : j.bathrooms + (j.bathrooms >= 3 ? '+' : '') + ' bath'].filter(Boolean).join(' · '));
+  }
+  bits.push(j.supplies_by === 'cleaner' ? 'You bring supplies' : 'Client provides supplies');
+  if (j.pets) bits.push('🐾 ' + j.pets);
+  const line = bits.filter(Boolean).map(b => `<span class="tag">${escapeHtml(b)}</span>`).join('');
+  const notes = j.notes ? `<div class="alert info" style="margin:8px 0 0;font-size:12px;white-space:pre-line"><strong>From the client:</strong> ${escapeHtml(j.notes)}</div>` : '';
+  return `<div class="tags" style="margin-top:6px">${line}</div>${notes}`;
+}
+
 function scheduleCardHtml(j) {
   const id = escapeHtml(j.id);
   const when = j.scheduled_at ? new Date(j.scheduled_at).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Time TBD';
@@ -2510,6 +2540,7 @@ function scheduleCardHtml(j) {
       <span class="tag ${started ? 'amber' : 'green'}">${started ? 'In progress' : 'Confirmed'}</span></div>
     <div class="tags" style="margin-top:8px"><span class="tag blue">${escapeHtml(when)}</span></div>
     <div class="meta" style="margin-top:6px">Client: <strong>${escapeHtml(j.client_name || 'Client')}</strong></div>
+    ${scheduleDetailsHtml(j)}
     ${j.payment_issue ? `<div class="alert warn" style="margin:8px 0 0;font-size:12px">💳 The client's card hasn't been approved for this clean yet. We've asked them to fix it. Check back before you head out.</div>` : ''}
     ${stage('before', before, started ? 'Photos of each room before you started cleaning.' : 'Take these when you arrive, before you start cleaning.')}
     ${started ? stage('after', after, 'Photos of the same rooms once you have finished.') : ''}
@@ -4170,13 +4201,14 @@ async function loadCleanerConversation(idx) {
 
 function postJob() {
   const page    = document.getElementById('page-cl-post');
-  const address = page?.querySelector('input.inp:not([type="date"])')?.value?.trim();
-  const dateEl  = document.getElementById('job-date');
+  const field   = id => document.getElementById(id);
+  const address = field('job-address')?.value?.trim();
+  const dateEl  = field('job-date');
   const dateVal = dateEl?.value;
 
   if (!address || address.length < 5) {
     showToast('Please enter a valid address before posting.', 'warn');
-    page?.querySelector('input.inp')?.focus();
+    field('job-address')?.focus();
     return;
   }
   if (!dateVal) {
@@ -4184,36 +4216,54 @@ function postJob() {
     dateEl?.focus();
     return;
   }
-  // Date must not be in the past
-  if (new Date(dateVal) < new Date(new Date().toDateString())) {
-    showToast('Please select a date in the future.', 'warn');
+
+  // The chosen arrival window decides the start time (8:00, 12:00 or 17:00).
+  const timeEl     = field('job-time');
+  const startHour  = Number(timeEl?.value) || 10;
+  const windowText = timeEl?.selectedOptions?.[0]?.textContent?.trim() || null;
+  const scheduled  = new Date(`${dateVal}T${String(startHour).padStart(2, '0')}:00:00`);
+  // Must not be in the past — a window that has already started today doesn't count.
+  if (isNaN(scheduled) || scheduled.getTime() <= Date.now()) {
+    showToast('Please choose a date and time in the future.', 'warn');
     dateEl?.focus();
     return;
   }
 
-  // The "Type of cleaning" dropdown. (This used to look for service chips that
-  // don't exist on this form, so every job was posted as "Standard".)
-  const serviceType = document.getElementById('job-type')?.value || 'Standard clean';
+  if (!currentUser) return;
 
-  if (currentUser) {
-    // ── Real session: hit the backend API ──────────────────────────
-    const postBtn = page?.querySelector('.btn-primary, button[onclick="postJob()"]');
-    if (postBtn) { postBtn.disabled = true; postBtn.textContent = 'Posting…'; }
+  // Everything on the form goes to the server; this used to send only the type,
+  // address and date, so cleaners quoted without ever seeing the rest.
+  const recurring = field('job-recurring')?.value || '';
+  const job = {
+    service_type:   field('job-type')?.value || 'Standard clean',
+    bedrooms:       Number(field('job-beds')?.value ?? 2),
+    bathrooms:      Number(field('job-baths')?.value ?? 2),
+    address,
+    scheduled_at:   scheduled.toISOString(),
+    arrival_window: windowText,
+    supplies_by:    field('job-supplies')?.value || 'client',
+    pets:           field('job-pets')?.value || null,
+    notes:          field('job-notes')?.value?.trim() || null,
+    is_recurring:   !!recurring,
+    recurring_freq: recurring || null,
+  };
 
-    SparkleAPI.postJob({
-      service_type:  serviceType,
-      address:       address,
-      scheduled_at:  new Date(dateVal + 'T10:00:00').toISOString(),
-    })
+  const postBtn = page?.querySelector('button[onclick="postJob()"]');
+  const idleText = postBtn?.textContent;
+  if (postBtn) { postBtn.disabled = true; postBtn.textContent = 'Posting…'; }
+
+  SparkleAPI.postJob(job)
     .then(() => {
-      if (postBtn) { postBtn.disabled = false; postBtn.textContent = 'Post Job'; }
+      if (postBtn) { postBtn.disabled = false; postBtn.textContent = idleText; }
+      // Clear the form so a second tap can't post the same job twice.
+      ['job-address', 'job-date', 'job-notes'].forEach(id => { const el = field(id); if (el) el.value = ''; });
       showPage('cl-bookings');
       setTimeout(() => { document.getElementById('page-cl-bookings')?.scrollTo(0, 0); }, 100);
       showToast('Job posted! Cleaners near you will be notified within minutes.', 'success');
       loadMyBookings(); // refresh the bookings page
     })
     .catch(err => {
-      if (postBtn) { postBtn.disabled = false; postBtn.textContent = 'Post Job'; }
+      if (postBtn) { postBtn.disabled = false; postBtn.textContent = idleText; }
       if (err.message === 'SESSION_EXPIRED') {
         showToast('Session expired — please sign in again.', 'error');
         logout();
@@ -4221,7 +4271,6 @@ function postJob() {
         showToast('Could not post job: ' + err.message, 'error');
       }
     });
-  }
 }
 
 function toggleBidForm(idx) {

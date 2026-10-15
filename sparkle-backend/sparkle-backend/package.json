@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node --experimental-sqlite server.js",
     "dev": "node --experimental-sqlite --watch server.js",
+    "dev:local": "node --experimental-sqlite scripts/dev-local.js",
     "test": "node --experimental-sqlite tests/run.js",
     "test:photos": "node --experimental-sqlite tests/job-photos.js",
     "test:tracking": "node --experimental-sqlite tests/tracking-and-account.js",
