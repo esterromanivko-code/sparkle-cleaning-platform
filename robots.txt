@@ -1,17 +1,14 @@
 # Sparkle — Cleaning Marketplace
-# https://sparkle.app
+# https://sparklecleaningplatform.netlify.app
 
 User-agent: *
 Allow: /
-Allow: /app
 Allow: /blog
 
-# Keep API endpoints, admin, and auth pages out of search results
+# The signed-in app and the API have nothing for a search engine to index.
+Disallow: /app
 Disallow: /api/
-Disallow: /admin/
 Disallow: /sparkle_full.html
-Disallow: /sparkle_landing.html
-Disallow: /sparkle_blog.html
 
 # Sitemap location
-Sitemap: https://sparkle.app/sitemap.xml
+Sitemap: https://sparklecleaningplatform.netlify.app/sitemap.xml

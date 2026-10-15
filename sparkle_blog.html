@@ -567,12 +567,12 @@ img { display: block; max-width: 100%; }
             </div>
           </div>
           <div class="blog-body">
-            <div class="blog-title">The Sparkle Standard: What Sets Our Cleaners Apart</div>
-            <p class="blog-excerpt">Every cleaner went through background checks, ID verification, and a skills screening. Here's exactly what that process looks like.</p>
+            <div class="blog-title">The Sparkle Standard: How Every Clean Stays Accountable</div>
+            <p class="blog-excerpt">Photos before and after, payment only after the clean, and 72 hours to report a problem. Here&#39;s exactly how accountability works on Sparkle.</p>
             <div class="blog-meta">
               <div class="blog-meta-ava">SK</div>
               <div class="blog-meta-author">Sparkle Team</div>
-              <div class="blog-meta-date">Apr 28, 2026</div>
+              <div class="blog-meta-date">Oct 15, 2026</div>
             </div>
             <span class="blog-read">Read Article →</span>
           </div>
@@ -704,7 +704,7 @@ const ARTICLES = {
 
       <h2>So How Often Should You Deep Clean?</h2>
       <p>Most cleaning professionals recommend a full deep clean <strong>2–4 times per year</strong>, with standard maintenance cleaning in between. If you have pets, allergies, or kids, lean toward the more frequent end.</p>
-      <p>On Sparkle, you can post a job in under two minutes, receive competitive bids from background-checked cleaners, and have it done this week — without a single phone call. <a href="sparkle_full.html?role=client">Post your first job here →</a></p>
+      <p>On Sparkle, you can post a job in under two minutes, receive competitive quotes from local cleaners, and have it done this week — without a single phone call. <a href="sparkle_full.html?role=client">Post your first job here →</a></p>
     `
   },
 
@@ -755,60 +755,50 @@ const ARTICLES = {
 
   3: {
     id: 3,
-    title: 'The Sparkle Standard: What Sets Our Cleaners Apart',
+    title: 'The Sparkle Standard: How Every Clean Stays Accountable',
     category: 'Behind the Platform',
-    date: 'Apr 28, 2026',
-    readTime: '7 min read',
+    date: 'Oct 15, 2026',
+    readTime: '4 min read',
     banner: { bg: 'linear-gradient(145deg,#1a1200,#3a2900)', emoji: '✦' },
     prose: `
-      <p>When we built Sparkle, we made a clear decision: we wouldn't be the platform that lets anyone sign up and start taking jobs. We'd be the platform where clients could trust the person they were letting into their home.</p>
-      <p>That commitment shows up in what we call the <strong>Sparkle Standard</strong> — a set of requirements every cleaner goes through before they can accept their first booking. Here's exactly what that process looks like.</p>
+      <p>Letting someone into your home takes trust. We can't promise that every clean goes perfectly, and we won't pretend a badge replaces your own judgment. What we can do is build the platform so that what happens in your home is documented, paid for fairly, and fixable if something goes wrong.</p>
+      <p>That's what we call the <strong>Sparkle Standard</strong>. Here's exactly how it works today.</p>
 
-      <h2>Step 1: Identity Verification</h2>
-      <p>Every cleaner on Sparkle goes through Stripe Identity verification — the same identity infrastructure used by financial institutions and major platforms. This involves submitting a government-issued ID (driver's license, passport, or ID card) and a live selfie that's checked against the document using biometric matching.</p>
-      <p>This means the person you booked is the person who shows up. Not a borrowed identity, not a stock profile photo.</p>
+      <h2>1. Photos before and after, every time</h2>
+      <p>A cleaner can't finish a job on Sparkle, or get paid for it, without uploading at least one photo from before they started and one from after they finished. You can see them in My bookings as soon as they're added.</p>
+      <p>The photos are private. Only you, your cleaner and the Sparkle team can see them, and location data is stripped from the image files. They're kept for 180 days after the job, and longer only if a problem report is still open.</p>
 
-      <h2>Step 2: Criminal Background Check</h2>
-      <p>After identity is confirmed, each cleaner goes through a full background check powered by Checkr, one of the most trusted background check providers in the gig economy. This covers:</p>
-      <ul>
-        <li>National criminal database search</li>
-        <li>County courthouse records (current and past counties of residence)</li>
-        <li>Sex offender registry search</li>
-        <li>Terrorist watchlist check</li>
-      </ul>
-      <p>The background check is conducted at the cleaner's own expense — a $30 fee they pay during onboarding. This is intentional. It signals seriousness and commitment before they've taken a single job.</p>
+      <h2>2. You're charged after the clean, not before</h2>
+      <p>Booking a cleaner doesn't charge you. A few days before the clean, a hold for the quote plus Sparkle's booking fee is placed on your card, and your bank may show it as a pending charge. The actual charge happens when your cleaner completes the job with its photos. Cancel before your cleaner arrives and the hold is released.</p>
+      <p>Your card number goes straight into Stripe's secure form. It never touches Sparkle's servers.</p>
+
+      <h2>3. You can see your cleaner coming</h2>
+      <p>When your cleaner taps "On my way", you're notified and can see how far away they are until they arrive. Sparkle also records when they arrived and when they finished, so the time on site is on the record if you ever need it.</p>
+      <p>Location is shared only for that trip. Precise positions are deleted after 180 days; the arrival and finish times are kept.</p>
+
+      <h2>4. Credentials you can check</h2>
+      <p>Cleaners can upload a license and proof of insurance. A member of the Sparkle team reviews each document before a badge appears on the cleaner's profile: <em>Licensed</em>, <em>Insured</em> or <em>Licensed &amp; Insured</em>. The documents themselves are never shown to clients, only the badge, and when a document expires the badge comes off until a new one is approved.</p>
 
       <div class="tip-box">
-        <div class="tip-label">Why the cleaner pays for it</div>
-        Some platforms absorb the background check cost as a signup incentive. We chose not to, for a specific reason: the cleaners who are willing to pay a $30 fee upfront are the ones who are serious about building a real business. It self-selects for the right people.
+        <div class="tip-label">What a badge does and doesn't mean</div>
+        A badge means our team reviewed the document the cleaner uploaded. It isn't a guarantee that a particular policy will cover a particular loss, and a cleaner without a badge isn't a bad cleaner. They just haven't had a document approved on Sparkle yet.
       </div>
 
-      <h2>Step 3: The Verified Badge</h2>
-      <p>Once both identity verification and the criminal background check return clear results, the cleaner receives a <strong>Sparkle Verified</strong> badge on their profile. This badge is visible to every client during the bidding process.</p>
-      <p>Badges don't expire automatically, but Sparkle reviews them annually and can revoke them if a cleaner's status changes. Cleaners whose checks expire are required to re-verify before continuing to accept bookings.</p>
+      <h2>5. Ratings from real cleans</h2>
+      <p>Only a completed job can be reviewed, and only by the client and cleaner who were on it. A cleaner's profile shows their average rating, how many jobs they've completed, and the written reviews. Reviewers are shown by first name and last initial.</p>
 
-      <blockquote>"Every person you let into your home through Sparkle went through the same vetting process. That's not a checkbox — it's the baseline."</blockquote>
+      <h2>6. If something goes wrong</h2>
+      <p>You have 72 hours after a clean is finished to report a problem from My bookings, and you can add your own photos. Your cleaner is asked for their side, and their earnings for that job are frozen while the report is open. A member of the Sparkle team then reviews the photos and statements from both sides and decides. If it's resolved in your favor you're refunded to your card, and the amount comes out of the cleaner's earnings.</p>
+      <p>It goes both ways. If a cleaner arrives and can't get in, they can charge a lockout fee, but only with a photo taken at the door. The amount is shown on their quote before you book, and you can dispute it within the same 72 hours.</p>
 
-      <h2>Step 4: Reputation Over Time</h2>
-      <p>Verification covers the baseline. But the cleaner's ongoing rating tells you even more. Every Sparkle job ends with a rating from the client — and those ratings are aggregated publicly on the cleaner's profile. You can see:</p>
-      <ul>
-        <li>Their overall star rating (out of 5)</li>
-        <li>Total number of jobs completed</li>
-        <li>Review text from previous clients</li>
-        <li>Response rate and average response time</li>
-      </ul>
-      <p>A cleaner with a 4.9 rating over 80+ jobs has built that reputation job by job. No platform can fake that track record.</p>
+      <blockquote>"Every clean on Sparkle leaves a record: photos, times and payments. That's the baseline."</blockquote>
 
-      <h2>What Happens If a Problem Occurs?</h2>
-      <p>Despite our vetting process, things occasionally go wrong — a missed area, a broken item, a miscommunication. Sparkle's payment structure is designed to protect you when that happens.</p>
-      <p><strong>Payment is held in escrow</strong> until the job is complete and you're satisfied. If there's a dispute, you can flag it before funds are released, and our support team reviews it. No other cleaning platform in Seattle does this.</p>
+      <h2>What we don't do yet</h2>
+      <p>Sparkle doesn't run criminal background checks or government ID verification on cleaners yet, and we'd rather say that plainly than imply it. If we add them, we'll announce it here and they'll show up on cleaner profiles as their own badge.</p>
+      <p>Until then, the photos, ratings, credentials and the 72-hour problem process above are the protections you have, alongside your own judgment. Read a cleaner's reviews, look for badges, and message them before you book.</p>
 
-      <h2>A Note on Cleaners Who Don't Have the Badge</h2>
-      <p>You may occasionally see cleaner profiles without the Verified badge — these are cleaners who have recently joined and are in the process of completing their background check. You're free to hire them, but we recommend waiting for the badge if trust is your top priority.</p>
-      <p>We're transparent about this distinction rather than hiding it, because we think you deserve to make an informed choice.</p>
-
-      <h2>Ready to Book a Verified Cleaner?</h2>
-      <p>Post your job on Sparkle — it's free and takes under two minutes. You'll receive bids from verified professionals, and you choose who you hire. <a href="sparkle_full.html?role=client">Post a cleaning job →</a></p>
+      <h2>Ready to book?</h2>
+      <p>Post a job on Sparkle. It's free to post, you compare quotes from local cleaners, and you choose who you hire. <a href="sparkle_full.html?role=client">Post a cleaning job →</a></p>
     `
   }
 };

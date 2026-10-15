@@ -6,3 +6,6 @@ sparkle-backend-final.zip
 # OS junk
 .DS_Store
 Thumbs.db
+
+# Built website (scripts/build-site.js) — rebuilt on every deploy
+dist/

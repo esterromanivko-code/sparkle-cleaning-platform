@@ -1,12 +1,10 @@
+# Netlify builds the site with scripts/build-site.js, which copies an approved list of
+# public files into dist/. Only dist/ is published — never the repository itself.
+# (Publishing "." put the backend's source code and internal documents on the
+# public internet.) To publish a new page, add it to PUBLIC_FILES in that script.
 [build]
-  publish = "."
-
-# ── Force HTTPS ───────────────────────────────────────────────────────────────
-[[redirects]]
-  from  = "http://sparkle.app/*"
-  to    = "https://sparkle.app/:splat"
-  status = 301
-  force  = true
+  command = "node scripts/build-site.js"
+  publish = "dist"
 
 # ── Security headers on every response ───────────────────────────────────────
 [[headers]]
@@ -17,7 +15,6 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
     Permissions-Policy = "geolocation=(self), camera=(), microphone=()"
-    X-XSS-Protection = "1; mode=block"
 
 # Serve sparkle_full.html at /app for a cleaner URL
 [[redirects]]
@@ -50,14 +47,3 @@
   from = "/"
   to = "/sparkle_landing.html"
   status = 200
-
-# ── Block internal docs/archives from being served publicly ──────────────────
-[[redirects]]
-  from = "/*.md"
-  to = "/sparkle_landing.html"
-  status = 404
-
-[[redirects]]
-  from = "/*.zip"
-  to = "/sparkle_landing.html"
-  status = 404
