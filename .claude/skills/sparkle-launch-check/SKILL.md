@@ -23,6 +23,8 @@ Do these in order. "It works on my machine" is not done; **live and green is don
    - `.../api/profile/cleaner/x` and `.../api/reviews/x` signed out → **401**
    - `https://sparklecleaningplatform.netlify.app/sparkle-backend/sparkle-backend/server.js` and `/LAUNCH.md` → **404**; `/`, `/app`, `/blog`, `/privacy`, `/terms`, `/og-image.png` → **200**
    - `.../api/config` → `payments_mode` is what you expect (see Money below)
+   - **Confirm Railway actually deployed the new code, not just that CI passed.** Netlify and Railway deploy independently, so the website can be new while the server is old. Probe something only the new commit has (a new field in `/api/config`, or a new route answering **401** instead of **404**), and look at `gh api repos/esterromanivko-code/sparkle-cleaning-platform/deployments?per_page=1`: its `sha` should be your commit. If Railway is behind, say so plainly and tell her to look at the service's Deployments tab. Don't claim the feature is live.
+   - `gh run list --commit <sha>` needs the **full 40-character hash**; a short one silently returns nothing (a background watcher built on it reported an empty result and looked like success). Read the result back before relying on it.
 6. **Keep the phone app in step.** `C:\Users\ester\Projects\sparkle-mobile` holds a *copy* of the website in `www/`. If `sparkle_full.html`, `sparkle_api.js` or a legal page changed, run `npm run sync:web` there, commit, push, and wait for the *Android debug APK* run. An app that wasn't re-synced shows the old screens against a server that has moved on (this already happened once: the bundle still read street addresses the server had stopped sending).
 
 ## Mistakes that actually happened, and what stops them now
