@@ -83,6 +83,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
 .tl-sub{font-size:11px;color:var(--tx2)}
 .ob-btn{width:100%;padding:10px;background:var(--g);color:#fff;border:none;border-radius:var(--rad);font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .15s;margin-top:6px}
 .ob-btn:hover{background:var(--gd)}
+.ob-btn:disabled{opacity:.55;cursor:not-allowed}
+.ob-btn:disabled:hover{background:var(--g)}
 .ob-btn-ghost{width:100%;padding:9px;background:transparent;color:var(--tx2);border:1px solid var(--bdr2);border-radius:var(--rad);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:8px}
 .auth-link{text-align:center;font-size:12px;color:var(--tx2);margin-top:1rem}
 .auth-link a{color:var(--g);cursor:pointer;text-decoration:none}
@@ -1284,14 +1286,28 @@ const friendlyAuthError = err => (err.message || '').startsWith('Cannot reach')
   ? "Can't reach Sparkle right now. Check your connection and try again."
   : err.message;
 
-function showForgot() {
+const EMAIL_UNAVAILABLE_MSG = "Password reset by email isn't available right now. Please contact Sparkle support and we'll help you get back in.";
+
+async function showForgot() {
   const typed = document.getElementById('signin-email')?.value?.trim();
   const field = document.getElementById('forgot-email');
+  const btn   = document.getElementById('forgot-btn');
   if (field && typed) field.value = typed;
   authMsg('forgot-error', '');
+  if (btn) btn.disabled = false;
   showOnly('forgot-form', ['forgot-form', 'forgot-sent']);
   showAuthStep('auth-forgot');
   field?.focus();
+
+  // Ask the server whether it can send email before letting anyone wait for one. A server
+  // that doesn't say "yes" can't (no email set up, or an older version that would only
+  // pretend to). No answer at all means we're offline: let them try and see the real error.
+  const cfg = await SparkleAPI.getPublicConfig();
+  const answered = cfg && ('payments_mode' in cfg || 'turnstile_site_key' in cfg);
+  if (answered && cfg.email_enabled !== true) {
+    authMsg('forgot-error', EMAIL_UNAVAILABLE_MSG);
+    if (btn) btn.disabled = true;
+  }
 }
 
 let forgotCooldownTimer = null;
