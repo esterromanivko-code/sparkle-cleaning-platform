@@ -309,6 +309,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
 /* LEGAL LINKS */
 .auth-legal{font-size:11px;color:var(--tx2);margin:.25rem 0 .5rem;line-height:1.5}
 .auth-legal a{color:var(--g);text-decoration:none}
+.auth-link{color:var(--gd);font-size:12px;font-weight:500;text-decoration:none;background:none;border:0;padding:0;cursor:pointer;font-family:inherit}
+.auth-link:hover{text-decoration:underline}
+.auth-link:disabled{color:var(--tx3);cursor:not-allowed;text-decoration:none}
+.auth-msg{display:none;font-size:12px;border-radius:var(--rad);padding:8px 12px;margin-bottom:.75rem;line-height:1.5}
+.auth-msg.error{color:var(--r);background:var(--rl)}
 
 /* NOTIFICATIONS PANEL */
 .notif-panel{position:fixed;top:52px;right:0;width:330px;height:calc(100vh - 52px);background:var(--surf);border-left:1px solid var(--bdr);z-index:700;transform:translateX(100%);transition:transform .25s ease;overflow-y:auto;box-shadow:var(--shl)}
@@ -612,6 +617,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
         <label class="ob-lbl">Password</label>
         <input class="ob-inp" type="password" id="signin-password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doSignIn()">
       </div>
+      <div style="text-align:right;margin:-.25rem 0 .75rem"><a href="#" class="auth-link" id="forgot-link" onclick="showForgot();return false">Forgot password?</a></div>
       <div id="signin-error" role="alert" style="display:none;font-size:12px;color:var(--r);background:var(--rl);border-radius:var(--rad);padding:8px 12px;margin-bottom:.75rem;line-height:1.5"></div>
       <button class="ob-btn" id="signin-btn" onclick="doSignIn()">Sign in</button>
 
@@ -624,6 +630,55 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);font-
       </div>
       <button class="ob-btn" onclick="startOnboard()">Create account →</button>
       <div class="auth-legal" style="text-align:center;margin-top:.875rem"><a href="terms.html" target="_blank" rel="noopener">Terms</a> · <a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="accessibility.html" target="_blank" rel="noopener">Accessibility</a></div>
+    </div>
+
+    <!-- Forgot password: ask for the link, then say where it went -->
+    <div class="auth-step" id="auth-forgot">
+      <div id="forgot-form">
+        <div class="ob-title">Reset your password</div>
+        <div class="ob-sub" style="margin-bottom:1.25rem">Enter the email you signed up with and we'll send you a link to choose a new password.</div>
+        <div class="ob-field">
+          <label class="ob-lbl" for="forgot-email">Email</label>
+          <input class="ob-inp" type="email" id="forgot-email" placeholder="you@example.com" autocomplete="email" onkeydown="if(event.key==='Enter')doForgotPassword()">
+        </div>
+        <div id="forgot-error" class="auth-msg error" role="alert"></div>
+        <button class="ob-btn" id="forgot-btn" onclick="doForgotPassword()">Send reset link</button>
+      </div>
+      <div id="forgot-sent" style="display:none" aria-live="polite">
+        <div class="ob-title">Check your email</div>
+        <div class="ob-sub" id="forgot-sent-text" style="margin-bottom:.75rem"></div>
+        <div class="ob-sub" style="font-size:12px;margin-bottom:.75rem">The link works once and lasts an hour. Nothing yet? Look in your spam folder, then <button class="auth-link" id="forgot-resend" onclick="doForgotPassword(true)">send it again</button>.</div>
+      </div>
+      <div style="text-align:center;margin-top:1rem"><a href="#" class="auth-link" onclick="showAuthStep('auth-demo');return false">← Back to sign in</a></div>
+    </div>
+
+    <!-- Choose a new password (opened by the link in the email) -->
+    <div class="auth-step" id="auth-reset">
+      <div id="reset-checking" class="ob-sub" aria-live="polite">Checking your link…</div>
+      <div id="reset-form" style="display:none">
+        <div class="ob-title">Choose a new password</div>
+        <div class="ob-sub" style="margin-bottom:1.25rem">Pick something you don't use anywhere else. At least 8 characters. You'll be signed out on all your devices.</div>
+        <div class="ob-field">
+          <label class="ob-lbl" for="reset-pw">New password</label>
+          <input class="ob-inp" type="password" id="reset-pw" autocomplete="new-password" minlength="8" onkeydown="if(event.key==='Enter')document.getElementById('reset-pw2').focus()">
+        </div>
+        <div class="ob-field">
+          <label class="ob-lbl" for="reset-pw2">Type it again</label>
+          <input class="ob-inp" type="password" id="reset-pw2" autocomplete="new-password" minlength="8" onkeydown="if(event.key==='Enter')doResetPassword()">
+        </div>
+        <div id="reset-error" class="auth-msg error" role="alert"></div>
+        <button class="ob-btn" id="reset-btn" onclick="doResetPassword()">Save new password</button>
+      </div>
+      <div id="reset-done" style="display:none" aria-live="polite">
+        <div class="ob-title">Password updated ✓</div>
+        <div class="ob-sub" style="margin-bottom:1.25rem">You've been signed out everywhere. Sign in with your new password.</div>
+        <button class="ob-btn" onclick="showAuthStep('auth-demo')">Sign in</button>
+      </div>
+      <div id="reset-bad" style="display:none">
+        <div class="ob-title">This link has expired</div>
+        <div class="ob-sub" style="margin-bottom:1.25rem">Reset links work once and last an hour. Request a fresh one and we'll email it right away.</div>
+        <button class="ob-btn" onclick="showForgot()">Send me a new link</button>
+      </div>
     </div>
 
     <!-- Onboarding Steps -->
@@ -1197,6 +1252,126 @@ function obStep(n) {
   document.querySelectorAll('.ob-step').forEach((s,i)=>s.classList.toggle('active',i===n));
   document.querySelectorAll('.ob-dot').forEach((d,i)=>{d.classList.toggle('done',i<=n)});
 }
+// ── Links from emails ─────────────────────────────────────────────────────────
+// A reset or verification email opens the app with a one-time token in the #fragment
+// (…/app#reset=<64 hex characters>). A fragment is never sent to a server, a log or
+// another site, so the token stays in this browser. It is read once, here, and removed
+// from the address bar straight away.
+const emailLink = (() => {
+  const m = /^#(reset|verify)=([0-9a-f]{64})$/.exec(location.hash);
+  if (!m) return null;
+  history.replaceState(null, '', location.pathname + location.search);
+  return { kind: m[1], token: m[2] };
+})();
+
+// ── Forgot / reset password ───────────────────────────────────────────────────
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function showAuthStep(id) {
+  document.querySelectorAll('#auth-screen .auth-step').forEach(s => s.classList.toggle('active', s.id === id));
+}
+function authMsg(id, text) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text || '';
+  el.style.display = text ? 'block' : 'none';
+}
+// Only one of these blocks shows at a time inside a step.
+function showOnly(visibleId, allIds) {
+  allIds.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = id === visibleId ? '' : 'none'; });
+}
+const friendlyAuthError = err => (err.message || '').startsWith('Cannot reach')
+  ? "Can't reach Sparkle right now. Check your connection and try again."
+  : err.message;
+
+function showForgot() {
+  const typed = document.getElementById('signin-email')?.value?.trim();
+  const field = document.getElementById('forgot-email');
+  if (field && typed) field.value = typed;
+  authMsg('forgot-error', '');
+  showOnly('forgot-form', ['forgot-form', 'forgot-sent']);
+  showAuthStep('auth-forgot');
+  field?.focus();
+}
+
+let forgotCooldownTimer = null;
+async function doForgotPassword(isResend = false) {
+  const field = document.getElementById('forgot-email');
+  const btn   = document.getElementById(isResend ? 'forgot-resend' : 'forgot-btn');
+  const email = field?.value?.trim() || '';
+  if (!EMAIL_SHAPE.test(email)) { authMsg('forgot-error', 'Enter the email address you signed up with.'); field?.focus(); return; }
+
+  authMsg('forgot-error', '');
+  const label = btn?.textContent;
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    await SparkleAPI.forgotPassword(email);
+    // The same words whether or not there is an account: the server never says.
+    document.getElementById('forgot-sent-text').textContent =
+      `If there's a Sparkle account for ${email}, a reset link is on its way.`;
+    showOnly('forgot-sent', ['forgot-form', 'forgot-sent']);
+    // Match the server's one-email-a-minute limit so "send it again" can't just be refused.
+    const resend = document.getElementById('forgot-resend');
+    if (resend) {
+      let left = 60;
+      resend.disabled = true;
+      clearInterval(forgotCooldownTimer);
+      forgotCooldownTimer = setInterval(() => {
+        left -= 1;
+        if (left <= 0) { clearInterval(forgotCooldownTimer); resend.disabled = false; resend.textContent = 'send it again'; }
+        else resend.textContent = `send it again (${left}s)`;
+      }, 1000);
+      resend.textContent = 'send it again (60s)';
+    }
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = label; }
+    showOnly('forgot-form', ['forgot-form', 'forgot-sent']);
+    authMsg('forgot-error', friendlyAuthError(err));
+    return;
+  }
+  if (btn && !isResend) { btn.disabled = false; btn.textContent = 'Send reset link'; }
+}
+
+let activeResetToken = null;
+async function openResetScreen(token) {
+  activeResetToken = token;
+  showOnly('reset-checking', ['reset-checking', 'reset-form', 'reset-done', 'reset-bad']);
+  showAuthStep('auth-reset');
+  try {
+    const valid = await SparkleAPI.checkResetToken(token);
+    if (!valid) { activeResetToken = null; showOnly('reset-bad', ['reset-checking', 'reset-form', 'reset-done', 'reset-bad']); return; }
+    showOnly('reset-form', ['reset-checking', 'reset-form', 'reset-done', 'reset-bad']);
+    document.getElementById('reset-pw')?.focus();
+  } catch (err) {
+    showOnly('reset-form', ['reset-checking', 'reset-form', 'reset-done', 'reset-bad']);
+    authMsg('reset-error', friendlyAuthError(err));
+  }
+}
+
+async function doResetPassword() {
+  const pw  = document.getElementById('reset-pw')?.value || '';
+  const pw2 = document.getElementById('reset-pw2')?.value || '';
+  const btn = document.getElementById('reset-btn');
+  authMsg('reset-error', '');
+  if (pw.length < 8) { authMsg('reset-error', 'Your password needs at least 8 characters.'); document.getElementById('reset-pw')?.focus(); return; }
+  if (pw !== pw2)    { authMsg('reset-error', "The two passwords don't match."); document.getElementById('reset-pw2')?.focus(); return; }
+  if (!activeResetToken) { showOnly('reset-bad', ['reset-checking', 'reset-form', 'reset-done', 'reset-bad']); return; }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    await SparkleAPI.resetPassword(activeResetToken, pw);
+    activeResetToken = null;
+    document.getElementById('reset-pw').value = '';
+    document.getElementById('reset-pw2').value = '';
+    showOnly('reset-done', ['reset-checking', 'reset-form', 'reset-done', 'reset-bad']);
+  } catch (err) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Save new password'; }
+    // 400 means the link is no longer good; anything else (a too-short password, no connection) can be retried.
+    if (err.status === 400) { activeResetToken = null; showOnly('reset-bad', ['reset-checking', 'reset-form', 'reset-done', 'reset-bad']); return; }
+    authMsg('reset-error', friendlyAuthError(err));
+  }
+}
+
 // ── Real auth: sign in with email + password ──────────────────────────────────
 async function doSignIn() {
   const emailEl = document.getElementById('signin-email');
@@ -1334,6 +1509,9 @@ function _openAuthScreen(show) {
 (function restoreSession() {
   // Demo mode no longer exists; a role left behind by an old demo visit means nothing.
   sessionStorage.removeItem('sparkle_role');
+  // Someone who opens a reset link is changing their password: don't sign them straight
+  // back in as whoever was signed in on this browser.
+  if (emailLink && emailLink.kind === 'reset') SparkleAPI.logout();
   // Real session: access token present + user object cached
   if (SparkleAPI.isRealSession()) {
     const user = SparkleAPI.getUser();
@@ -6690,6 +6868,15 @@ function resetCaptcha() {
 //   tab, or straight to the right page when already signed in as that role.
 // There is no special admin URL: admins sign in with the normal form.
 // ══════════════════════════════════════
+// A link from a Sparkle email: choose a new password, or confirm an email address.
+if (emailLink && emailLink.kind === 'reset') {
+  openResetScreen(emailLink.token);
+} else if (emailLink && emailLink.kind === 'verify') {
+  SparkleAPI.verifyEmail(emailLink.token)
+    .then(() => showToast('✅ Email verified. Thank you!', 'success'))
+    .catch(err => showToast(friendlyAuthError(err), 'error'));
+}
+
 (function handleUrlParams() {
   const params = new URLSearchParams(window.location.search);
   const role   = params.get('role');

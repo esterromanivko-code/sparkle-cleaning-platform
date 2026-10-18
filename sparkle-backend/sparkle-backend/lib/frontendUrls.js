@@ -38,10 +38,14 @@ function appReturnUrl(requested) {
     if (secure && (frontendHosts().has(u.hostname) || (local && dev))) return u.origin + u.pathname;
   } catch { /* fall through to the configured frontend */ }
 
+  // With no FRONTEND_URL there is no honest address to give. (Without this check the code
+  // below turned "nothing" into https://undefined/app, and emailed that to people.)
   const first = String(process.env.FRONTEND_URL || '').split(',').map(s => s.trim()).find(Boolean);
+  if (!first) return 'http://localhost:4200/sparkle_full.html';
   try {
     const u = new URL(/^https?:\/\//i.test(first) ? first : `https://${first}`);
-    return `${isLocal(u.hostname) ? u.origin : `https://${u.host}`}/app`;
+    // A local static server has no /app shortcut (that is a Netlify rewrite), so use the file.
+    return isLocal(u.hostname) ? `${u.origin}/sparkle_full.html` : `https://${u.host}/app`;
   } catch {
     return 'http://localhost:4200/sparkle_full.html';
   }

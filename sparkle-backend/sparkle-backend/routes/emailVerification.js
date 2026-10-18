@@ -7,7 +7,7 @@ const { v4: uuid } = require('uuid');
 const { body, validationResult } = require('express-validator');
 const db      = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { sendEmail } = require('../lib/email');
+const { sendEmail, emailEnabled, esc, appUrl } = require('../lib/email');
 const { audit } = require('../lib/logger');
 
 const router = express.Router();
@@ -26,9 +26,12 @@ async function sendVerificationEmail(userId, email, firstName) {
     VALUES (?, ?, ?, ?, ?)
   `).run(uuid(), userId, tokenHash, email, expiresAt);
 
-  const verifyUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${rawToken}`;
+  // The link opens the app, which finishes the job (GET /api/verify-email/:token). It used
+  // to point at /verify-email?token=…, a page that doesn't exist, so no one could ever
+  // verify. The token rides in the #fragment, which is never sent to a server or a log.
+  const verifyUrl = appUrl(`#verify=${rawToken}`);
 
-  await sendEmail({
+  return sendEmail({
     to: email,
     subject: 'Please verify your Sparkle email address',
     html: `
@@ -37,7 +40,7 @@ async function sendVerificationEmail(userId, email, firstName) {
           <h1 style="color:#fff;margin:0;font-size:22px">Verify your email</h1>
         </div>
         <div style="padding:28px;border:1px solid #E0E2DC;border-top:none;border-radius:0 0 12px 12px">
-          <p>Hi ${firstName},</p>
+          <p>Hi ${esc(firstName)},</p>
           <p>Click the button below to verify your Sparkle email address. This link expires in 24 hours.</p>
           <div style="text-align:center;margin:28px 0">
             <a href="${verifyUrl}" style="background:#1D9E75;color:#fff;padding:12px 28px;border-radius:10px;text-decoration:none;font-weight:500">Verify my email →</a>
@@ -66,7 +69,12 @@ router.post('/send', requireAuth, async (req, res) => {
     return res.status(429).json({ error: 'Too many verification emails sent. Please wait an hour.' });
   }
 
-  await sendVerificationEmail(user.id, user.email, user.first_name);
+  // Don't claim an email went out when none can: say so, and let them try again later.
+  if (!emailEnabled()) {
+    return res.status(503).json({ error: "Email isn't available right now, so we can't send a verification link. Please try again later.", code: 'EMAIL_UNAVAILABLE' });
+  }
+  const sent = await sendVerificationEmail(user.id, user.email, user.first_name);
+  if (!sent?.ok) return res.status(502).json({ error: "We couldn't send the email just now. Please try again in a few minutes." });
   res.json({ message: 'Verification email sent. Check your inbox.' });
 });
 
@@ -93,7 +101,7 @@ router.get('/:token', async (req, res) => {
 
   if (!record) {
     return res.status(400).json({
-      error: 'This verification link is invalid or has expired. Request a new one in your account settings.'
+      error: 'This verification link is invalid or has expired.'
     });
   }
 
@@ -106,7 +114,7 @@ router.get('/:token', async (req, res) => {
   // Redirect to frontend (or return JSON for API clients)
   const accept = req.headers.accept || '';
   if (accept.includes('text/html')) {
-    return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}?email_verified=true`);
+    return res.redirect(appUrl());
   }
   res.json({ message: 'Email verified successfully! Your account is now fully active.' });
 });

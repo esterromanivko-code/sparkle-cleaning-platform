@@ -387,6 +387,54 @@ window.SparkleAPI = (function () {
     return json;
   }
 
+  // ─── Forgotten passwords and email links ─────────────────────────────────────
+
+  // Errors from these keep the server's words and a machine-readable code.
+  async function authCall(path, options, fallback) {
+    const res  = await apiFetch(path, options);
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(json.errors?.[0]?.msg || json.error || fallback);
+      err.status = res.status;
+      err.code   = json.code;
+      throw err;
+    }
+    return json;
+  }
+
+  /**
+   * Ask for a password-reset email. The server answers the same way whether or not the
+   * address has an account. Fails with err.code 'EMAIL_UNAVAILABLE' when it can't send mail.
+   */
+  async function forgotPassword(email) {
+    const cf_turnstile_response = await getCaptchaToken();
+    if (!cf_turnstile_response && _captchaRequired) throw new Error(captchaHelp());
+    return authCall('/api/auth/forgot-password', {
+      method: 'POST',
+      body:   JSON.stringify(cf_turnstile_response ? { email, cf_turnstile_response } : { email }),
+    }, "Couldn't send the reset email. Please try again.");
+  }
+
+  /** True while a reset link from an email is still usable (unused and under an hour old). */
+  async function checkResetToken(token) {
+    try {
+      const json = await authCall('/api/auth/verify-reset-token', { method: 'POST', body: JSON.stringify({ token }) }, 'Could not check the link');
+      return !!json.valid;
+    } catch (err) {
+      if (err.status && err.status < 500) return false;
+      throw err;
+    }
+  }
+
+  /** Set a new password with the token from the email. Signs the account out everywhere. */
+  const resetPassword = (token, newPassword) => authCall('/api/auth/reset-password', {
+    method: 'POST',
+    body:   JSON.stringify({ token, new_password: newPassword }),
+  }, "Couldn't reset your password. Please request a new link.");
+
+  /** Finish verifying an email address with the token from the verification email. */
+  const verifyEmail = (token) => authCall(`/api/verify-email/${encodeURIComponent(token)}`, {}, 'This verification link is invalid or has expired.');
+
   /**
    * Sign in with email and password.
    * @returns {{ access_token, refresh_token, user, profile }}
@@ -1142,5 +1190,9 @@ window.SparkleAPI = (function () {
     openPayoutDashboard,
     registerDevice,
     unregisterDevice,
+    forgotPassword,
+    checkResetToken,
+    resetPassword,
+    verifyEmail,
   };
 })();

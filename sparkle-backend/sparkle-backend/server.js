@@ -247,6 +247,9 @@ app.get('/api/config', (req, res) => {
     // payments_mode: live | test | mock (local, simulated) | off (not set up)
     stripe_publishable_key: publishableKey(),
     payments_mode: paymentsMode(),
+    // Whether email can reach people (password resets, verification). When false the
+    // app tells people to contact support instead of promising an email that won't come.
+    email_enabled: require('./lib/email').emailEnabled(),
   });
 });
 
@@ -362,6 +365,10 @@ app.listen(PORT, () => {
   require('./lib/retention').startRetentionSweep();    // Deletes job photos and location history after 180 days
   require('./lib/payments').startPaymentSweep();       // Places card holds before cleans; settles lost charges
   require('./lib/expiry').startExpirySweep();          // Closes jobs nobody booked, expires old quotes
+
+  if (!require('./lib/email').emailEnabled()) {
+    console.warn('  ⚠️  SMTP_HOST, SMTP_USER and SMTP_PASS are not set — no email can be sent, so password resets and verification links will not arrive.');
+  }
 
   const stripeState = require('./lib/stripe');
   const mode = stripeState.paymentsMode();

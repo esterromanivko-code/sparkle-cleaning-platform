@@ -13,7 +13,7 @@ const path     = require('path');
 
 const db       = require('../db');
 const { signToken, requireAuth } = require('../middleware/auth');
-const { sendPasswordReset, send2FASetupEmail, send2FACode } = require('../lib/email');
+const { sendPasswordReset, send2FASetupEmail, send2FACode, emailEnabled } = require('../lib/email');
 const { handleSingleUpload, getFileUrl, UPLOAD_DIR } = require('../lib/uploads');
 const { createRefreshToken, verifyRefreshToken, revokeRefreshToken, revokeAllUserTokens } = require('../lib/tokens');
 const { requireCaptcha } = require('../middleware/captcha');
@@ -118,15 +118,32 @@ router.post('/auth/forgot-password', requireCaptcha, [
   // Always return the same response whether email exists or not
   const SAFE_RESPONSE = { message: 'If that email is registered, you\'ll receive a reset link shortly.' };
 
+  // This depends on how the server is set up, not on whether the account exists, so
+  // saying it reveals nothing about anyone. Better than a success message for an email
+  // that will never arrive.
+  if (!emailEnabled()) {
+    return res.status(503).json({
+      error: "Password reset by email isn't available right now. Please contact Sparkle support and we'll help you get back in.",
+      code: 'EMAIL_UNAVAILABLE',
+    });
+  }
+
   const { email } = req.body;
 
   try {
-    const user = db.prepare('SELECT id, first_name, is_active FROM users WHERE email = ?').get(email);
+    const user = db.prepare('SELECT id, first_name, is_active, deleted_at FROM users WHERE email = ?').get(email);
 
-    if (!user || !user.is_active) {
+    if (!user || !user.is_active || user.deleted_at) {
       // Return success anyway — never reveal if email exists
       return res.json(SAFE_RESPONSE);
     }
+
+    // One email a minute per account: stops a double-click sending two, and stops anyone
+    // using this form to flood someone's inbox. The answer is the same either way.
+    const recent = db.prepare(`
+      SELECT 1 FROM password_reset_tokens WHERE user_id = ? AND created_at > datetime('now', '-60 seconds')
+    `).get(user.id);
+    if (recent) return res.json(SAFE_RESPONSE);
 
     // Invalidate any existing reset tokens for this user
     db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE user_id = ?').run(user.id);
@@ -141,8 +158,10 @@ router.post('/auth/forgot-password', requireCaptcha, [
       VALUES (?, ?, ?, ?)
     `).run(uuid(), user.id, tokenHash, expiresAt);
 
-    // Send the email with the RAW token (not the hash)
-    await sendPasswordReset(email, user.first_name, rawToken);
+    // Send the email with the RAW token (not the hash). Not awaited: sending takes a
+    // moment, and a request for an unknown address returns at once, so waiting here
+    // would let anyone tell which addresses have accounts by timing the response.
+    sendPasswordReset(email, user.first_name, rawToken).catch(err => console.error('[EMAIL] Password reset not sent:', err.message));
 
     res.json(SAFE_RESPONSE);
 
@@ -189,8 +208,8 @@ router.post('/auth/reset-password', authLimiter, [
       UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?
     `).run(password_hash, resetRecord.user_id);
 
-    // Mark token as used
-    db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE id = ?').run(resetRecord.id);
+    // Mark this link — and any other outstanding one for the account — as used
+    db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE user_id = ?').run(resetRecord.user_id);
 
     // Revoke ALL existing refresh tokens (security: new password = fresh start)
     db.prepare('UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ?').run(resetRecord.user_id);

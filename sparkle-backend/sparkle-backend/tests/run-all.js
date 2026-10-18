@@ -19,6 +19,7 @@ const SUITES = [
   ['job-photos',            'photos, disputes, cashouts, refunds'],
   ['tracking-and-account',  'location tracking, account deletion, retention'],
   ['mobile',                'phone apps: devices and push'],
+  ['password-reset',        'forgotten passwords, email links, honest failure when mail cannot be sent'],
   ['run',                   'sign-in, profile, messages, reviews, billing'],
 ];
 

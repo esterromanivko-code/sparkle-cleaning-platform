@@ -35,7 +35,7 @@ Then, still on Stripe:
 
 | | What | Why |
 | --- | --- | --- |
-| [ ] | **Check email works.** Railway variables `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`. Test with "Forgot password" on your own account. | Password resets and verification emails depend on it. |
+| [ ] | **Set up email, then test it.** Railway variables `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`, and `FRONTEND_URL` (the website address, so links in emails open the app). Then use **Forgot password?** on the sign-in page with your own account and open the link from the email. | The "Forgot password?" button exists, but until email is set up nobody can reset a password: the app says so and tells them to contact support. `https://noble-flow-sparkle.up.railway.app/api/config` shows `"email_enabled": true` once it is working. Welcome, verification, support-reply and document-approval emails use the same setup. |
 | [ ] | **Make the website repository private** (GitHub → the repo → Settings → Danger Zone → Change visibility). | It is public today. (The backend source is no longer served by the website, but there's no reason to publish it.) |
 | [ ] | **Railway → Settings → "Wait for CI".** | Stops a deploy when the checks fail. |
 | [ ] | **Cloudflare → Turnstile → your widget → add the hostname `localhost`.** | The phone apps run from `localhost`; without it signing in from the app fails its security check. |
