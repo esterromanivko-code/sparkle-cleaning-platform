@@ -9,6 +9,9 @@ const db     = require('../db');
 const { getStripe } = require('../lib/stripe');
 const { reverseJobEarnings, transaction } = require('../lib/payouts');
 const { notify } = require('../lib/notify');
+const { audit } = require('../lib/logger');
+const { issueResetToken, RESET_LINK_MINUTES } = require('../lib/passwordReset');
+const { appUrl } = require('../lib/email');
 const stripe = getStripe();
 
 const router = express.Router();
@@ -130,6 +133,32 @@ router.post('/users/:id/reinstate', requireAuth, requireRole('admin'), (req, res
 router.post('/users/:id/flag', requireAuth, requireRole('admin'), (req, res) => {
   db.prepare('UPDATE users SET is_flagged = 1 WHERE id = ?').run(req.params.id);
   res.json({ message: 'User flagged for review' });
+});
+
+// POST /api/admin/users/:id/reset-link — a one-time password reset link, for someone who
+// can't use the "Forgot password?" email (no access to that inbox, email not set up yet).
+// The admin hands the link over themselves. They never see or choose the password: whoever
+// opens the link picks it, and that signs the account out of every device.
+router.post('/users/:id/reset-link', requireAuth, requireRole('admin'), (req, res) => {
+  const target = db.prepare('SELECT id, role, is_active, deleted_at FROM users WHERE id = ?').get(req.params.id);
+  if (!target || target.deleted_at) return res.status(404).json({ error: 'User not found' });
+  // SECURITY: a link takes over an account, so admin accounts are off limits here (this
+  // also covers an admin resetting their own).
+  if (target.role === 'admin') return res.status(403).json({ error: 'Admin accounts cannot be reset through this screen' });
+  if (!target.is_active) return res.status(409).json({ error: 'This account is suspended. Reinstate it first, then make a reset link.' });
+
+  const { token } = issueResetToken(target.id);
+  // Who made a link for whom is recorded. The link itself never is.
+  audit('ADMIN_RESET_LINK', { adminId: req.user.id, userId: target.id });
+  notify(target.id, '🔑 Password reset started',
+    'Sparkle support made a password reset link for your account. If you didn\'t ask for this, contact support immediately.',
+    'password_reset_by_admin');
+
+  // The link is a password in all but name: keep it out of any cache.
+  res.set('Cache-Control', 'no-store').json({
+    reset_url: appUrl(`#reset=${token}`),
+    expires_in_minutes: RESET_LINK_MINUTES,
+  });
 });
 
 // GET /api/admin/disputes

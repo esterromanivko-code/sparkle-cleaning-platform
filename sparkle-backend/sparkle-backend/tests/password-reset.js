@@ -33,13 +33,14 @@ require('../server');
 
 const BASE = `http://127.0.0.1:${process.env.PORT}`;
 let ip = 0;
-async function api(p, { method = 'GET', body } = {}) {
+async function api(p, { method = 'GET', body, token } = {}) {
   const headers = { 'X-Forwarded-For': `10.33.${Math.floor(++ip / 250)}.${ip % 250}` };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(BASE + p, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   const text = await res.text();
   let json = null; try { json = JSON.parse(text); } catch {}
-  return { status: res.status, json, text };
+  return { status: res.status, json, text, headers: res.headers };
 }
 async function waitForServer() {
   for (let i = 0; i < 40; i++) { try { if ((await fetch(`${BASE}/health`)).ok) return; } catch {} await new Promise(r => setTimeout(r, 250)); }
@@ -151,6 +152,44 @@ async function main() {
   assert.equal((await api('/api/auth/reset-password', { method: 'POST', body: { token: fourth, new_password: NEW } })).status, 200);
   assert.equal((await api('/api/auth/verify-reset-token', { method: 'POST', body: { token: 'e'.repeat(64) } })).json.valid, false, 'another open link died with it');
 
+  // ── An admin can make a link for someone who can't get the email ───────────
+  const { signToken } = require('../middleware/auth');
+  db.prepare(`INSERT INTO users (id, role, first_name, last_name, email, password_hash, email_verified) VALUES ('boss', 'admin', 'Ada', 'Admin', 'boss@reset.test', ?, 1)`).run(hash);
+  const adminToken = signToken({ id: 'boss', role: 'admin' });
+  const clientToken = signToken({ id: 'pat', role: 'client' });
+  const makeLink = (id, token) => api(`/api/admin/users/${id}/reset-link`, { method: 'POST', body: {}, token });
+  const mailBefore = email.outbox.length;
+
+  assert.equal((await makeLink('pat')).status, 401, 'signed-out visitors cannot');
+  assert.equal((await makeLink('pat', clientToken)).status, 403, 'neither can a client or cleaner');
+  assert.equal((await makeLink('nobody', adminToken)).status, 404, 'unknown account');
+  assert.equal((await makeLink('gone', adminToken)).status, 404, 'a deleted account is gone');
+  assert.equal((await makeLink('boss', adminToken)).status, 403, 'a link would take over an account, so not an admin account (or your own)');
+  const suspended = await makeLink('banned', adminToken);
+  assert.equal(suspended.status, 409, 'a suspended account is reinstated first');
+  assert.match(suspended.json.error, /Reinstate/);
+
+  const made = await makeLink('pat', adminToken);
+  assert.equal(made.status, 200, made.text);
+  assert.match(made.headers.get('cache-control') || '', /no-store/, 'a link is kept out of caches');
+  assert.equal(made.json.expires_in_minutes, 60);
+  const adminLinkToken = (made.json.reset_url.match(/^https:\/\/sparkle\.test\/app#reset=([0-9a-f]{64})$/) || [])[1];
+  assert.ok(adminLinkToken, `a link to the app with the token in the #fragment: ${made.json.reset_url}`);
+  assert.equal(email.outbox.length, mailBefore, 'nothing is emailed: the admin hands the link over themselves');
+  assert.ok(!JSON.stringify(db.prepare('SELECT * FROM password_reset_tokens').all()).includes(adminLinkToken), 'only a hash is stored');
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM notifications WHERE user_id = 'pat' AND type = 'password_reset_by_admin'").get().n, 1, 'the account is told');
+
+  const again = await makeLink('pat', adminToken);
+  const adminLinkToken2 = again.json.reset_url.split('#reset=')[1];
+  assert.equal((await api('/api/auth/verify-reset-token', { method: 'POST', body: { token: adminLinkToken } })).json.valid, false, 'a newer link cancels the older one');
+
+  const signedIn = (await login('pat@reset.test', NEW)).json;
+  assert.equal((await api('/api/auth/reset-password', { method: 'POST', body: { token: adminLinkToken2, new_password: 'AdminMadeLink7!' } })).status, 200, 'the person opens it and chooses their own password');
+  assert.equal((await login('pat@reset.test', NEW)).status, 401);
+  assert.equal((await login('pat@reset.test', 'AdminMadeLink7!')).status, 200);
+  assert.equal((await api('/api/auth/refresh', { method: 'POST', body: { refresh_token: signedIn.refresh_token } })).status, 401, 'and every device is signed out');
+  assert.equal((await api('/api/auth/reset-password', { method: 'POST', body: { token: adminLinkToken2, new_password: 'AnotherPass22!' } })).status, 400, 'the link works once');
+
   // ── With no way to send mail, say so instead of pretending ─────────────────
   const outboxBefore = email.outbox.length;
   const mode = process.env.NODE_ENV;
@@ -177,7 +216,7 @@ async function main() {
   assert.equal(db.prepare("SELECT email_verified FROM users WHERE id = 'pat'").get().email_verified, 1);
   assert.equal((await api(`/api/verify-email/${verifyToken}`)).status, 400, 'a verification link works once');
 
-  console.log('Password reset tests passed: request, email link, new password, expiry, supersession, no-email honesty, verification link.');
+  console.log('Password reset tests passed: request, email link, new password, expiry, supersession, admin-made links, no-email honesty, verification link.');
 }
 
 main()

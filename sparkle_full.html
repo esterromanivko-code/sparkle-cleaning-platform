@@ -5905,7 +5905,8 @@ function renderAdminUsers() {
                  : '<span class="tag">Active</span>';
     const actions = !u.is_active
       ? `<button class="btn sm" onclick="adminReinstateUser('${u.id}')">Reinstate</button>`
-      : `<button class="btn sm" onclick="adminFlagUser('${u.id}')">Flag</button>
+      : `<button class="btn sm" onclick="adminResetPassword('${u.id}')">Reset password</button>
+         <button class="btn sm" onclick="adminFlagUser('${u.id}')">Flag</button>
          <button class="btn sm danger" onclick="adminBanUser('${u.id}')">Ban</button>`;
     return `<tr>
       <td><div style="font-weight:500">${escapeHtml(name)}</div>
@@ -5974,6 +5975,92 @@ async function adminFlagUser(id) {
     if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
     showToast(err.message, 'error');
   }
+}
+
+// For someone who can't use the emailed "Forgot password?" link (no access to that inbox,
+// or email isn't set up yet). The admin makes a one-time link and hands it over; they never
+// see or choose the password. The name comes from loaded state, never through onclick.
+async function adminResetPassword(id) {
+  const u = adminUsersState.users.find(x => x.id === id);
+  const name = u ? `${u.first_name || ''} ${u.last_name || ''}`.trim() : '';
+  showConfirm({
+    title: 'Make a password reset link?',
+    body: `${name || 'This person'} gets a one-time link that lets whoever opens it choose a new password. ` +
+          `Only do this once you're sure you're talking to ${name || 'them'}. They'll be notified in the app, ` +
+          `and every device they're signed in on is signed out when the password changes.`,
+    confirmLabel: 'Make link',
+    onConfirm: async () => {
+      try {
+        const data = await SparkleAPI.createResetLink(id);
+        showResetLinkDialog(name, data.reset_url, data.expires_in_minutes);
+      } catch (err) {
+        if (err.message === 'SESSION_EXPIRED') { showToast('Session expired — please sign in again.', 'error'); logout(); return; }
+        showToast(err.message, 'error');
+      }
+    },
+  });
+}
+
+function showResetLinkDialog(name, url, minutes) {
+  document.getElementById('reset-link-modal')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'reset-link-modal';
+  overlay.className = 'modal-overlay show';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', 'reset-link-title');
+
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+
+  const title = document.createElement('div');
+  title.className = 'modal-title';
+  title.id = 'reset-link-title';
+  title.textContent = `Reset link for ${name || 'this person'}`;
+
+  const sub = document.createElement('div');
+  sub.className = 'modal-sub';
+  sub.textContent = `Send this to them yourself, by text or on a call. It works once and expires in ${minutes || 60} minutes. ` +
+                    `Anyone who has it can take over the account, so don't post it anywhere else.`;
+
+  const field = document.createElement('input');
+  field.className = 'inp';
+  field.readOnly = true;
+  field.value = url;
+  field.setAttribute('aria-label', 'Password reset link');
+  field.style.marginBottom = '1rem';
+  field.onfocus = () => field.select();
+
+  const actions = document.createElement('div');
+  actions.className = 'modal-actions';
+
+  const close = () => overlay.remove();
+  const doneBtn = document.createElement('button');
+  doneBtn.className = 'btn';
+  doneBtn.textContent = 'Done';
+  doneBtn.onclick = close;
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'btn primary';
+  copyBtn.textContent = 'Copy link';
+  copyBtn.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // No clipboard permission (or an older browser): select it so they can copy by hand.
+      field.focus(); field.select();
+      try { document.execCommand('copy'); } catch { /* selected for manual copy */ }
+    }
+    showToast('Link copied.', 'success');
+  };
+
+  actions.append(doneBtn, copyBtn);
+  modal.append(title, sub, field, actions);
+  overlay.appendChild(modal);
+  overlay.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  document.body.appendChild(overlay);
+  copyBtn.focus();
 }
 
 // ── Disputes ─────────────────────────────────────────────────────────────────

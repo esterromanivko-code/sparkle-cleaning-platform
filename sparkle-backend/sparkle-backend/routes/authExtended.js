@@ -16,6 +16,7 @@ const { signToken, requireAuth } = require('../middleware/auth');
 const { sendPasswordReset, send2FASetupEmail, send2FACode, emailEnabled } = require('../lib/email');
 const { handleSingleUpload, getFileUrl, UPLOAD_DIR } = require('../lib/uploads');
 const { createRefreshToken, verifyRefreshToken, revokeRefreshToken, revokeAllUserTokens } = require('../lib/tokens');
+const { issueResetToken } = require('../lib/passwordReset');
 const { requireCaptcha } = require('../middleware/captcha');
 const { authLimiter } = require('../middleware/security');
 
@@ -145,18 +146,8 @@ router.post('/auth/forgot-password', requireCaptcha, [
     `).get(user.id);
     if (recent) return res.json(SAFE_RESPONSE);
 
-    // Invalidate any existing reset tokens for this user
-    db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE user_id = ?').run(user.id);
-
-    // Generate a secure random token
-    const rawToken  = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
-
-    db.prepare(`
-      INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at)
-      VALUES (?, ?, ?, ?)
-    `).run(uuid(), user.id, tokenHash, expiresAt);
+    // A fresh link; any earlier one for this account stops working.
+    const { token: rawToken } = issueResetToken(user.id);
 
     // Send the email with the RAW token (not the hash). Not awaited: sending takes a
     // moment, and a request for an unknown address returns at once, so waiting here
