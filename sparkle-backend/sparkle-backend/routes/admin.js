@@ -12,6 +12,8 @@ const { notify } = require('../lib/notify');
 const { audit } = require('../lib/logger');
 const { issueResetToken, RESET_LINK_MINUTES } = require('../lib/passwordReset');
 const { appUrl } = require('../lib/email');
+const { setupChecks } = require('../lib/setupStatus');
+const { pushToUser, pushEnabled } = require('../lib/push');
 const stripe = getStripe();
 
 const router = express.Router();
@@ -159,6 +161,31 @@ router.post('/users/:id/reset-link', requireAuth, requireRole('admin'), (req, re
     reset_url: appUrl(`#reset=${token}`),
     expires_in_minutes: RESET_LINK_MINUTES,
   });
+});
+
+// GET /api/admin/setup-status — is Stripe, Firebase, email etc. connected properly?
+// Only ever says whether things are set and what the other side answered, never the keys.
+router.get('/setup-status', requireAuth, requireRole('admin'), async (req, res) => {
+  const host = req.get('host') || '';
+  const scheme = /^(localhost|127\.0\.0\.1)(:|$)/.test(host) ? 'http' : 'https';
+  const checks = await setupChecks({ stripe: getStripe(), webhookUrl: `${scheme}://${host}/api/payments/webhook` });
+  res.set('Cache-Control', 'no-store').json({ checks });
+});
+
+// POST /api/admin/push-test — sends a test notification to the admin's own phone(s), and
+// says why when it doesn't arrive (a real push failure is otherwise only in the server log).
+router.post('/push-test', requireAuth, requireRole('admin'), async (req, res) => {
+  if (!pushEnabled()) {
+    return res.status(409).json({ error: "Firebase isn't connected yet. Add FIREBASE_SERVICE_ACCOUNT_JSON in Railway → Variables first." });
+  }
+  const r = await pushToUser(req.user.id, { title: 'Sparkle test', body: 'Phone notifications are working. 🎉', type: 'push_test' });
+  if (r.error) return res.status(502).json({ error: `Firebase's credentials were refused (${r.error}).` });
+  if (!r.devices) {
+    return res.status(409).json({ error: 'No phone is signed in as you yet. Install the Sparkle app, sign in as this admin, and allow notifications, then try again.' });
+  }
+  const reasons = Array.from(new Set(r.failed)).join('; ');
+  if (!r.sent) return res.status(502).json({ error: `Firebase didn't deliver it: ${reasons}.` });
+  res.json({ message: `Sent to ${r.sent} of ${r.devices} phone${r.devices === 1 ? '' : 's'}. It should buzz in a few seconds.` });
 });
 
 // GET /api/admin/disputes

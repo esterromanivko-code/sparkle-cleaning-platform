@@ -966,6 +966,10 @@ window.SparkleAPI = (function () {
   const banUser       = (id, reason) => adminPost(`/api/admin/users/${encodeURIComponent(id)}/ban`, { reason }, 'ban user');
   const reinstateUser = (id)         => adminPost(`/api/admin/users/${encodeURIComponent(id)}/reinstate`, {}, 'reinstate user');
   const flagUser      = (id)         => adminPost(`/api/admin/users/${encodeURIComponent(id)}/flag`, {}, 'flag user');
+  /** Is Stripe, Firebase, email etc. connected properly? (never contains keys) */
+  const getSetupStatus = ()          => adminGet('/api/admin/setup-status', 'setup check');
+  /** Sends a test notification to the admin's own phone(s). */
+  const sendTestPush   = ()          => adminPost('/api/admin/push-test', {}, 'send the test notification');
   /** A one-time password reset link for someone who can't use the emailed one. */
   const createResetLink = (id)       => adminPost(`/api/admin/users/${encodeURIComponent(id)}/reset-link`, {}, 'create reset link');
 
@@ -1142,6 +1146,8 @@ window.SparkleAPI = (function () {
     getAdminUsers,
     banUser,
     createResetLink,
+    getSetupStatus,
+    sendTestPush,
     reinstateUser,
     flagUser,
     getDisputes,

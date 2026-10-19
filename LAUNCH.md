@@ -15,16 +15,23 @@ Last updated 2026-10-15.
       *Right now the server reports `payments_mode: "live"` with no publishable key: nobody can add a
       card, and anything that did go through would charge a real one.*
       Check: `https://noble-flow-sparkle.up.railway.app/api/config` should show `"payments_mode":"test"`
-      and a `pk_test_…` key.
+      and a `pk_test_…` key. Better still, sign in as admin → **Platform overview → Setup check**: it
+      says in plain words whether Stripe accepted the key, whether test or live, and whether the
+      publishable key matches (it never shows the keys themselves).
+      *Railway only picks up changed variables when it redeploys.*
 
 Then, still on Stripe:
 
 - [ ] **[you] Turn on Connect** (Stripe → Connect → Get started: a marketplace, Express accounts), or
       cleaners can't set up payouts.
-- [ ] **[you] Add the webhook** (optional, makes updates arrive sooner): Stripe → Developers → Webhooks →
-      `https://noble-flow-sparkle.up.railway.app/api/payments/webhook`, then its signing secret into
-      `STRIPE_WEBHOOK_SECRET`. A second one for "connected accounts" (`account.updated`) goes in
-      `STRIPE_CONNECT_WEBHOOK_SECRET`.
+- [ ] **[you] Add the webhooks** (optional, makes updates arrive sooner; payments work without them).
+      Stripe → Developers → Webhooks → Add endpoint, URL `https://noble-flow-sparkle.up.railway.app/api/payments/webhook`:
+      1. *Events on your account* — `payment_intent.succeeded`, `payment_intent.amount_capturable_updated`,
+         `payment_intent.processing`, `payment_intent.payment_failed`, `payment_intent.canceled`.
+         Open it → **Signing secret → Reveal** (`whsec_…`) → Railway `STRIPE_WEBHOOK_SECRET`.
+      2. A second endpoint, same URL, *Events on connected accounts* — `account.updated`.
+         Its signing secret → Railway `STRIPE_CONNECT_WEBHOOK_SECRET`.
+      The Setup check shows each one as Working once Stripe and Railway agree.
 - [ ] **[both] One full test booking** with Stripe's test card `4242 4242 4242 4242`: post a job, quote it
       from a cleaner account, book it, complete it with photos, see the charge, set up a test payout
       account, cash out. **This is the last unproven part of the money flow.**
@@ -39,7 +46,7 @@ Then, still on Stripe:
 | [ ] | **Make the website repository private** (GitHub → the repo → Settings → Danger Zone → Change visibility). | It is public today. (The backend source is no longer served by the website, but there's no reason to publish it.) |
 | [ ] | **Railway → Settings → "Wait for CI".** | Stops a deploy when the checks fail. |
 | [ ] | **Cloudflare → Turnstile → your widget → add the hostname `localhost`.** | The phone apps run from `localhost`; without it signing in from the app fails its security check. |
-| [ ] | **Firebase project** → service-account JSON into Railway as `FIREBASE_SERVICE_ACCOUNT_JSON`; `google-services.json` and `GoogleService-Info.plist` for the apps; an APNs key uploaded to Firebase. | Push notifications. Until then they simply don't buzz. |
+| [ ] | **Firebase project** (free). Android, today: create the project, add an Android app `com.sparklecleaning.app`, paste its `google-services.json` into a GitHub secret `GOOGLE_SERVICES_JSON` (phone-app repo), and the service-account key into Railway as `FIREBASE_SERVICE_ACCOUNT_JSON`. Step by step in the phone app's README (Firebase section). Then **Admin → Platform overview → Setup check → Send me a test notification**. iPhone later: `GoogleService-Info.plist` plus an APNs key (needs the Apple account). | Push notifications. Until then they simply don't buzz (they still appear inside the app). The Android GitHub builds had no way to include `google-services.json` before; they do now, and the Play Store build refuses to run without it. |
 | [ ] | **D-U-N-S number** (free, 1–2 weeks). | Apple and Google both need it to list the app under a company name. Start now. |
 | [ ] | **Apple Developer Program** ($99/yr) and **Google Play Console** ($25 once), both as your business. | Google: register as an organisation, or you must run a 14-day test with 12 people first. |
 | [ ] | **Codemagic** (free tier, personal account) for the iPhone build. | Apple needs a Mac. |

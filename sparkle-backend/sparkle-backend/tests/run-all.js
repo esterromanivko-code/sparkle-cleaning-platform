@@ -20,6 +20,7 @@ const SUITES = [
   ['tracking-and-account',  'location tracking, account deletion, retention'],
   ['mobile',                'phone apps: devices and push'],
   ['password-reset',        'forgotten passwords, email links, honest failure when mail cannot be sent'],
+  ['setup-status',          'admin setup check, test notification, no secrets in any answer'],
   ['run',                   'sign-in, profile, messages, reviews, billing'],
 ];
 

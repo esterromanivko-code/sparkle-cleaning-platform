@@ -11,6 +11,7 @@
     "test:smoke": "node --experimental-sqlite tests/run.js",
     "test:routes": "node tests/route-guard.js",
     "test:reset": "node --experimental-sqlite tests/password-reset.js",
+    "test:setup": "node --experimental-sqlite tests/setup-status.js",
     "test:leaks": "node --experimental-sqlite tests/leak-crawl.js",
     "test:photos": "node --experimental-sqlite tests/job-photos.js",
     "test:tracking": "node --experimental-sqlite tests/tracking-and-account.js",

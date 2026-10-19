@@ -16,21 +16,24 @@ const db = require('../db');
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 
-let _account = null;      // parsed credentials, or false when unusable
+let _account = false;     // parsed credentials, or false when unset or unusable
+let _parsedFrom = null;   // the variable's text that _account came from (so a change is noticed)
+let _unreadable = null;   // why the variable is set but can't be used
 let _token = null;        // { value, expiresAt }
 
 function serviceAccount() {
-  if (_account !== null) return _account;
   const raw = String(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim();
-  if (!raw) return (_account = false);
+  if (raw === _parsedFrom) return _account;
+  _parsedFrom = raw; _token = null; _unreadable = null; _account = false;
+  if (!raw) return _account;
   try {
     const parsed = JSON.parse(raw);
     if (!parsed.client_email || !parsed.private_key || !parsed.project_id) throw new Error('client_email, private_key and project_id are required');
     parsed.private_key = parsed.private_key.replace(/\\n/g, '\n');   // survives being pasted into a dashboard
     _account = parsed;
   } catch (err) {
+    _unreadable = err.message;
     console.error('[PUSH] FIREBASE_SERVICE_ACCOUNT_JSON could not be read:', err.message);
-    _account = false;
   }
   return _account;
 }
@@ -47,9 +50,7 @@ function signedAssertion(account) {
   return `${body}.${crypto.sign('RSA-SHA256', Buffer.from(body), account.private_key).toString('base64url')}`;
 }
 
-async function accessToken() {
-  if (_token && _token.expiresAt > Date.now() + 60_000) return _token.value;
-  const account = serviceAccount();
+async function requestToken(account) {
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -60,8 +61,36 @@ async function accessToken() {
   });
   if (!res.ok) throw new Error(`Google refused the push credentials (${res.status})`);
   const data = await res.json();
-  _token = { value: data.access_token, expiresAt: Date.now() + (data.expires_in || 3600) * 1000 };
+  return { value: data.access_token, expiresAt: Date.now() + (data.expires_in || 3600) * 1000 };
+}
+
+async function accessToken() {
+  if (_token && _token.expiresAt > Date.now() + 60_000) return _token.value;
+  _token = await requestToken(serviceAccount());
   return _token.value;
+}
+
+// Asks Google whether the credentials really work, instead of only whether they parse.
+// Never throws; never returns the credentials.
+async function checkCredentials() {
+  const account = serviceAccount();
+  if (!account) return { configured: false, unreadable: _unreadable };
+  try {
+    await requestToken(account);
+    return { configured: true, ok: true, project_id: account.project_id };
+  } catch (err) {
+    return { configured: true, ok: false, project_id: account.project_id, error: err.message };
+  }
+}
+
+// What went wrong with one message, in words an admin can act on.
+function failureReason(httpStatus, status) {
+  if (httpStatus === 404 || status === 'UNREGISTERED') return "that phone's app was uninstalled or reinstalled, so it was forgotten";
+  if (status === 'INVALID_ARGUMENT') return "the phone's notification address wasn't valid, so it was forgotten";
+  if (httpStatus === 401 || httpStatus === 403 || status === 'PERMISSION_DENIED' || status === 'UNAUTHENTICATED') {
+    return 'Firebase refused it. Check that "Firebase Cloud Messaging API (V1)" is enabled for the project and that the key is from the same project as the app';
+  }
+  return `Firebase answered ${httpStatus}${status ? ` (${status})` : ''}`;
 }
 
 // Sends to every phone this person is signed in on. Never throws: a notification
@@ -69,18 +98,19 @@ async function accessToken() {
 async function pushToUser(userId, { title, body, type, jobId } = {}) {
   if (!pushEnabled()) return { sent: 0, skipped: true };
   const devices = db.prepare('SELECT token FROM device_tokens WHERE user_id = ?').all(userId);
-  if (!devices.length) return { sent: 0 };
+  if (!devices.length) return { sent: 0, devices: 0 };
 
   let auth;
   try {
     auth = await accessToken();
   } catch (err) {
     console.error('[PUSH]', err.message);
-    return { sent: 0, error: err.message };
+    return { sent: 0, devices: devices.length, error: err.message };
   }
 
   const project = serviceAccount().project_id;
   let sent = 0;
+  const failed = [];   // why each message that didn't go, for the admin's "send a test" button
   for (const device of devices) {
     const message = {
       token: device.token,
@@ -101,6 +131,7 @@ async function pushToUser(userId, { title, body, type, jobId } = {}) {
         continue;
       }
       const status = (await res.json().catch(() => ({})))?.error?.status;
+      failed.push(failureReason(res.status, status));
       // The app was uninstalled, or the token was replaced: stop sending to it.
       if (res.status === 404 || status === 'UNREGISTERED' || status === 'INVALID_ARGUMENT') {
         db.prepare('DELETE FROM device_tokens WHERE token = ?').run(device.token);
@@ -108,10 +139,11 @@ async function pushToUser(userId, { title, body, type, jobId } = {}) {
         console.error('[PUSH] Firebase refused a message:', res.status, status || '');
       }
     } catch (err) {
+      failed.push("Sparkle couldn't reach Firebase");
       console.error('[PUSH] Could not reach Firebase:', err.message);
     }
   }
-  return { sent };
+  return { sent, devices: devices.length, failed };
 }
 
-module.exports = { pushToUser, pushEnabled };
+module.exports = { pushToUser, pushEnabled, checkCredentials };
