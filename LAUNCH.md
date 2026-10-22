@@ -10,7 +10,7 @@ Checked against the code on 2026-10-20 by a nine-area review (each finding re-ch
 3. Have me remove the invented earnings figures, the 'zero cut' wording and the fake phone number from the landing page and sign-up.
 4. Create your admin account with the one-time token, then delete the token and use a strong password.
 5. Connect email in Railway (SMTP, EMAIL_FROM, FRONTEND_URL, DNS records) and test Forgot password.
-6. Add the live site to the Turnstile hostname list and do one real cleaner sign-up on the live site.
+6. ~~Add the live site to the Turnstile hostname list~~ (done). Still to do: one real cleaner sign-up on the live site to prove the bot check passes.
 7. Make the website repo private and set an uptime monitor on /health.
 8. Decide what clients see for now (waitlist recommended) and send Terms and Privacy to a lawyer.
 
@@ -45,7 +45,7 @@ Checked against the code on 2026-10-20 by a nine-area review (each finding re-ch
 - [ ] **Create your real admin account (must).** Without it you cannot see support messages, documents, disputes or help locked-out people. Set a secret `ADMIN_BOOTSTRAP_TOKEN` in Railway, have me send the one request that makes the account, then delete the token from Railway. Use a long, unique password in a password manager, and consider a second admin so one lost password does not lock you out. This only works after the redeploy.
 - [ ] **Choose a real contact email on a domain you own (must).** The landing page and every email use hello@sparkle.com, which you probably do not own, so cleaners' messages could reach a stranger or never arrive. Pick an address you read, then I set it on the site and as `EMAIL_FROM`.
 - [ ] **Connect email in Railway.** Add `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` and `FRONTEND_URL` from a proper email-sending service (not a personal Gmail). Add the DNS records the service gives you (SPF/DKIM) so mail does not land in spam. Until then nobody can reset a password by email. Test "Forgot password" on your own account.
-- [ ] **Allow the live website in Cloudflare Turnstile.** Sign-up needs the bot check, so the live site's address must be on the Turnstile hostname list (the list currently has "localhost" on your list). Afterwards do one real cleaner sign-up on the live site before announcing.
+- [x] **Allow the live website in Cloudflare Turnstile (done: Ester added the site to the hostname list).** Sign-up needs the bot check, so the live site's address must be on the Turnstile hostname list (the list currently has "localhost" on your list). Afterwards do one real cleaner sign-up on the live site before announcing.
 - [ ] **Make the website GitHub repo private.** It is public today, exposing your source code and security notes.
 - [ ] **Pick a second place for backups and prove one opens.** Backups sit on the same disk as the database, so losing the disk loses both, and uploaded documents are not backed up at all. Use Railway's Volume backups if your plan has them (or ask me for a cloud copy), then download one backup and check it opens.
 - [ ] **Set up a free uptime monitor on `/health`.** The server stops retrying after 3 crashes and nothing tells you it is down. Have it email or text you.
