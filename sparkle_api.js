@@ -253,12 +253,20 @@ window.SparkleAPI = (function () {
     if (resolve) resolve(token || null);
   }
 
-  /** Public runtime config from the backend, fetched at most once. */
+  // The server's /api/config always includes payments_mode; an empty object means no answer.
+  const hasRealConfig = cfg => !!cfg && typeof cfg === 'object' && 'payments_mode' in cfg;
+
+  /** Public runtime config from the backend, fetched until a real answer arrives. */
   function getPublicConfig() {
     if (!_configPromise) {
-      _configPromise = fetch(`${BASE}/api/config`)
+      const attempt = fetch(`${BASE}/api/config`)
         .then(r => (r.ok ? r.json() : {}))
         .catch(() => ({}));            // offline or old backend — behave as unconfigured
+      _configPromise = attempt;
+      // Only a real answer is remembered. A failure (a slow or dropped connection while the
+      // app was starting) used to be kept for the whole session, so the app never learned a
+      // bot check was required and sent none: "CAPTCHA token required".
+      attempt.then(cfg => { if (!hasRealConfig(cfg) && _configPromise === attempt) _configPromise = null; });
     }
     return _configPromise;
   }
@@ -289,7 +297,11 @@ window.SparkleAPI = (function () {
   async function getCaptchaToken() {
     let siteKey = null;
     try {
-      ({ turnstile_site_key: siteKey } = await getPublicConfig());
+      let cfg = await getPublicConfig();
+      // No answer yet (slow start-up, brief signal loss): ask once more before deciding
+      // that no bot check is needed, because sending no token to a server that wants one fails.
+      if (!hasRealConfig(cfg)) cfg = await getPublicConfig();
+      siteKey = cfg && cfg.turnstile_site_key;
     } catch { return null; }
     if (!siteKey) return null;                       // CAPTCHA switched off
     if (typeof document === 'undefined') return null;
